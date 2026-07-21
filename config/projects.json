@@ -1,0 +1,112 @@
+{
+  "projects": [
+    {
+      "id": "nancy",
+      "name": "Nancy",
+      "locale": "es-MX",
+      "currency": "MXN",
+      "managerName": "Maya Nancy",
+      "managerHandle": "@Maya_Nancy",
+      "managerAvatarPath": "data/media/avatars/manager_nancy.jpg",
+      "wallpaperPath": "data/media/wallpapers/nancy.jpg",
+      "conditionsImagePath": "data/media/conditions/nancy_conditions.png",
+      "theme": {
+        "incomingBubble": "#FFFFFF",
+        "outgoingBubble": "#E7FCC4",
+        "outgoingBubbleAlt": "#FFF4C2",
+        "accentColor": "#34C759",
+        "headerBg": "#F7F7F7",
+        "statusBarStyle": "dark"
+      },
+      "depositMessageTemplate": "💳 Debe pagar a esta dirección: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
+      "completionMessageTemplate": "El trabajo está terminado, con {{deposit}} pesos ganamos {{profitFinal}} pesos 📈💰\nEnvíeme el número de su tarjeta para enviarle la ganancia💸",
+      "payoutMessageTemplate": "Te transfirió dinero 🩵\nPuedes comprobar tus beneficios 💸",
+      "twoPhaseReview": true,
+      "phaseDelayMinutes": 90
+    },
+    {
+      "id": "maya",
+      "name": "Maya",
+      "locale": "es-MX",
+      "currency": "MXN",
+      "managerName": "Maya Veronica",
+      "managerHandle": "@Maya_V",
+      "wallpaperPath": "data/media/wallpapers/maya.jpg",
+      "theme": {
+        "incomingBubble": "#FFFFFF",
+        "outgoingBubble": "#D4F0FD",
+        "accentColor": "#007AFF",
+        "headerBg": "#F7F7F7",
+        "statusBarStyle": "dark"
+      },
+      "depositMessageTemplate": "💳 Debe pagar a esta dirección: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
+      "completionMessageTemplate": "El trabajo está terminado, con {{deposit}} pesos ganamos {{profitFinal}} pesos 📈💰",
+      "payoutMessageTemplate": "Te transfirió dinero 🩵",
+      "twoPhaseReview": true,
+      "phaseDelayMinutes": 90
+    },
+    {
+      "id": "luna",
+      "name": "Luna",
+      "locale": "es-MX",
+      "currency": "MXN",
+      "managerName": "Luna Martinez",
+      "managerHandle": "@Luna_M",
+      "wallpaperPath": "data/media/wallpapers/luna.jpg",
+      "theme": {
+        "incomingBubble": "#FFFFFF",
+        "outgoingBubble": "#F5E6FF",
+        "accentColor": "#AF52DE",
+        "headerBg": "#F7F7F7",
+        "statusBarStyle": "dark"
+      },
+      "depositMessageTemplate": "💳 Debe pagar a esta dirección: {{clabe}}\nEnvíame captura después del pago 💙",
+      "completionMessageTemplate": "Trabajo terminado: {{deposit}} → {{profitFinal}} pesos 📈",
+      "payoutMessageTemplate": "Transferencia enviada 🩵",
+      "twoPhaseReview": false,
+      "phaseDelayMinutes": 90
+    },
+    {
+      "id": "sofia",
+      "name": "Sofia",
+      "locale": "es-MX",
+      "currency": "MXN",
+      "managerName": "Sofia Reyes",
+      "managerHandle": "@Sofia_R",
+      "wallpaperPath": "data/media/wallpapers/sofia.jpg",
+      "theme": {
+        "incomingBubble": "#FFFFFF",
+        "outgoingBubble": "#FFE8E8",
+        "accentColor": "#FF3B30",
+        "headerBg": "#F7F7F7",
+        "statusBarStyle": "dark"
+      },
+      "depositMessageTemplate": "💳 Paga aquí: {{clabe}}\nEnvía captura 💙",
+      "completionMessageTemplate": "Listo: ganamos {{profitFinal}} pesos 📈💰",
+      "payoutMessageTemplate": "Dinero transferido 🩵",
+      "twoPhaseReview": false,
+      "phaseDelayMinutes": 90
+    },
+    {
+      "id": "valeria",
+      "name": "Valeria",
+      "locale": "es-MX",
+      "currency": "MXN",
+      "managerName": "Valeria Cruz",
+      "managerHandle": "@Valeria_C",
+      "wallpaperPath": "data/media/wallpapers/valeria.jpg",
+      "theme": {
+        "incomingBubble": "#FFFFFF",
+        "outgoingBubble": "#FFF3E0",
+        "accentColor": "#FF9500",
+        "headerBg": "#F7F7F7",
+        "statusBarStyle": "dark"
+      },
+      "depositMessageTemplate": "💳 Dirección de pago: {{clabe}}\nCaptura por favor 💙",
+      "completionMessageTemplate": "Con {{deposit}} pesos ganamos {{profitFinal}} 📈",
+      "payoutMessageTemplate": "Transferencia lista 🩵",
+      "twoPhaseReview": false,
+      "phaseDelayMinutes": 90
+    }
+  ]
+}

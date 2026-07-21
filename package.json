@@ -1,0 +1,35 @@
+{
+  "name": "bot-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "next build",
+    "start": "node scripts/start.mjs",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/playwright-install.mjs",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f app"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "drizzle-orm": "^0.45.2",
+    "next": "^15.3.3",
+    "openai": "^6.46.0",
+    "playwright": "^1.61.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,39 @@
+# Dependencies & build
+node_modules
+npm-debug.log*
+.next
+out
+build
+
+# Git / IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+
+# Env & secrets (compose uses env_file)
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Local artifacts
+data/app.db
+data/app.db-*
+data/logs
+data/runtime
+data/reviews
+data/renders
+public/renders/*.png
+public/renders/*.html
+
+# Docs / misc
+*.md
+!README.md
+agent-transcripts
+terminals
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,43 @@
+{
+  "stages": {
+    "greeting": [
+      { "role": "manager", "type": "text", "content": "Hola\nTe lo contaré todo", "delayMinutes": 1 }
+    ],
+    "trust_building": [
+      { "role": "manager", "type": "text", "content": "Te explico cómo funciona nuestro sistema de inversión paso a paso 📊", "delayMinutes": 2 },
+      { "role": "manager", "type": "text", "content": "Primero analizamos el mercado, luego hacemos las operaciones y al final repartimos las ganancias 💰", "delayMinutes": 3 }
+    ],
+    "conditions": [
+      { "role": "manager", "type": "conditions", "content": "conditions", "delayMinutes": 5 }
+    ],
+    "deposit": [
+      { "role": "manager", "type": "text", "content": "{{depositMessage}}", "delayMinutes": 8 }
+    ],
+    "bet_1": [
+      { "role": "manager", "type": "bet", "content": "bet_1", "delayMinutes": 15 }
+    ],
+    "bet_2": [
+      { "role": "manager", "type": "bet", "content": "bet_2", "delayMinutes": 25 }
+    ],
+    "bet_3": [
+      { "role": "manager", "type": "bet", "content": "bet_3", "delayMinutes": 35 }
+    ],
+    "completion": [
+      { "role": "manager", "type": "text", "content": "{{completionMessage}}", "delayMinutes": 45 }
+    ],
+    "payout": [
+      { "role": "manager", "type": "receipt", "content": "receipt", "delayMinutes": 55 },
+      { "role": "manager", "type": "text", "content": "{{payoutMessage}}", "delayMinutes": 56 }
+    ],
+    "gratitude": []
+  },
+  "clientReplies": {
+    "trust_building": ["doubt"],
+    "deposit": ["Sí, ahora lo entiendo. ¿Seguro que saldrá bien?", "Me parece bien. Tienes muy buenas condiciones."],
+    "deposit_captura": [{ "type": "captura", "content": "payment_proof", "delayMinutes": 10 }],
+    "bet_1": ["Estos resultados son geniales", "No me lo puedo creer"],
+    "completion": ["Tan pronto???", "No esperaba tanto dinero"],
+    "payout": ["gratitude"],
+    "gratitude": ["gratitude"]
+  }
+}

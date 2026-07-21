@@ -1,0 +1,27 @@
+{
+  "defaultLocale": "es-MX",
+  "locales": [
+    {
+      "code": "es-MX",
+      "name": "Español (México)",
+      "timezone": "America/Mexico_City",
+      "currency": "MXN",
+      "dateFormat": "d 'de' MMMM yyyy",
+      "timeFormat": "HH:mm"
+    }
+  ],
+  "clientNamePools": {
+    "es-MX": [
+      "Manuel Pablo Sevilla",
+      "Carlos Eduardo Ruiz",
+      "Jorge Luis Mendoza",
+      "Ricardo Antonio Vega",
+      "Fernando Javier Ortiz",
+      "Alejandro Martín Torres",
+      "Diego Armando Herrera",
+      "Luis Alberto Campos",
+      "Miguel Ángel Ríos",
+      "Roberto Carlos Salinas"
+    ]
+  }
+}

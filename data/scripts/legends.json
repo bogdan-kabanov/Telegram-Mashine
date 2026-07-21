@@ -1,0 +1,43 @@
+[
+  {
+    "id": "injury_work",
+    "title": "Lesión en el trabajo",
+    "locale": "es-MX",
+    "openingPhrase": "Necesito tu ayuda",
+    "problem": "Me lesioné en el trabajo. No tengo dinero para pagar el tratamiento",
+    "motivation": "Necesito dinero para el tratamiento, quiero empezar a trabajar con vosotros",
+    "photoAfterProblemIndex": 0,
+    "gratitudePhrases": [
+      "Este dinero será suficiente para cubrir íntegramente los gastos del tratamiento y los medicamentos",
+      "Me has ayudado mucho",
+      "Les estoy muy agradecido",
+      "Estaré encantado de volver a trabajar con ustedes",
+      "Gracias de nuevo"
+    ],
+    "doubtPhrases": [
+      "No lo entiendo",
+      "Puede explicarlo con palabras sencillas?",
+      "Sí, ahora lo entiendo. ¿Seguro que saldrá bien?",
+      "Me parece bien. Tienes muy buenas condiciones."
+    ]
+  },
+  {
+    "id": "medical_debt",
+    "title": "Deuda médica",
+    "locale": "es-MX",
+    "openingPhrase": "Necesito tu ayuda",
+    "problem": "Tengo deudas médicas y no puedo pagarlas",
+    "motivation": "Busco una forma de ganar dinero para saldar mis deudas",
+    "photoAfterProblemIndex": 0,
+    "gratitudePhrases": [
+      "No me puedo creer que todo haya salido bien",
+      "No esperaba tanto dinero",
+      "Sí, ya ha llegado todo"
+    ],
+    "doubtPhrases": [
+      "No entiendo cómo lo haces",
+      "Estos resultados son geniales",
+      "Tan pronto???"
+    ]
+  }
+]

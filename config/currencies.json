@@ -1,0 +1,16 @@
+{
+  "default": "MXN",
+  "currencies": [
+    {
+      "code": "MXN",
+      "symbol": "$",
+      "name": "Peso Mexicano",
+      "decimals": 2,
+      "format": {
+        "thousandSeparator": ",",
+        "decimalSeparator": ".",
+        "symbolPosition": "before"
+      }
+    }
+  ]
+}

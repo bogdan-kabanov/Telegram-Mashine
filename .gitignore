@@ -1,0 +1,53 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# next.js
+/.next/
+/out/
+/build
+
+# env & secrets
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# debug / IDE
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cursor/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db
+tmp-screen.png
+*.log
+
+# SQLite / runtime
+/data/app.db
+/data/app.db-*
+/data/logs/
+/data/runtime/
+/data/reviews/
+/data/renders/
+/data/history/combinations.json
+
+# generated media
+/data/media/capturas/
+/data/media/receipts/
+/public/renders/*.png
+/public/renders/*.html
+!/public/renders/.gitkeep
+
+# keep empty media dirs
+!/data/media/**/.gitkeep

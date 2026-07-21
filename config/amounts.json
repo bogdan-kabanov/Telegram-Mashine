@@ -1,0 +1,23 @@
+{
+  "packs": [
+    { "id": "pack_01", "deposit": 700, "profit1": 19768, "profit2": 37581, "profitFinal": 78221, "currency": "MXN" },
+    { "id": "pack_02", "deposit": 738, "profit1": 19768, "profit2": 37581, "profitFinal": 78221, "currency": "MXN" },
+    { "id": "pack_03", "deposit": 850, "profit1": 22450, "profit2": 41200, "profitFinal": 85600, "currency": "MXN" },
+    { "id": "pack_04", "deposit": 920, "profit1": 24100, "profit2": 43800, "profitFinal": 91200, "currency": "MXN" },
+    { "id": "pack_05", "deposit": 1000, "profit1": 26500, "profit2": 48200, "profitFinal": 98500, "currency": "MXN" },
+    { "id": "pack_06", "deposit": 1100, "profit1": 28900, "profit2": 52100, "profitFinal": 105800, "currency": "MXN" },
+    { "id": "pack_07", "deposit": 1200, "profit1": 31200, "profit2": 55800, "profitFinal": 112400, "currency": "MXN" },
+    { "id": "pack_08", "deposit": 1350, "profit1": 34800, "profit2": 62400, "profitFinal": 124600, "currency": "MXN" },
+    { "id": "pack_09", "deposit": 1500, "profit1": 38500, "profit2": 69100, "profitFinal": 138200, "currency": "MXN" },
+    { "id": "pack_10", "deposit": 1650, "profit1": 42100, "profit2": 75600, "profitFinal": 151800, "currency": "MXN" },
+    { "id": "pack_11", "deposit": 1800, "profit1": 45800, "profit2": 82200, "profitFinal": 165400, "currency": "MXN" },
+    { "id": "pack_12", "deposit": 2000, "profit1": 50200, "profit2": 89800, "profitFinal": 181200, "currency": "MXN" },
+    { "id": "pack_13", "deposit": 2200, "profit1": 54800, "profit2": 97600, "profitFinal": 197800, "currency": "MXN" },
+    { "id": "pack_14", "deposit": 2500, "profit1": 61200, "profit2": 108400, "profitFinal": 219600, "currency": "MXN" },
+    { "id": "pack_15", "deposit": 2800, "profit1": 67800, "profit2": 119800, "profitFinal": 242400, "currency": "MXN" }
+  ],
+  "accountLastDigits": {
+    "min": 1000,
+    "max": 9999
+  }
+}

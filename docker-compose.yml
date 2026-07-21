@@ -1,0 +1,45 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        PLAYWRIGHT_VERSION: "1.61.1"
+    image: bot-ai:latest
+    container_name: bot-ai
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DOCKER: "1"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      DATA_DIR: /app/data
+      CONFIG_DIR: /app/config
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      # Set to 1 to auto-register Telegram webhook on start
+      AUTO_SETUP_WEBHOOK: "${AUTO_SETUP_WEBHOOK:-0}"
+    volumes:
+      # Persist DB, media uploads, reviews, legends
+      - ./data:/app/data
+      # Persist project/schedule config edits
+      - ./config:/app/config
+      # Persist generated PNG previews
+      - ./public/renders:/app/public/renders
+    # Chromium needs shared memory
+    shm_size: "256mb"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s

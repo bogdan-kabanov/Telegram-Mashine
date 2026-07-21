@@ -1,0 +1,284 @@
+import { randomUUID } from "crypto";
+import { existsSync, statSync } from "fs";
+import path from "path";
+import { and, eq, sql } from "drizzle-orm";
+
+import { getDb } from "@/lib/db";
+import { mediaAssets } from "@/lib/db/schema";
+import { createLogger } from "@/lib/runtime/manager";
+import { getFileStore } from "@/lib/storage/file-store";
+import { bankIdToCapturaStyle, renderCapturaPng } from "./captura";
+import { bankIdToReceiptStyle, renderReceiptPng } from "./receipt";
+
+const logger = createLogger("media-handler");
+
+export type MediaType =
+  | "video_note"
+  | "bet"
+  | "conditions"
+  | "wallpaper"
+  | "sticker"
+  | "story_photo"
+  | "voice"
+  | "receipt"
+  | "captura";
+
+export interface MediaAsset {
+  id: string;
+  type: MediaType;
+  filename: string;
+  path: string;
+  projectId?: string | null;
+  legendId?: string | null;
+}
+
+const MEDIA_DIRS: Record<Exclude<MediaType, "receipt" | "captura">, string> = {
+  video_note: "media/video_notes",
+  bet: "media/bets",
+  conditions: "media/conditions",
+  wallpaper: "media/wallpapers",
+  sticker: "media/stickers",
+  story_photo: "media/story_photos",
+  voice: "media/voices",
+};
+
+function isValidMediaFile(filename: string, filePath: string): boolean {
+  if (filename.startsWith(".")) return false;
+  if (filename === ".gitkeep") return false;
+  if (filePath.includes(".gitkeep")) return false;
+  if (!/\.(jpg|jpeg|png|webp|gif|mp4|mov)$/i.test(filename) && !/\.(jpg|jpeg|png|webp|gif|mp4|mov)$/i.test(filePath)) {
+    return false;
+  }
+  const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+  if (!existsSync(resolved)) {
+    const dataDir = process.env.DATA_DIR ?? "./data";
+    const alt = path.resolve(dataDir, filePath.replace(/^data[\\/]/, ""));
+    if (!existsSync(alt)) return false;
+    try {
+      return statSync(alt).size >= 512;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    return statSync(resolved).size >= 512;
+  } catch {
+    return false;
+  }
+}
+
+export class MediaHandler {
+  private readonly store = getFileStore();
+
+  isValidFile(filePath: string, minBytes = 512): boolean {
+    if (!filePath || filePath.includes(".gitkeep")) return false;
+    const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+    if (!existsSync(resolved)) return false;
+    try {
+      const stat = statSync(resolved);
+      return stat.size >= minBytes && /\.(jpg|jpeg|png|webp|gif|mp4|mov)$/i.test(path.basename(resolved));
+    } catch {
+      return false;
+    }
+  }
+
+  async listMedia(type: MediaType, projectId?: string): Promise<MediaAsset[]> {
+    const db = getDb();
+    const conditions = projectId
+      ? and(eq(mediaAssets.type, type), eq(mediaAssets.projectId, projectId))
+      : eq(mediaAssets.type, type);
+
+    const dbAssets = await db.select().from(mediaAssets).where(conditions);
+
+    const fromDb = dbAssets
+      .filter((a) => isValidMediaFile(a.filename, a.path))
+      .map((a) => ({
+        id: a.id,
+        type: type as MediaType,
+        filename: a.filename,
+        path: a.path,
+        projectId: a.projectId,
+      }));
+
+    if (fromDb.length > 0) return fromDb;
+
+    const dir = MEDIA_DIRS[type as Exclude<MediaType, "receipt" | "captura">];
+    if (!dir) return [];
+
+    const files = (await this.store.listFiles(dir)).filter((f) =>
+      isValidMediaFile(f, `data/${dir}/${f}`),
+    );
+
+    return files.map((filename) => ({
+      id: randomUUID(),
+      type,
+      filename,
+      path: `data/${dir}/${filename}`,
+      projectId: null,
+    }));
+  }
+
+  async pickRandom(type: MediaType, projectId?: string): Promise<MediaAsset | null> {
+    const assets = await this.listMedia(type, projectId);
+    if (assets.length === 0) {
+      await logger.warn(`No media found for type: ${type}`, { projectId });
+      return null;
+    }
+    return assets[Math.floor(Math.random() * assets.length)] ?? null;
+  }
+
+  async pickRandomFromDb(type: string, projectId?: string): Promise<MediaAsset | null> {
+    const db = getDb();
+    const conditions = projectId
+      ? and(eq(mediaAssets.type, type), eq(mediaAssets.projectId, projectId))
+      : eq(mediaAssets.type, type);
+
+    const rows = await db
+      .select()
+      .from(mediaAssets)
+      .where(conditions)
+      .orderBy(sql`RANDOM()`)
+      .limit(20);
+
+    const valid = rows.filter((r) => isValidMediaFile(r.filename, r.path));
+    const pick = valid[Math.floor(Math.random() * valid.length)];
+
+    if (pick) {
+      return {
+        id: pick.id,
+        type: pick.type as MediaType,
+        filename: pick.filename,
+        path: pick.path,
+        projectId: pick.projectId,
+      };
+    }
+
+    return this.pickRandom(type as MediaType, projectId);
+  }
+
+  async pickStoryPhoto(legendId: string): Promise<MediaAsset | null> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(mediaAssets)
+      .where(eq(mediaAssets.type, "story_photo"))
+      .orderBy(sql`RANDOM()`)
+      .limit(30);
+
+    const tagged = rows.filter(
+      (r) =>
+        isValidMediaFile(r.filename, r.path) &&
+        (r.path.includes(`story_photos/${legendId}`) || r.path.includes(`story_photos\\${legendId}`)),
+    );
+    const pick = tagged[Math.floor(Math.random() * tagged.length)];
+    if (pick) {
+      return {
+        id: pick.id,
+        type: "story_photo",
+        filename: pick.filename,
+        path: pick.path,
+        projectId: pick.projectId,
+        legendId,
+      };
+    }
+
+    const dir = `media/story_photos/${legendId}`;
+    const files = (await this.store.listFiles(dir)).filter((f) =>
+      isValidMediaFile(f, this.store.resolve(`${dir}/${f}`)),
+    );
+    const file = files[Math.floor(Math.random() * files.length)];
+    if (!file) return null;
+
+    const filePath = `data/${dir}/${file}`;
+    return {
+      id: randomUUID(),
+      type: "story_photo",
+      filename: file,
+      path: filePath,
+      legendId,
+    };
+  }
+
+  async pickSticker(projectId?: string): Promise<MediaAsset | null> {
+    const fromDb = await this.pickRandomFromDb("sticker", projectId);
+    if (fromDb) return fromDb;
+    return this.pickRandom("sticker", projectId);
+  }
+
+  async generateReceipt(params: {
+    amount: number;
+    currency: string;
+    senderName: string;
+    recipientName: string;
+    bankId: string;
+    bankName: string;
+    accountLastDigits: string;
+    date: string;
+    time?: string;
+  }): Promise<{ id: string; path: string }> {
+    const id = randomUUID();
+    const outputDir = this.store.resolve("media/receipts");
+    const outputPath = path.join(outputDir, `${id}.png`);
+
+    await renderReceiptPng(
+      {
+        amount: params.amount,
+        currency: params.currency,
+        senderName: params.senderName,
+        recipientName: params.recipientName,
+        bankName: params.bankName,
+        bankStyle: bankIdToReceiptStyle(params.bankId),
+        accountLastDigits: params.accountLastDigits,
+        date: params.date,
+        time: params.time ?? "14:32",
+        reference: id.slice(0, 8).toUpperCase(),
+      },
+      outputPath,
+    );
+
+    await logger.info("Receipt generated", { id, path: outputPath, bankId: params.bankId });
+    return { id, path: outputPath };
+  }
+
+  async generateCaptura(params: {
+    amount: number;
+    currency: string;
+    senderName: string;
+    recipientLabel: string;
+    clabe: string;
+    bankId: string;
+    bankName: string;
+    date: string;
+    time?: string;
+  }): Promise<{ id: string; path: string }> {
+    const id = randomUUID();
+    const outputDir = this.store.resolve("media/capturas");
+    const outputPath = path.join(outputDir, `${id}.png`);
+
+    await renderCapturaPng(
+      {
+        amount: params.amount,
+        currency: params.currency,
+        senderName: params.senderName,
+        recipientLabel: params.recipientLabel,
+        clabe: params.clabe,
+        bankStyle: bankIdToCapturaStyle(params.bankId),
+        bankName: params.bankName,
+        date: params.date,
+        time: params.time ?? "17:18",
+        reference: id.slice(0, 10).toUpperCase(),
+      },
+      outputPath,
+    );
+
+    await logger.info("Captura generated", { id, path: outputPath, bankId: params.bankId });
+    return { id, path: outputPath };
+  }
+}
+
+let instance: MediaHandler | null = null;
+
+export function getMediaHandler(): MediaHandler {
+  if (!instance) instance = new MediaHandler();
+  return instance;
+}

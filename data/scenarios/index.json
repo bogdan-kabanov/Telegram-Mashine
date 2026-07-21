@@ -1,0 +1,39 @@
+{
+  "scenarios": [
+    {
+      "id": "nancy_injury_story",
+      "projectId": "nancy",
+      "name": "Historia de lesión laboral",
+      "legendIds": ["injury_work", "medical_debt"],
+      "enabled": true
+    },
+    {
+      "id": "maya_medical_story",
+      "projectId": "maya",
+      "name": "Deuda médica",
+      "legendIds": ["medical_debt", "injury_work"],
+      "enabled": true
+    },
+    {
+      "id": "luna_injury_story",
+      "projectId": "luna",
+      "name": "Lesión laboral",
+      "legendIds": ["injury_work", "medical_debt"],
+      "enabled": true
+    },
+    {
+      "id": "sofia_medical_story",
+      "projectId": "sofia",
+      "name": "Gastos médicos",
+      "legendIds": ["medical_debt", "injury_work"],
+      "enabled": true
+    },
+    {
+      "id": "valeria_injury_story",
+      "projectId": "valeria",
+      "name": "Accidente laboral",
+      "legendIds": ["injury_work", "medical_debt"],
+      "enabled": true
+    }
+  ]
+}
