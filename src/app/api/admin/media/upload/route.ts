@@ -5,9 +5,31 @@ import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 
 import { bootstrapApp } from "@/lib/bootstrap";
+import { updateProject } from "@/lib/config/writer";
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
 import { MEDIA_TYPE_DIRS, UPLOAD_MEDIA_TYPES, type UploadMediaType } from "@/lib/media/types";
+
+const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+const VIDEO_EXTS = new Set([".mp4", ".mov"]);
+
+function allowedExtsForType(type: UploadMediaType): Set<string> {
+  if (type === "video_note") return VIDEO_EXTS;
+  // Conditions explicitly support animated GIF (ТЗ: картинка / GIF).
+  if (type === "conditions") return IMAGE_EXTS;
+  return new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+}
+
+function safeUploadFilename(originalName: string): string {
+  const ext = path.extname(originalName).toLowerCase();
+  const base = path
+    .basename(originalName, path.extname(originalName))
+    .replace(/[^\w.\-а-яА-ЯёЁ]+/gu, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 80);
+  return `${Date.now()}_${base || "file"}${ext}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,12 +49,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Неверный тип медиа" }, { status: 400 });
     }
 
-    if (type === "story_photo" && !legendId) {
-      return NextResponse.json({ error: "Для фото в диалоге выберите легенду" }, { status: 400 });
+    const ext = path.extname(file.name).toLowerCase();
+    const allowed = allowedExtsForType(type);
+    if (!allowed.has(ext)) {
+      const list = [...allowed].join(", ");
+      return NextResponse.json(
+        {
+          error:
+            type === "conditions"
+              ? `Для условий нужен JPG, PNG, WEBP или GIF. Сейчас: ${ext || "без расширения"}`
+              : `Неподдерживаемый формат ${ext || "(нет расширения)"}. Разрешено: ${list}`,
+        },
+        { status: 400 },
+      );
     }
 
-    if (type === "wallpaper" && !projectId) {
-      return NextResponse.json({ error: "Для обоев выберите проект" }, { status: 400 });
+    // Project-scoped media (bets, conditions, circles, avatars) — always pick a project.
+    const PROJECT_SCOPED: UploadMediaType[] = ["wallpaper", "bet", "conditions", "video_note", "avatar"];
+    if (PROJECT_SCOPED.includes(type) && !projectId) {
+      return NextResponse.json({ error: "Выберите проект — медиа не смешиваем между менеджерами" }, { status: 400 });
     }
 
     const dataDir = process.env.DATA_DIR ?? "./data";
@@ -42,19 +77,26 @@ export async function POST(request: NextRequest) {
 
     if (type === "wallpaper" && projectId) {
       destDir = path.resolve(dataDir, MEDIA_TYPE_DIRS.wallpaper);
-      savedFilename = `${projectId}${path.extname(file.name) || ".jpg"}`;
+      savedFilename = `${projectId}${ext || ".jpg"}`;
       relativePath = path.join("data", MEDIA_TYPE_DIRS.wallpaper, savedFilename).replace(/\\/g, "/");
-    } else if (type === "story_photo" && legendId) {
-      destDir = path.resolve(dataDir, MEDIA_TYPE_DIRS.story_photo, legendId);
-      savedFilename = `${Date.now()}_${file.name.replace(/[^\w.\-а-яА-ЯёЁ]+/g, "_")}`;
+    } else if (type === "story_photo") {
+      // Shared pool — each photo is used at most once across all reviews
+      const folder = legendId ? legendId : "pool";
+      destDir = path.resolve(dataDir, MEDIA_TYPE_DIRS.story_photo, folder);
+      savedFilename = safeUploadFilename(file.name);
       relativePath = path
-        .join("data", MEDIA_TYPE_DIRS.story_photo, legendId, savedFilename)
+        .join("data", MEDIA_TYPE_DIRS.story_photo, folder, savedFilename)
         .replace(/\\/g, "/");
+    } else if (type === "sticker") {
+      const base = MEDIA_TYPE_DIRS.sticker;
+      destDir = path.resolve(dataDir, base);
+      savedFilename = safeUploadFilename(file.name);
+      relativePath = path.join("data", base, savedFilename).replace(/\\/g, "/");
     } else {
       const base = MEDIA_TYPE_DIRS[type as keyof typeof MEDIA_TYPE_DIRS] ?? `media/${type}`;
-      const subdir = projectId && type !== "sticker" ? `${base}/${projectId}` : base;
+      const subdir = projectId ? `${base}/${projectId}` : base;
       destDir = path.resolve(dataDir, subdir);
-      savedFilename = `${Date.now()}_${file.name.replace(/[^\w.\-а-яА-ЯёЁ]+/g, "_")}`;
+      savedFilename = safeUploadFilename(file.name);
       relativePath = path.join("data", subdir, savedFilename).replace(/\\/g, "/");
     }
 
@@ -64,15 +106,37 @@ export async function POST(request: NextRequest) {
 
     const id = randomUUID();
     const db = getDb();
+    const mimeFallback =
+      ext === ".gif"
+        ? "image/gif"
+        : ext === ".png"
+          ? "image/png"
+          : ext === ".webp"
+            ? "image/webp"
+            : ext === ".mp4"
+              ? "video/mp4"
+              : ext === ".mov"
+                ? "video/quicktime"
+                : "image/jpeg";
     await db.insert(mediaAssets).values({
       id,
       projectId,
       type,
       filename: savedFilename,
       path: relativePath,
-      mimeType: file.type || null,
+      mimeType: file.type || mimeFallback,
       createdAt: new Date().toISOString(),
     });
+
+    if (projectId && type === "wallpaper") {
+      await updateProject(projectId, { wallpaperPath: relativePath });
+    }
+    if (projectId && type === "conditions") {
+      await updateProject(projectId, { conditionsImagePath: relativePath });
+    }
+    if (projectId && type === "avatar") {
+      await updateProject(projectId, { clientAvatarPath: relativePath });
+    }
 
     return NextResponse.json({
       ok: true,
@@ -85,10 +149,12 @@ export async function POST(request: NextRequest) {
       url: `/api/admin/media/file?id=${id}`,
       message:
         type === "story_photo"
-          ? `Фото привязано к легенде «${legendId}». При генерации попадёт в диалог.`
+          ? "Фото клиента добавлено в общий пул. Каждое фото используется только один раз."
           : type === "wallpaper"
             ? `Обои для проекта ${projectId} установлены.`
-            : "Файл загружен",
+            : type === "conditions"
+              ? `Условия для проекта ${projectId} сохранены${ext === ".gif" ? " (GIF)" : ""}.`
+              : "Файл загружен",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

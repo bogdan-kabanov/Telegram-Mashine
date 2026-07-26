@@ -8,7 +8,11 @@
     "start": "node scripts/start.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed:media": "node scripts/seed-media.mjs",
     "postinstall": "node scripts/playwright-install.mjs",
+    "trim:receipts": "node scripts/trim-receipts.mjs",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
@@ -17,11 +21,13 @@
   "dependencies": {
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
+    "emoji-datasource-apple": "^15.1.2",
     "next": "^15.3.3",
     "openai": "^6.46.0",
     "playwright": "^1.61.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "sharp": "^0.35.3",
     "zod": "^3.25.67"
   },
   "devDependencies": {
@@ -30,6 +36,7 @@
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
     "drizzle-kit": "^0.31.10",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   }
 }

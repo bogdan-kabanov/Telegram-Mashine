@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { colors, inputStyle, radius, styles } from "../styles";
+import { HelpTip, LabelWithHelp } from "../ui/HelpTip";
 
 interface Legend {
   id: string;
@@ -151,16 +152,23 @@ export function LegendsEditor() {
   if (!current) {
     return (
       <div>
-        <p style={{ color: colors.muted, fontSize: "0.875rem" }}>Легенд пока нет.</p>
+        <p style={{ color: colors.muted, fontSize: "0.875rem" }}>Историй пока нет.</p>
         <button type="button" style={styles.button} onClick={addLegend}>
-          Создать легенду
+          Создать историю
         </button>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "1rem" }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(180px, 220px) 1fr",
+        gap: "1rem",
+      }}
+      className="legends-editor-grid"
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
         {legends.map((l, i) => (
           <button
@@ -183,50 +191,75 @@ export function LegendsEditor() {
           </button>
         ))}
         <button type="button" style={{ ...styles.buttonSecondary, marginTop: "0.35rem" }} onClick={addLegend}>
-          + Новая легенда
+          + Новая история
         </button>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
         <p style={{ margin: 0, color: colors.muted, fontSize: "0.8125rem", lineHeight: 1.45 }}>
-          Легенда — история клиента. Фото из блока ниже попадают в диалог после фразы о проблеме.
-          При генерации бот случайно выбирает одно фото этой легенды.
+          История (легенда) — кто такой клиент в переписке. Фото из блока ниже попадут в диалог. При генерации бот
+          случайно возьмёт одно фото этой истории.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
-          <Field label="ID (латиница, без пробелов)">
+          <Field
+            label={
+              <LabelWithHelp
+                label="Технический ID"
+                tip="Латиницей, без пробелов. Нужен системе, чтобы привязать фото. Обычно не меняют."
+              />
+            }
+          >
             <input
               style={field}
               value={current.id}
               onChange={(e) => update({ id: e.target.value.trim().replace(/\s+/g, "_") })}
             />
           </Field>
-          <Field label="Локаль">
+          <Field label={<LabelWithHelp label="Язык" tip="Обычно es-MX — испанский Мексики." />}>
             <input style={field} value={current.locale} onChange={(e) => update({ locale: e.target.value })} />
           </Field>
         </div>
 
-        <Field label="Название">
+        <Field label={<LabelWithHelp label="Название для вас" tip="Как история называется в списке слева. Клиент это не видит." />}>
           <input style={field} value={current.title} onChange={(e) => update({ title: e.target.value })} />
         </Field>
-        <Field label="Первая фраза клиента">
+        <Field
+          label={
+            <LabelWithHelp label="Первая фраза клиента" tip="С чего клиент начинает диалог. На испанском." />
+          }
+        >
           <input
             style={field}
             value={current.openingPhrase ?? ""}
             onChange={(e) => update({ openingPhrase: e.target.value })}
           />
         </Field>
-        <Field label="Проблема (можно несколько предложений)">
+        <Field
+          label={
+            <LabelWithHelp
+              label="Проблема"
+              tip="Главная история клиента: что случилось. Можно 1–3 предложения."
+            />
+          }
+        >
           <textarea style={{ ...field, minHeight: 64 }} value={current.problem} onChange={(e) => update({ problem: e.target.value })} />
         </Field>
-        <Field label="Мотивация">
+        <Field label={<LabelWithHelp label="Мотивация" tip="Почему клиент хочет заработать / начать." />}>
           <textarea
             style={{ ...field, minHeight: 48 }}
             value={current.motivation}
             onChange={(e) => update({ motivation: e.target.value })}
           />
         </Field>
-        <Field label="После какого предложения проблемы вставить фото (0 = первое)">
+        <Field
+          label={
+            <LabelWithHelp
+              label="После какого предложения вставить фото"
+              tip="0 = после первого предложения проблемы. Так фото выглядит естественно в чате."
+            />
+          }
+        >
           <input
             type="number"
             min={0}
@@ -235,14 +268,28 @@ export function LegendsEditor() {
             onChange={(e) => update({ photoAfterProblemIndex: Number(e.target.value) || 0 })}
           />
         </Field>
-        <Field label="Фразы благодарности (каждая с новой строки)">
+        <Field
+          label={
+            <LabelWithHelp
+              label="Фразы благодарности"
+              tip="Каждая строка — отдельный вариант. Бот или AI выберет одну."
+            />
+          }
+        >
           <textarea
             style={{ ...field, minHeight: 72 }}
             value={current.gratitudePhrases.join("\n")}
             onChange={(e) => update({ gratitudePhrases: e.target.value.split("\n").filter(Boolean) })}
           />
         </Field>
-        <Field label="Фразы сомнений (каждая с новой строки)">
+        <Field
+          label={
+            <LabelWithHelp
+              label="Фразы сомнений"
+              tip="Когда клиент ещё не доверяет. Каждая строка — отдельный вариант."
+            />
+          }
+        >
           <textarea
             style={{ ...field, minHeight: 72 }}
             value={current.doubtPhrases.join("\n")}
@@ -258,10 +305,12 @@ export function LegendsEditor() {
             background: colors.bg,
           }}
         >
-          <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Фото этой легенды в диалоге</div>
+          <div style={{ fontWeight: 650, marginBottom: "0.35rem", display: "flex", alignItems: "center", gap: 6 }}>
+            Фото этой истории
+            <HelpTip text="Фото «доказательства» проблемы (документы, ситуация). 1–5 штук достаточно." />
+          </div>
           <p style={{ margin: "0 0 0.65rem", fontSize: "0.75rem", color: colors.muted }}>
-            Загрузите 1–5 фото «доказательства» проблемы (рука, документы и т.п.). Они хранятся в{" "}
-            <code>story_photos/{current.id}/</code>.
+            Загрузите фото, которые клиент «скидывает» в чат. Они сохраняются для этой истории.
           </p>
 
           {legendPhotos.length === 0 ? (
@@ -320,7 +369,7 @@ export function LegendsEditor() {
             {saving ? "Сохранение…" : "Сохранить"}
           </button>
           <button type="button" style={{ ...styles.buttonSecondary, color: colors.danger }} onClick={() => void removeLegend()}>
-            Удалить легенду
+            Удалить историю
           </button>
           {message && (
             <span style={{ fontSize: "0.875rem", color: message === "Сохранено" || message.includes("Фото") ? colors.success : colors.danger }}>
@@ -333,10 +382,14 @@ export function LegendsEditor() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-      <span style={{ fontSize: "0.75rem", color: colors.muted }}>{label}</span>
+    <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+      {typeof label === "string" ? (
+        <span style={{ fontSize: "0.75rem", color: colors.muted, fontWeight: 650 }}>{label}</span>
+      ) : (
+        label
+      )}
       {children}
     </label>
   );

@@ -23,11 +23,22 @@ function extractLegendId(filePath: string): string | null {
   return m?.[1] ?? null;
 }
 
+/** Infer project from path: media/bets/nancy/x.png or media/wallpapers/nancy.jpg */
+function extractProjectId(filePath: string, type: string): string | null {
+  const norm = filePath.replace(/\\/g, "/");
+  if (type === "wallpaper") {
+    const base = path.basename(norm, path.extname(norm));
+    return base || null;
+  }
+  const m = norm.match(/media\/(?:bets|conditions|video_notes|avatars|stickers)\/([^/]+)\//);
+  return m?.[1] ?? null;
+}
+
 export async function GET() {
   try {
     await bootstrapApp();
     const db = getDb();
-    const rows = await db.select().from(mediaAssets).orderBy(desc(mediaAssets.createdAt)).limit(200);
+    const rows = await db.select().from(mediaAssets).orderBy(desc(mediaAssets.createdAt)).limit(500);
 
     const fromDb = rows
       .map((a) => {
@@ -39,7 +50,7 @@ export async function GET() {
           label: MEDIA_TYPE_LABELS[a.type] ?? a.type,
           filename: a.filename,
           path: a.path,
-          projectId: a.projectId,
+          projectId: a.projectId ?? extractProjectId(a.path, a.type),
           legendId: extractLegendId(a.path),
           mimeType: a.mimeType,
           createdAt: a.createdAt,
@@ -50,7 +61,6 @@ export async function GET() {
       })
       .filter(Boolean);
 
-    // Also surface disk-only story photos / stickers not yet in DB
     const dataDir = process.env.DATA_DIR ?? "./data";
     const diskExtras: typeof fromDb = [];
     const knownPaths = new Set(fromDb.map((a) => a!.path.replace(/\\/g, "/")));
@@ -78,7 +88,7 @@ export async function GET() {
             label: MEDIA_TYPE_LABELS[type] ?? type,
             filename: name.name,
             path: relPath,
-            projectId: null,
+            projectId: extractProjectId(relPath, type),
             legendId: type === "story_photo" ? legendId : extractLegendId(relPath),
             mimeType: null,
             createdAt: "",

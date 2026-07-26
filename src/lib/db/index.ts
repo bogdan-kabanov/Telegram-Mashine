@@ -6,6 +6,7 @@ import path from "path";
 import * as schema from "./schema";
 
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let sqliteInstance: Database.Database | null = null;
 
 function getDbPath(): string {
   const dataDir = process.env.DATA_DIR ?? "./data";
@@ -60,6 +61,8 @@ function initTables(sqlite: Database.Database): void {
       client_name TEXT NOT NULL,
       client_avatar_path TEXT,
       phase TEXT NOT NULL,
+      review_type TEXT NOT NULL DEFAULT 'big',
+      pin_video_note INTEGER NOT NULL DEFAULT 0,
       screenshots TEXT NOT NULL,
       media TEXT NOT NULL,
       published_at TEXT,
@@ -99,6 +102,42 @@ function initTables(sqlite: Database.Database): void {
       slot_id TEXT NOT NULL,
       executed_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS used_account_digits (
+      digits TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      review_id TEXT,
+      used_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS used_weekly_circles (
+      id TEXT PRIMARY KEY,
+      media_path TEXT NOT NULL UNIQUE,
+      project_id TEXT NOT NULL,
+      week_key TEXT NOT NULL,
+      message_id TEXT,
+      pinned_at TEXT,
+      used_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS used_client_photos (
+      id TEXT PRIMARY KEY,
+      media_path TEXT NOT NULL UNIQUE,
+      project_id TEXT NOT NULL,
+      review_id TEXT,
+      used_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS used_bets (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      media_path TEXT NOT NULL,
+      review_id TEXT,
+      used_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_used_bets_project_used
+      ON used_bets (project_id, used_at);
   `);
 
   const row = sqlite.prepare("SELECT COUNT(*) as count FROM runtime_state").get() as { count: number };
@@ -110,6 +149,16 @@ function initTables(sqlite: Database.Database): void {
       )
       .run(new Date().toISOString());
   }
+
+  // Migrations for existing DBs
+  const reviewCols = sqlite.prepare("PRAGMA table_info(review_packages)").all() as Array<{ name: string }>;
+  const reviewColNames = new Set(reviewCols.map((c) => c.name));
+  if (!reviewColNames.has("review_type")) {
+    sqlite.exec(`ALTER TABLE review_packages ADD COLUMN review_type TEXT NOT NULL DEFAULT 'big'`);
+  }
+  if (!reviewColNames.has("pin_video_note")) {
+    sqlite.exec(`ALTER TABLE review_packages ADD COLUMN pin_video_note INTEGER NOT NULL DEFAULT 0`);
+  }
 }
 
 export function getDb() {
@@ -119,6 +168,16 @@ export function getDb() {
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
   initTables(sqlite);
+  sqliteInstance = sqlite;
   dbInstance = drizzle(sqlite, { schema });
   return dbInstance;
+}
+
+/** Test helper — closes DB and clears singleton so DATA_DIR can change. */
+export function resetDbForTests(): void {
+  if (sqliteInstance) {
+    sqliteInstance.close();
+  }
+  sqliteInstance = null;
+  dbInstance = null;
 }

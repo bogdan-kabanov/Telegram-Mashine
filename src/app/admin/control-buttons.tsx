@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { colors, styles } from "./styles";
+import { HelpTip } from "./ui/HelpTip";
 
 export function ControlButtons({ currentStatus }: { currentStatus: string }) {
   const [status, setStatus] = useState(currentStatus);
@@ -29,24 +29,43 @@ export function ControlButtons({ currentStatus }: { currentStatus: string }) {
     }
   }
 
+  const statusLabel: Record<string, string> = {
+    running: "Работает",
+    paused: "На паузе",
+    stopped: "Остановлен",
+    error: "Ошибка",
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <button style={styles.button} disabled={loading} onClick={() => action("start")}>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+        <button className="admin-btn" disabled={loading} onClick={() => action("start")} type="button">
           Запустить
         </button>
-        <button style={styles.buttonSecondary} disabled={loading} onClick={() => action("pause")}>
+        <HelpTip text="Включает автоматическую генерацию и публикацию по расписанию." />
+
+        <button className="admin-btn-secondary" disabled={loading} onClick={() => action("pause")} type="button">
           Пауза
         </button>
-        <button style={styles.buttonSecondary} disabled={loading} onClick={() => action("resume")}>
+        <HelpTip text="Временно останавливает новые посты. Уже запланированная «часть 2» может ещё дойти." />
+
+        <button className="admin-btn-secondary" disabled={loading} onClick={() => action("resume")} type="button">
           Продолжить
         </button>
-        <button style={{ ...styles.buttonSecondary, color: colors.danger, borderColor: colors.danger }} disabled={loading} onClick={() => action("stop")}>
+        <HelpTip text="Снимает паузу и возвращает бота к обычному режиму." />
+
+        <button
+          className="admin-btn-secondary admin-btn-danger"
+          disabled={loading}
+          onClick={() => action("stop")}
+          type="button"
+        >
           Стоп
         </button>
+        <HelpTip text="Полностью выключает воркер. Чтобы снова публиковать — нажмите «Запустить»." />
       </div>
-      <p style={{ color: colors.muted, marginTop: "0.5rem", fontSize: "0.875rem", marginBottom: 0 }}>
-        {status}
+      <p className="admin-muted" style={{ marginTop: "0.65rem", fontSize: "0.875rem", marginBottom: 0 }}>
+        Сейчас: <strong style={{ color: "var(--admin-ink)" }}>{statusLabel[status] ?? status}</strong>
         {message ? ` · ${message}` : ""}
       </p>
     </div>

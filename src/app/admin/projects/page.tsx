@@ -3,7 +3,7 @@ import { loadAppConfig } from "@/lib/config/loader";
 import { getRecentReviewsByProject } from "@/lib/db/reviews";
 import { toPublicScreenshotUrl } from "@/lib/media/screenshot-url";
 
-import { AdminShell } from "../components";
+import { AdminShell, SectionCard } from "../components";
 import { ProjectWorkspace } from "../project-workspace";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,40 @@ export default async function ProjectsPage() {
   );
 
   return (
-    <AdminShell title="Проекты">
+    <AdminShell
+      title="Проекты"
+      description="Каждый проект — отдельный менеджер в чате. Сделайте пробный отзыв, чтобы увидеть, как выглядит переписка, и при необходимости поправьте фон, имя и цвета."
+    >
+      <SectionCard
+        title="Как пользоваться этим разделом"
+        tip="Короткая шпаргалка: сначала пробный отзыв, потом тонкая настройка."
+        tourId="tour-projects-guide"
+      >
+        <div className="admin-steps">
+          <div className="admin-step">
+            <div className="admin-step-num">1</div>
+            <div>
+              <h3>Выберите проект</h3>
+              <p>Nancy, Grisel, Melissa, Paola, Francesca — менеджеры, от имени которых идёт переписка.</p>
+            </div>
+          </div>
+          <div className="admin-step">
+            <div className="admin-step-num">2</div>
+            <div>
+              <h3>Сделайте пробный отзыв</h3>
+              <p>Кнопка не публикует в канал — только показывает скриншоты здесь, в панели.</p>
+            </div>
+          </div>
+          <div className="admin-step">
+            <div className="admin-step-num">3</div>
+            <div>
+              <h3>При желании откройте «Настройки»</h3>
+              <p>Здесь задаются фон чата, имя, тексты реквизитов и цвета пузырей сообщений.</p>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
       {projectsWithReviews.map(({ project, initialReview }) => (
         <ProjectWorkspace
           key={project.id}
@@ -41,6 +74,7 @@ export default async function ProjectsPage() {
             managerHandle: project.managerHandle,
             managerName: project.managerName,
             twoPhaseReview: project.twoPhaseReview,
+            wallpaperPath: project.wallpaperPath ?? null,
             theme: {
               incomingBubble: project.theme.incomingBubble,
               outgoingBubble: project.theme.outgoingBubble,

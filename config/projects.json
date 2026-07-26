@@ -5,106 +5,218 @@
       "name": "Nancy",
       "locale": "es-MX",
       "currency": "MXN",
-      "managerName": "Maya Nancy",
+      "managerName": "Nancy Veronica Maya Mar",
       "managerHandle": "@Maya_Nancy",
-      "managerAvatarPath": "data/media/avatars/manager_nancy.jpg",
+      "clientAvatarPath": "data/media/story_photos/pool/ai_1784812785611_4c17ee23.png",
       "wallpaperPath": "data/media/wallpapers/nancy.jpg",
-      "conditionsImagePath": "data/media/conditions/nancy_conditions.png",
+      "conditionsImagePath": "data/media/conditions/nancy/condiciones.jpg",
+      "telegramThemeId": "PJ6uSlD87ipPf7Ci",
+      "receiptStyle": "spin",
+      "capturaStyle": "spin",
+      "receiptTemplates": {
+        "client": [
+          "01_banorte.jpg",
+          "02_mercado.jpg",
+          "03_spin.jpg"
+        ],
+        "manager": [
+          "01_banorte.jpg",
+          "02_mercado.jpg"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#E7FCC4",
-        "outgoingBubbleAlt": "#FFF4C2",
         "accentColor": "#34C759",
         "headerBg": "#F7F7F7",
-        "statusBarStyle": "dark"
+        "statusBarStyle": "light"
       },
-      "depositMessageTemplate": "💳 Debe pagar a esta dirección: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
+      "depositMessageTemplate": "💳 Banco: {{bankName}}\nCLABE: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
       "completionMessageTemplate": "El trabajo está terminado, con {{deposit}} pesos ganamos {{profitFinal}} pesos 📈💰\nEnvíeme el número de su tarjeta para enviarle la ganancia💸",
       "payoutMessageTemplate": "Te transfirió dinero 🩵\nPuedes comprobar tus beneficios 💸",
       "twoPhaseReview": true,
       "phaseDelayMinutes": 90
     },
     {
-      "id": "maya",
-      "name": "Maya",
+      "id": "grisel",
+      "name": "Grisel",
       "locale": "es-MX",
       "currency": "MXN",
-      "managerName": "Maya Veronica",
-      "managerHandle": "@Maya_V",
-      "wallpaperPath": "data/media/wallpapers/maya.jpg",
+      "managerName": "Grisel Aleman Carrera",
+      "managerHandle": "@Grisel_A",
+      "wallpaperPath": "data/media/wallpapers/grisel.jpg",
+      "conditionsTexts": [
+        "😊 Condiciones para trabajar conmigo:\n\n👮‍♂️ El trabajo se realiza dentro del marco legal\n⏰ El proceso toma de 2 a 4 horas \n💛 Estoy disponible 24/7, siempre lista para escucharle y responder sus preguntas \n\n💸 Depósitos para invertir\n\n600 pesos >>> 70,000 pesos 🇲🇽\n850 pesos >>> 180,000 pesos 🇲🇽\n1,000 pesos >>> 250,000 pesos 🇲🇽\n\nListos para empezar a invertir? 🥰"
+      ],
+      "telegramThemeId": "T8EEcizSz3R4drfb",
+      "receiptStyle": "mercado_pago",
+      "capturaStyle": "mercado_pago",
+      "receiptTemplates": {
+        "client": [
+          "01_mercado.jpg",
+          "02_compartamos.jpg"
+        ],
+        "manager": [
+          "02_compartamos.jpg"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#D4F0FD",
         "accentColor": "#007AFF",
-        "headerBg": "#F7F7F7",
-        "statusBarStyle": "dark"
+        "headerBg": "#F7FBFF",
+        "headerBgEnd": "#D6EBFF",
+        "statusBarStyle": "light"
       },
-      "depositMessageTemplate": "💳 Debe pagar a esta dirección: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
+      "depositMessageTemplate": "💳 Banco: {{bankName}}\nCLABE: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
       "completionMessageTemplate": "El trabajo está terminado, con {{deposit}} pesos ganamos {{profitFinal}} pesos 📈💰",
       "payoutMessageTemplate": "Te transfirió dinero 🩵",
-      "twoPhaseReview": true,
-      "phaseDelayMinutes": 90
-    },
-    {
-      "id": "luna",
-      "name": "Luna",
-      "locale": "es-MX",
-      "currency": "MXN",
-      "managerName": "Luna Martinez",
-      "managerHandle": "@Luna_M",
-      "wallpaperPath": "data/media/wallpapers/luna.jpg",
-      "theme": {
-        "incomingBubble": "#FFFFFF",
-        "outgoingBubble": "#F5E6FF",
-        "accentColor": "#AF52DE",
-        "headerBg": "#F7F7F7",
-        "statusBarStyle": "dark"
-      },
-      "depositMessageTemplate": "💳 Debe pagar a esta dirección: {{clabe}}\nEnvíame captura después del pago 💙",
-      "completionMessageTemplate": "Trabajo terminado: {{deposit}} → {{profitFinal}} pesos 📈",
-      "payoutMessageTemplate": "Transferencia enviada 🩵",
       "twoPhaseReview": false,
       "phaseDelayMinutes": 90
     },
     {
-      "id": "sofia",
-      "name": "Sofia",
+      "id": "melissa",
+      "name": "Melissa",
+      "locale": "es-AR",
+      "currency": "ARS",
+      "managerName": "Melissa Carabajal",
+      "managerHandle": "@Melissa_C",
+      "wallpaperPath": "data/media/wallpapers/melissa.jpg",
+      "conditionsTexts": [
+        "Ahora te contaré mi historia ❤️\n1️⃣ Soy de Argentina 🇦🇷 y nací en Puerto Madero 🇦🇷\n2️⃣ Actualmente reside en Puerto Madero 🏠\n3️⃣ Mi trabajo no es apostar y no es un casino. Trabajo en los mercados financieros de criptomonedas. 📈\n4️⃣ Mi experiencia en el mercado de criptomonedas: 5 años 🤑\n5️⃣ Estoy entre las 100 personas más ricas del Argentina 💵\nNo siempre he sido rica. Nací en un barrio pobre. En mi casa, cuando llovía, el techo goteaba. Esa vida no me convenía. Y comencé a explorar el mundo de las criptomonedas. Sé lo malo que es vivir sin dinero. Y es por eso que quiero ayudar a mis conciudadanos a ganar dinero para que haya menos gente pobre en nuestro país 🇦🇷❤️",
+        "Aquí tienes las opciones de inversión disponibles para hoy, sin riesgo, tu depósito está asegurado, no puedes perder dinero 🏦🤗\n\n📈 Plan de ganancias:\n🔷 Con 40.000Ars obtendrás 2.200.000Ars 🇦🇷 💰\n🔷 Con 50.000Ars obtendrás 3.500.000Ars 🇦🇷 💰\n🔷 Con 120.000Ars obtendrás 7.500.000Ars 🇦🇷 💰\nMayormente mis clientes toman la segunda opción, es la más rentable 💵❤️\n\nCuánto estás dispuesto a invertir? 👌🇦🇷"
+      ],
+      "telegramThemeId": "YtZOfPeUAPfNifBt",
+      "receiptStyle": "mercado_pago",
+      "capturaStyle": "mercado_pago",
+      "receiptTemplates": {
+        "client": [
+          "01_mercado_ar.jpg",
+          "02_belo.jpg",
+          "03_retiro_ar.jpg"
+        ],
+        "manager": [
+          "01_mercado_ar.jpg",
+          "02_belo.jpg",
+          "03_retiro_ar.jpg"
+        ]
+      },
+      "theme": {
+        "incomingBubble": "#FFFFFF",
+        "outgoingBubble": "#F5E6FF",
+        "accentColor": "#AF52DE",
+        "headerBg": "#FBF7FF",
+        "headerBgEnd": "#EBD9FF",
+        "statusBarStyle": "light"
+      },
+      "depositMessageTemplate": "💳 Banco: {{bankName}}\nCLABE / alias: {{clabe}}\nMandame una captura después del pago 💙",
+      "completionMessageTemplate": "El trabajo terminó: con {{deposit}} ganamos {{profitFinal}} 📈💰",
+      "payoutMessageTemplate": "Te transferí el dinero 🩵",
+      "twoPhaseReview": false,
+      "phaseDelayMinutes": 90
+    },
+    {
+      "id": "paola",
+      "name": "Paola",
       "locale": "es-MX",
       "currency": "MXN",
-      "managerName": "Sofia Reyes",
-      "managerHandle": "@Sofia_R",
-      "wallpaperPath": "data/media/wallpapers/sofia.jpg",
+      "managerName": "Paola Cebada Ramos",
+      "managerHandle": "@Paola_C",
+      "wallpaperPath": "data/media/wallpapers/paola.jpg",
+      "conditionsTexts": [
+        "💸 INVERSIONES EN CRIPTO CON\nPAOLA 💸\n\n❗️ Términos de inversión ❗️\n\n💰 Haces un depósito de 850 MXN 🇲🇽\n\n🏦 En 1-3 horas obtienes una ganancia\ngarantizada de ~60,000 MXN 🇲🇽\n\nEsto es posible con mi ayuda! ✅\n\n📊 Me encargo de todas las\noperaciones en el mercado de valores\npara multiplicar tu dinero 📈\n\n🔒 La seguridad total de tus inversiones\nestá garantizada 📑 Todo el trabajo está\nprotegido por el estado ❗️\n\n⬆️ El pago se realiza a través de\ncualquier método electrónico que te\nresulte cómodo 🤝 💳\n\nSi aún tienes alguna duda, escribe, me\nencanta responder ❤️"
+      ],
+      "telegramThemeId": "CfLKWIH0PvOhtiNx",
+      "receiptStyle": "bbva",
+      "capturaStyle": "bbva",
+      "receiptTemplates": {
+        "client": [
+          "01_mercado.jpg",
+          "02_spin.jpg",
+          "03_nu.jpg"
+        ],
+        "manager": [
+          "01_mercado.jpg",
+          "02_spin.jpg",
+          "03_nu.jpg"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#FFE8E8",
         "accentColor": "#FF3B30",
-        "headerBg": "#F7F7F7",
-        "statusBarStyle": "dark"
+        "headerBg": "#FFF8F8",
+        "headerBgEnd": "#FFD9D6",
+        "statusBarStyle": "light"
       },
-      "depositMessageTemplate": "💳 Paga aquí: {{clabe}}\nEnvía captura 💙",
+      "depositMessageTemplate": "💳 Banco: {{bankName}}\nCLABE: {{clabe}}\nEnvía captura después del pago 💙",
       "completionMessageTemplate": "Listo: ganamos {{profitFinal}} pesos 📈💰",
       "payoutMessageTemplate": "Dinero transferido 🩵",
       "twoPhaseReview": false,
       "phaseDelayMinutes": 90
     },
     {
-      "id": "valeria",
-      "name": "Valeria",
-      "locale": "es-MX",
-      "currency": "MXN",
-      "managerName": "Valeria Cruz",
-      "managerHandle": "@Valeria_C",
-      "wallpaperPath": "data/media/wallpapers/valeria.jpg",
+      "id": "francesca",
+      "name": "Francesca",
+      "locale": "es-VE",
+      "currency": "VES",
+      "managerName": "Francesca",
+      "managerHandle": "@Francesca_V",
+      "wallpaperPath": "data/media/wallpapers/francesca.jpg",
+      "conditionsImagePath": "data/media/conditions/francesca/condiciones.jpg",
+      "conditionsTexts": [
+        "En este post encontrarás toda la información que necesitas. Y si todavía tiene preguntas, pregúnteme, estoy dispuesto a responder 🥰\n1️⃣ Importe del depósito: 20.000 Bs\n2️⃣ Ingresos: a partir de 700.000 Bs\n3️⃣ Duración del trabajo: de 1 a 5 horas\n4️⃣ Mi comisión: 10% del importe de las\nganancias\n5️⃣ Pago: en tarjeta bancaria, o crypto wallet (a su solicitud)💳💸\n\n🔹 Toda la actividad de trabajo 100% oficial, legal y segura. Listo para empezar a trabajar ahora mismo?❤️"
+      ],
+      "telegramThemeId": "BnVRAAEKyvwewUtW",
+      "receiptStyle": "generic",
+      "capturaStyle": "generic",
+      "receiptTemplates": {
+        "client": [
+          "01.jpg"
+        ],
+        "manager": [
+          "01.jpg"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#FFF3E0",
-        "accentColor": "#FF9500",
-        "headerBg": "#F7F7F7",
-        "statusBarStyle": "dark"
+        "accentColor": "#C62828",
+        "headerBg": "#FFFBF5",
+        "headerBgEnd": "#FFE4BF",
+        "statusBarStyle": "light"
       },
-      "depositMessageTemplate": "💳 Dirección de pago: {{clabe}}\nCaptura por favor 💙",
-      "completionMessageTemplate": "Con {{deposit}} pesos ganamos {{profitFinal}} 📈",
+      "depositMessageTemplate": "💳 Banco: {{bankName}}\nDatos: {{clabe}}\nCaptura por favor 💙",
+      "completionMessageTemplate": "Con {{deposit}} ganamos {{profitFinal}} 📈",
       "payoutMessageTemplate": "Transferencia lista 🩵",
+      "twoPhaseReview": false,
+      "phaseDelayMinutes": 90
+    },
+    {
+      "id": "demo-ru",
+      "name": "Тест RU",
+      "locale": "ru-RU",
+      "currency": "RUB",
+      "managerName": "Анна Тестова",
+      "managerHandle": "@Demo_RU",
+      "clientAvatarPath": "data/media/story_photos/pool/ai_1784812803851_e86a5bf0.png",
+      "wallpaperPath": "data/media/wallpapers/nancy.jpg",
+      "conditionsImagePath": "data/media/conditions/demo-ru/1785065110808_ChatGPT_Image_25_июл._2026_г._15_26_13.png",
+      "conditionsTexts": [
+        "😊 Условия работы со мной (тестовый проект):\n\n1️⃣ Депозит: 5 000 ₽\n2️⃣ Доход: от 80 000 ₽\n3️⃣ Время работы: 2–4 часа\n4️⃣ Моя комиссия: 10% от прибыли\n5️⃣ Выплата: на карту или криптокошелёк 💳\n\n🔹 Это демо-проект на русском, чтобы было понятно, как выглядит отзыв."
+      ],
+      "receiptStyle": "generic",
+      "capturaStyle": "generic",
+      "theme": {
+        "incomingBubble": "#FFFFFF",
+        "outgoingBubble": "#E7FCC4",
+        "accentColor": "#34C759",
+        "headerBg": "#F7F7F7",
+        "statusBarStyle": "light"
+      },
+      "depositMessageTemplate": "💳 Банк: {{bankName}}\nРеквизиты: {{clabe}}\nПришлите, пожалуйста, скрин оплаты 💙",
+      "completionMessageTemplate": "Работа готова: с {{deposit}} ₽ мы заработали {{profitFinal}} ₽ 📈💰\nПришлите номер карты для вывода 💸",
+      "payoutMessageTemplate": "Деньги отправлены 🩵\nМожете проверить поступление 💸",
       "twoPhaseReview": false,
       "phaseDelayMinutes": 90
     }

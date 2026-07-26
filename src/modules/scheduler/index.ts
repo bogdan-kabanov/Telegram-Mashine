@@ -1,5 +1,3 @@
-import { randomUUID } from "crypto";
-
 import { loadAppConfig } from "@/lib/config/loader";
 import {
   enqueueTask,
@@ -12,6 +10,7 @@ import {
 } from "@/lib/db/reviews";
 import { getReviewPipeline } from "@/lib/pipeline";
 import { createLogger, getRuntimeManager } from "@/lib/runtime/manager";
+import { getActiveCycleWeekInfo, getActiveScheduleSlots } from "@/lib/schedule/cycle";
 import type { ScheduleSlot } from "@/lib/schemas";
 import {
   getMexicoCityParts,
@@ -43,8 +42,10 @@ export class Scheduler {
   async initialize(): Promise<void> {
     const config = await loadAppConfig();
     const now = new Date();
+    const slots = getActiveScheduleSlots(config.schedule, now);
+    const cycle = getActiveCycleWeekInfo(config.schedule, now);
 
-    this.tasks = config.schedule.slots.map((slot) => {
+    this.tasks = slots.map((slot) => {
       const next = computeNextRunMexico(slot, now);
       return {
         id: slot.id,
@@ -58,6 +59,8 @@ export class Scheduler {
       tasksCount: this.tasks.length,
       timezone: config.schedule.timezone,
       postsPerDay: config.schedule.postsPerDay,
+      cycleWeekIndex: cycle.weekIndex,
+      cycleLabel: cycle.label,
     });
   }
 
@@ -96,8 +99,9 @@ export class Scheduler {
   async getUpcomingTasks(limit = 5): Promise<ScheduledTask[]> {
     const config = await loadAppConfig();
     const now = new Date();
+    const slots = getActiveScheduleSlots(config.schedule, now);
 
-    const tasks = config.schedule.slots.map((slot) => ({
+    const tasks = slots.map((slot) => ({
       id: slot.id,
       slot,
       nextRunAt: computeNextRunMexico(slot, now).toISOString(),
@@ -140,11 +144,13 @@ export class Scheduler {
     const state = await runtime.getState();
     if (state.status !== "running") return;
 
-    const dateKey = getMexicoDateKey();
+    const now = new Date();
+    const cycle = getActiveCycleWeekInfo(config.schedule, now);
+    const dateKey = getMexicoDateKey(now);
 
-    for (const slot of config.schedule.slots) {
+    for (const slot of cycle.slots) {
       if (!isMexicoSlotDue(slot.hour, slot.minute)) continue;
-      const key = `daily:${slot.id}:${dateKey}`;
+      const key = `daily:${slot.id}:${dateKey}:w${cycle.weekIndex}`;
       await this.triggerSlot(slot, slot.reviewType, key);
     }
 
@@ -158,14 +164,15 @@ export class Scheduler {
       const uniqueKey = `weekly:unique_circle:${weekKey}`;
       if (!(await isSlotExecuted(uniqueKey))) {
         const projects = config.projects.projects.map((p) => p.id);
-        const projectId = projects[parts.day % projects.length] ?? projects[0]!;
+        const projectId =
+          weekly.projectId ?? projects[parts.day % projects.length] ?? projects[0]!;
         await markSlotExecuted(uniqueKey, "unique_circle");
         await enqueueTask({
           type: "generate_review",
           projectId,
           reviewId: null,
           phase: "generating",
-          payload: { reviewType: "unique_circle", weekly: true },
+          payload: { reviewType: "unique_circle", weekly: true, pinVideoNote: true },
           scheduledAt: new Date().toISOString(),
         });
         await logger.info("Weekly unique_circle triggered", { projectId, weekKey });
@@ -209,7 +216,11 @@ export class Scheduler {
       projectId,
       reviewId: null,
       phase: "generating",
-      payload: { reviewType, manual: true },
+      payload: {
+        reviewType,
+        manual: true,
+        pinVideoNote: reviewType === "unique_circle",
+      },
       scheduledAt: new Date().toISOString(),
     });
   }

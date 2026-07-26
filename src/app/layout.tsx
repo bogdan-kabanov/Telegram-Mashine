@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Панель управления",
-  description: "Управление отзывами",
+  title: "BOT AI — Панель",
+  description: "Управление генерацией и публикацией отзывов",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

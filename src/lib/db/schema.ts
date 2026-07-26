@@ -44,6 +44,8 @@ export const reviewPackages = sqliteTable("review_packages", {
   clientName: text("client_name").notNull(),
   clientAvatarPath: text("client_avatar_path"),
   phase: text("phase").notNull(),
+  reviewType: text("review_type").notNull().default("big"),
+  pinVideoNote: integer("pin_video_note").notNull().default(0),
   screenshots: text("screenshots").notNull(),
   media: text("media").notNull(),
   publishedAt: text("published_at"),
@@ -82,4 +84,41 @@ export const executedSlots = sqliteTable("executed_slots", {
   slotKey: text("slot_key").notNull().unique(),
   slotId: text("slot_id").notNull(),
   executedAt: text("executed_at").notNull(),
+});
+
+/** Last 4 digits of payout accounts — globally unique (TZ §4.3). */
+export const usedAccountDigits = sqliteTable("used_account_digits", {
+  digits: text("digits").primaryKey(),
+  projectId: text("project_id").notNull(),
+  reviewId: text("review_id"),
+  usedAt: text("used_at").notNull(),
+});
+
+/** Video notes already used for weekly unique circles (pin cycle). */
+export const usedWeeklyCircles = sqliteTable("used_weekly_circles", {
+  id: text("id").primaryKey(),
+  mediaPath: text("media_path").notNull().unique(),
+  projectId: text("project_id").notNull(),
+  weekKey: text("week_key").notNull(),
+  messageId: text("message_id"),
+  pinnedAt: text("pinned_at"),
+  usedAt: text("used_at").notNull(),
+});
+
+/** Client story photos — never reuse across reviews. */
+export const usedClientPhotos = sqliteTable("used_client_photos", {
+  id: text("id").primaryKey(),
+  mediaPath: text("media_path").notNull().unique(),
+  projectId: text("project_id").notNull(),
+  reviewId: text("review_id"),
+  usedAt: text("used_at").notNull(),
+});
+
+/** Bet screenshots used in reviews — reusable after ~10 days (sequential 1→N pool). */
+export const usedBets = sqliteTable("used_bets", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  mediaPath: text("media_path").notNull(),
+  reviewId: text("review_id"),
+  usedAt: text("used_at").notNull(),
 });

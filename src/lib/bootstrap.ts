@@ -7,31 +7,41 @@ import { getScheduler } from "@/modules/scheduler";
 const logger = createLogger("bootstrap");
 
 let bootstrapped = false;
+let bootstrapPromise: Promise<void> | null = null;
 
 export async function bootstrapApp(): Promise<void> {
   if (bootstrapped) return;
+  if (bootstrapPromise) return bootstrapPromise;
 
-  try {
-    getDb();
-    await loadAppConfig();
-    const runtime = getRuntimeManager();
-    const state = await runtime.getState();
-    const scheduler = getScheduler();
+  bootstrapPromise = (async () => {
+    try {
+      const { ensurePlaywrightBrowsersPath } = await import("@/lib/playwright");
+      ensurePlaywrightBrowsersPath();
 
-    await scheduler.initialize();
-    scheduler.startWorker(30_000);
+      getDb();
+      await loadAppConfig();
+      const runtime = getRuntimeManager();
+      const state = await runtime.getState();
+      const scheduler = getScheduler();
 
-    if (state.status === "running") {
-      await logger.info("Bot was running — scheduler worker resumed");
+      await scheduler.initialize();
+      scheduler.startWorker(30_000);
+
+      if (state.status === "running") {
+        await logger.info("Bot was running — scheduler worker resumed");
+      }
+
+      await logger.info("Application bootstrapped (stages 2-5 active)");
+      bootstrapped = true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown bootstrap error";
+      await logger.error("Bootstrap failed", { error: message });
+      bootstrapPromise = null;
+      throw error;
     }
+  })();
 
-    await logger.info("Application bootstrapped (stages 2-5 active)");
-    bootstrapped = true;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown bootstrap error";
-    await logger.error("Bootstrap failed", { error: message });
-    throw error;
-  }
+  return bootstrapPromise;
 }
 
 export function isBootstrapped(): boolean {

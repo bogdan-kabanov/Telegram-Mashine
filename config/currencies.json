@@ -11,6 +11,39 @@
         "decimalSeparator": ".",
         "symbolPosition": "before"
       }
+    },
+    {
+      "code": "ARS",
+      "symbol": "$",
+      "name": "Peso Argentino",
+      "decimals": 0,
+      "format": {
+        "thousandSeparator": ".",
+        "decimalSeparator": ",",
+        "symbolPosition": "before"
+      }
+    },
+    {
+      "code": "VES",
+      "symbol": "Bs",
+      "name": "Bolívar",
+      "decimals": 2,
+      "format": {
+        "thousandSeparator": ".",
+        "decimalSeparator": ",",
+        "symbolPosition": "after"
+      }
+    },
+    {
+      "code": "RUB",
+      "symbol": "₽",
+      "name": "Российский рубль",
+      "decimals": 0,
+      "format": {
+        "thousandSeparator": " ",
+        "decimalSeparator": ",",
+        "symbolPosition": "after"
+      }
     }
   ]
 }

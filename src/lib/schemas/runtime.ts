@@ -30,10 +30,12 @@ export const reviewPackageSchema = z.object({
   clientName: z.string().min(1),
   createdAt: z.string().datetime(),
   phase: z.enum(["partial", "complete"]),
+  reviewType: z.enum(["small", "big", "unique_circle"]).default("big"),
+  pinVideoNote: z.boolean().default(false),
   screenshots: z.array(z.string()),
   media: z.array(
     z.object({
-      type: z.enum(["receipt", "bet", "video_note", "conditions", "voice"]),
+      type: z.enum(["receipt", "bet", "video_note", "conditions", "voice", "photo"]),
       path: z.string(),
     }),
   ),

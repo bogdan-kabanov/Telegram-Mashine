@@ -18,6 +18,7 @@
 .env.*
 !.env.example
 !.env.docker.example
+/config/ai-settings.json
 
 # debug / IDE
 npm-debug.log*

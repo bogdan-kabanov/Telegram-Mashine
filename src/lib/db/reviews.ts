@@ -116,6 +116,8 @@ export async function saveReviewToDb(review: ReviewPackage, clientAvatarPath?: s
       clientName: review.clientName,
       clientAvatarPath: clientAvatarPath ?? null,
       phase: review.phase,
+      reviewType: review.reviewType ?? "big",
+      pinVideoNote: review.pinVideoNote ? 1 : 0,
       screenshots: JSON.stringify(review.screenshots),
       media: JSON.stringify(review.media),
       publishedAt: review.publishedAt,
@@ -125,6 +127,8 @@ export async function saveReviewToDb(review: ReviewPackage, clientAvatarPath?: s
       target: reviewPackages.id,
       set: {
         phase: review.phase,
+        reviewType: review.reviewType ?? "big",
+        pinVideoNote: review.pinVideoNote ? 1 : 0,
         screenshots: JSON.stringify(review.screenshots),
         media: JSON.stringify(review.media),
         publishedAt: review.publishedAt,
@@ -132,12 +136,20 @@ export async function saveReviewToDb(review: ReviewPackage, clientAvatarPath?: s
     });
 }
 
-export async function getReviewFromDb(reviewId: string): Promise<ReviewPackage | null> {
-  const db = getDb();
-  const rows = await db.select().from(reviewPackages).where(eq(reviewPackages.id, reviewId)).limit(1);
-  const row = rows[0];
-  if (!row) return null;
-
+function mapReviewRow(row: {
+  id: string;
+  projectId: string;
+  scenarioId: string;
+  amountPackId: string;
+  clientName: string;
+  createdAt: string;
+  phase: string;
+  reviewType?: string | null;
+  pinVideoNote?: number | null;
+  screenshots: string;
+  media: string;
+  publishedAt: string | null;
+}): ReviewPackage {
   return reviewPackageSchema.parse({
     id: row.id,
     projectId: row.projectId,
@@ -146,10 +158,20 @@ export async function getReviewFromDb(reviewId: string): Promise<ReviewPackage |
     clientName: row.clientName,
     createdAt: row.createdAt,
     phase: row.phase,
+    reviewType: row.reviewType ?? "big",
+    pinVideoNote: Boolean(row.pinVideoNote),
     screenshots: JSON.parse(row.screenshots),
     media: JSON.parse(row.media),
     publishedAt: row.publishedAt,
   });
+}
+
+export async function getReviewFromDb(reviewId: string): Promise<ReviewPackage | null> {
+  const db = getDb();
+  const rows = await db.select().from(reviewPackages).where(eq(reviewPackages.id, reviewId)).limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return mapReviewRow(row);
 }
 
 export async function getRecentReviewsByProject(projectId: string, limit = 5): Promise<ReviewPackage[]> {
@@ -161,38 +183,12 @@ export async function getRecentReviewsByProject(projectId: string, limit = 5): P
     .orderBy(desc(reviewPackages.createdAt))
     .limit(limit);
 
-  return rows.map((row) =>
-    reviewPackageSchema.parse({
-      id: row.id,
-      projectId: row.projectId,
-      scenarioId: row.scenarioId,
-      amountPackId: row.amountPackId,
-      clientName: row.clientName,
-      createdAt: row.createdAt,
-      phase: row.phase,
-      screenshots: JSON.parse(row.screenshots),
-      media: JSON.parse(row.media),
-      publishedAt: row.publishedAt,
-    }),
-  );
+  return rows.map(mapReviewRow);
 }
 
 export async function getRecentReviews(limit = 10): Promise<ReviewPackage[]> {
   const db = getDb();
   const rows = await db.select().from(reviewPackages).orderBy(desc(reviewPackages.createdAt)).limit(limit);
 
-  return rows.map((row) =>
-    reviewPackageSchema.parse({
-      id: row.id,
-      projectId: row.projectId,
-      scenarioId: row.scenarioId,
-      amountPackId: row.amountPackId,
-      clientName: row.clientName,
-      createdAt: row.createdAt,
-      phase: row.phase,
-      screenshots: JSON.parse(row.screenshots),
-      media: JSON.parse(row.media),
-      publishedAt: row.publishedAt,
-    }),
-  );
+  return rows.map(mapReviewRow);
 }

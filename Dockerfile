@@ -53,6 +53,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/config ./config
+COPY --from=builder /app/assets/fonts ./assets/fonts
 COPY --from=builder /app/data/scripts ./data/scripts
 COPY --from=builder /app/data/scenarios ./data/scenarios
 COPY --from=builder /app/data/media ./data/media

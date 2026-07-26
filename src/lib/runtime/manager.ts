@@ -156,6 +156,7 @@ export class RuntimeManager {
     return this.updateState({
       status: "stopped",
       currentPhase: "idle",
+      lastError: null,
     });
   }
 

@@ -2,7 +2,7 @@ import { bootstrapApp } from "@/lib/bootstrap";
 import { loadAppConfig } from "@/lib/config/loader";
 import { loadLegendsFromDisk } from "@/lib/config/writer";
 
-import { AdminShell } from "../components";
+import { AdminShell, SectionCard } from "../components";
 import { MediaLibrary } from "./media-library";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,55 @@ export default async function MediaPage() {
   const [config, legends] = await Promise.all([loadAppConfig(), loadLegendsFromDisk()]);
 
   return (
-    <AdminShell title="Медиа">
+    <AdminShell
+      title="Медиатека"
+      description="Медиа разложено по проектам: ставки, условия и кружки — у каждого менеджера свои. Фото клиентов и стикеры — в общем пуле. Фон чата задаётся в Проекты → Настройки."
+    >
+      <SectionCard
+        title="Что загружать в первую очередь"
+        tip="Минимум для нормальной работы: кружки + ставки + фото историй."
+        tourId="tour-media-guide"
+      >
+        <div className="admin-steps">
+          <div className="admin-step">
+            <div className="admin-step-num">1</div>
+            <div>
+              <h3>Кружки (видео)</h3>
+              <p>Короткие круглые видео. Без них полный отзыв выглядит «ненастоящим».</p>
+            </div>
+          </div>
+          <div className="admin-step">
+            <div className="admin-step-num">2</div>
+            <div>
+              <h3>Ставки и условия</h3>
+              <p>Картинки, которые клиент «получает» в переписке на этапах ставок и условий.</p>
+            </div>
+          </div>
+          <div className="admin-step">
+            <div className="admin-step-num">3</div>
+            <div>
+              <h3>Фото для историй</h3>
+              <p>
+                Загрузите сами или сгенерируйте ИИ ниже. Каждое фото — один раз. Если пул пуст и в .env стоит{" "}
+                <code>AI_CLIENT_PHOTOS=fallback</code>, бот сам дорисует фото при отзыве.
+              </p>
+            </div>
+          </div>
+          <div className="admin-step">
+            <div className="admin-step-num">4</div>
+            <div>
+              <h3>Чеки банков</h3>
+              <p>
+                Не загружаются вручную: ИИ правит образцы из{" "}
+                <code>data/media/receipt_templates/&#123;project&#125;</code>. Нужны{" "}
+                <code>OPENAI_API_KEY</code> и <code>AI_RECEIPTS=fallback</code> (модель{" "}
+                <code>gpt-image-1</code>). Без ключа — HTML-заглушка.
+              </p>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
       <MediaLibrary
         projects={config.projects.projects.map((p) => ({ id: p.id, name: p.name }))}
         legends={legends.map((l) => ({ id: l.id, title: l.title }))}

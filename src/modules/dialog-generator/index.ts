@@ -3,15 +3,21 @@ import { randomUUID } from "crypto";
 
 import { markCombinationUsed, pickUnusedCombination } from "@/lib/combinations";
 import { loadAppConfig } from "@/lib/config/loader";
+import { pickUniqueAccountDigits } from "@/lib/account-digits";
 import {
   amountPackToVars,
   buildDialogVars,
   generateClabe,
   injectTemplate,
-  randomAccountLastDigits,
 } from "@/lib/format";
-import { generateDialogStub } from "@/lib/openai/client";
+import {
+  generateFullDialogBundle,
+  rephraseClientPhrase,
+  rephraseManagerPhrase,
+  type AiDialogBundle,
+} from "@/lib/openai/agents";
 import { createLogger } from "@/lib/runtime/manager";
+import { getEnv } from "@/lib/schemas/env";
 import { getFileStore } from "@/lib/storage/file-store";
 import {
   clientLegendSchema,
@@ -76,6 +82,7 @@ export interface GeneratedDialog {
   payoutBankId: string;
   messages: DialogMessage[];
   createdAt: string;
+  aiAuthored?: boolean;
 }
 
 type ManagerStage = z.infer<typeof managerScriptSchema>["stages"][string][number];
@@ -92,6 +99,19 @@ const STAGE_ORDER = [
   "payout",
   "gratitude",
 ] as const;
+
+const STAGE_DELAY: Record<string, number> = {
+  greeting: 1,
+  trust_building: 3,
+  conditions: 5,
+  deposit: 8,
+  bet_1: 15,
+  bet_2: 25,
+  bet_3: 35,
+  completion: 45,
+  payout: 55,
+  gratitude: 58,
+};
 
 function pickRandom<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
@@ -126,114 +146,321 @@ export class DialogGenerator {
   private async resolveClientReply(
     legend: ClientLegend,
     replyKey: string | string[],
+    context: {
+      clientName: string;
+      managerName: string;
+      deposit: number;
+      profitFinal: number;
+    },
   ): Promise<string> {
     if (Array.isArray(replyKey)) {
       return pickRandom(replyKey);
     }
     if (replyKey === "doubt") {
       const phrase = pickRandom(legend.doubtPhrases);
-      const ai = await generateDialogStub(
-        `Rephrase this Spanish doubt phrase naturally (1 sentence): "${phrase}"`,
-      );
-      return ai.startsWith("[stub]") ? phrase : ai.trim();
+      if (getEnv().AI_DIALOG === "off") return phrase;
+      return rephraseClientPhrase(phrase, "doubt", context);
     }
     const phrase = pickRandom(legend.gratitudePhrases);
-    const ai = await generateDialogStub(
-      `Rephrase this Spanish gratitude phrase naturally (1-2 sentences): "${phrase}"`,
-    );
-    return ai.startsWith("[stub]") ? phrase : ai.trim();
+    if (getEnv().AI_DIALOG === "off") return phrase;
+    return rephraseClientPhrase(phrase, "gratitude", context);
   }
 
-  private buildManagerMessage(
+  private async buildManagerMessage(
     stage: ManagerStage,
+    stageName: string,
     vars: Record<string, string | number>,
-  ): DialogMessage {
+    context: {
+      clientName: string;
+      managerName: string;
+      deposit: number;
+      profitFinal: number;
+    },
+  ): Promise<DialogMessage> {
+    const content = injectTemplate(stage.content, vars);
+    const shouldAi =
+      getEnv().AI_DIALOG !== "off" &&
+      stage.role === "manager" &&
+      stage.type === "text" &&
+      !content.includes("{{") &&
+      content.length > 12;
+
+    const finalContent = shouldAi
+      ? await rephraseManagerPhrase(content, stageName, context)
+      : content;
+
     return dialogMessageSchema.parse({
       id: randomUUID(),
       role: stage.role,
       type: stage.type as MessageType,
-      content: injectTemplate(stage.content, vars),
+      content: finalContent,
       delayMinutes: stage.delayMinutes,
     });
   }
 
-  async generate(params: {
-    projectId: string;
-    scenarioId?: string;
-    reviewType?: "small" | "big" | "unique_circle";
-  }): Promise<GeneratedDialog> {
-    const config = await loadAppConfig();
-    const project = config.projects.projects.find((p) => p.id === params.projectId);
-    if (!project) throw new Error(`Project not found: ${params.projectId}`);
-
-    const [scenarios, legends, managerScript] = await Promise.all([
-      this.loadScenarios(),
-      this.loadLegends(),
-      this.loadManagerScript(),
-    ]);
-
-    const scenario =
-      scenarios.find((s) => s.id === params.scenarioId && s.enabled) ??
-      scenarios.find((s) => s.projectId === params.projectId && s.enabled);
-    if (!scenario) throw new Error(`No scenario for project: ${params.projectId}`);
-
-    const availableLegends = legends.filter((l) => scenario.legendIds.includes(l.id));
-    if (availableLegends.length === 0) throw new Error("No legends for scenario");
-
-    const namePool = config.geo.clientNamePools[project.locale] ?? ["Cliente"];
-    const combination = await pickUnusedCombination({
-      projectId: params.projectId,
-      legendIds: availableLegends.map((l) => l.id),
-      amountPackIds: config.amounts.packs.map((p) => p.id),
-      clientNames: namePool,
-    });
-
-    const legend = availableLegends.find((l) => l.id === combination.legendId) ?? availableLegends[0]!;
-    const amountPack =
-      config.amounts.packs.find((p) => p.id === combination.amountPackId) ?? config.amounts.packs[0]!;
-
-    const depositBank = pickRandom(config.banks.depositBanks);
-    const payoutBank = pickRandom(config.banks.payoutBanks);
-    const accountLastDigits = randomAccountLastDigits(
-      config.amounts.accountLastDigits.min,
-      config.amounts.accountLastDigits.max,
+  private pushMessage(
+    messages: DialogMessage[],
+    msg: Omit<DialogMessage, "id">,
+  ): void {
+    messages.push(
+      dialogMessageSchema.parse({
+        id: randomUUID(),
+        ...msg,
+      }),
     );
-    const clabe = generateClabe(depositBank.clabePrefix, accountLastDigits);
+  }
 
-    const amountVars = amountPackToVars(amountPack);
-    const depositMessage = injectTemplate(project.depositMessageTemplate, { clabe, ...amountVars });
-    const completionMessage = injectTemplate(project.completionMessageTemplate, { clabe, ...amountVars });
-    const payoutMessage = injectTemplate(project.payoutMessageTemplate, { clabe, ...amountVars });
+  /** Replace AI placeholder tokens (e.g. literal "doubt") with real legend phrases. */
+  private resolveAiTurnText(
+    text: string,
+    legend: AiDialogBundle["legend"],
+  ): string | null {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    if (/^(doubt|doubt\d+)$/i.test(trimmed)) {
+      return pickRandom(legend.doubtPhrases);
+    }
+    if (/^(gratitude|thanks|gratitude\d+|thanks\d+)$/i.test(trimmed)) {
+      return pickRandom(legend.gratitudePhrases);
+    }
+    return text;
+  }
 
-    const vars = buildDialogVars({
-      deposit: amountPack.deposit,
-      profitFinal: amountPack.profitFinal,
-      clabe,
-      depositMessage,
-      completionMessage,
-      payoutMessage,
+  /** Assemble dialog from AI legend + turns, inserting media at fixed stages. */
+  private assembleAiDialog(params: {
+    bundle: AiDialogBundle;
+    legendId: string;
+    stagesToUse: readonly string[];
+    depositMessage: string;
+    completionMessage: string;
+    payoutMessage: string;
+    conditionsTexts?: string[];
+    includeConditionsImage?: boolean;
+  }): DialogMessage[] {
+    const { bundle, legendId, stagesToUse } = params;
+    const messages: DialogMessage[] = [];
+    const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg);
+    const pushTurn = (role: "client" | "manager", text: string, delayMinutes: number) => {
+      const content = this.resolveAiTurnText(text, bundle.legend);
+      if (!content) return;
+      push({ role, type: "text", content, delayMinutes });
+    };
+
+    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
+    push({
+      role: "client",
+      type: "text",
+      content: bundle.legend.openingPhrase,
+      delayMinutes: 0,
     });
 
-    const messages: DialogMessage[] = [];
-    let msgIndex = 0;
-
-    const push = (msg: Omit<DialogMessage, "id">) => {
-      messages.push(
-        dialogMessageSchema.parse({
-          id: randomUUID(),
-          ...msg,
-          delayMinutes: msg.delayMinutes,
-        }),
-      );
-      msgIndex++;
-    };
+    bundle.legend.problemParts.forEach((part, i) => {
+      push({
+        role: "client",
+        type: "text",
+        content: part,
+        delayMinutes: i + 1,
+      });
+      if (i === 0) {
+        push({
+          role: "client",
+          type: "image",
+          content: legendId,
+          delayMinutes: i + 1,
+          metadata: { legendId },
+        });
+      }
+    });
 
     push({
       role: "client",
-      type: "sticker",
-      content: "greeting",
-      delayMinutes: 0,
+      type: "text",
+      content: bundle.legend.motivation,
+      delayMinutes: 3,
     });
+
+    const turnsByStage = new Map<string, typeof bundle.turns>();
+    for (const turn of bundle.turns) {
+      if (!stagesToUse.includes(turn.stage)) continue;
+      const list = turnsByStage.get(turn.stage) ?? [];
+      list.push(turn);
+      turnsByStage.set(turn.stage, list);
+    }
+
+    for (const stageName of stagesToUse) {
+      const baseDelay = STAGE_DELAY[stageName] ?? 10;
+      const stageTurns = turnsByStage.get(stageName) ?? [];
+
+      if (stageName === "conditions") {
+        const fixed = (params.conditionsTexts ?? []).map((t) => t.trim()).filter(Boolean);
+        // Image card first when present (Vlad: photo → copy), then fixed texts.
+        if (params.includeConditionsImage) {
+          push({
+            role: "manager",
+            type: "conditions",
+            content: "conditions",
+            delayMinutes: baseDelay,
+          });
+        }
+        if (fixed.length > 0) {
+          for (const text of fixed) {
+            push({
+              role: "manager",
+              type: "text",
+              content: text,
+              delayMinutes: baseDelay,
+            });
+          }
+        } else if (!params.includeConditionsImage) {
+          for (const turn of stageTurns) {
+            pushTurn(turn.role, turn.text, baseDelay);
+          }
+        }
+        continue;
+      }
+
+      if (stageName === "deposit") {
+        let injectedDeposit = false;
+        for (const turn of stageTurns) {
+          const isDepositTpl =
+            turn.role === "manager" &&
+            (turn.text.includes(params.depositMessage.slice(0, 20)) ||
+              turn.text === params.depositMessage);
+          if (isDepositTpl) {
+            push({
+              role: turn.role,
+              type: "text",
+              content: params.depositMessage,
+              delayMinutes: baseDelay,
+            });
+            injectedDeposit = true;
+          } else {
+            pushTurn(turn.role, turn.text, baseDelay);
+          }
+        }
+        if (!injectedDeposit) {
+          push({
+            role: "manager",
+            type: "text",
+            content: params.depositMessage,
+            delayMinutes: baseDelay,
+          });
+        }
+        push({
+          role: "client",
+          type: "captura",
+          content: "payment_proof",
+          delayMinutes: baseDelay + 2,
+        });
+        continue;
+      }
+
+      if (stageName === "bet_1" || stageName === "bet_2" || stageName === "bet_3") {
+        push({
+          role: "manager",
+          type: "bet",
+          content: stageName,
+          delayMinutes: baseDelay,
+        });
+        for (const turn of stageTurns) {
+          pushTurn(turn.role, turn.text, baseDelay + 1);
+        }
+        continue;
+      }
+
+      if (stageName === "completion") {
+        let injected = false;
+        for (const turn of stageTurns) {
+          const isTpl =
+            turn.role === "manager" &&
+            (turn.text === params.completionMessage ||
+              turn.text.includes(params.completionMessage.slice(0, 20)));
+          if (isTpl) {
+            push({
+              role: turn.role,
+              type: "text",
+              content: params.completionMessage,
+              delayMinutes: baseDelay,
+            });
+            injected = true;
+          } else {
+            pushTurn(turn.role, turn.text, baseDelay);
+          }
+        }
+        if (!injected) {
+          push({
+            role: "manager",
+            type: "text",
+            content: params.completionMessage,
+            delayMinutes: baseDelay,
+          });
+        }
+        continue;
+      }
+
+      if (stageName === "payout") {
+        push({
+          role: "manager",
+          type: "receipt",
+          content: "receipt",
+          delayMinutes: baseDelay,
+        });
+        let injected = false;
+        for (const turn of stageTurns) {
+          const isTpl =
+            turn.role === "manager" &&
+            (turn.text === params.payoutMessage ||
+              turn.text.includes(params.payoutMessage.slice(0, 12)));
+          if (isTpl) {
+            push({
+              role: turn.role,
+              type: "text",
+              content: params.payoutMessage,
+              delayMinutes: baseDelay + 1,
+            });
+            injected = true;
+          } else {
+            pushTurn(turn.role, turn.text, baseDelay + 1);
+          }
+        }
+        if (!injected) {
+          push({
+            role: "manager",
+            type: "text",
+            content: params.payoutMessage,
+            delayMinutes: baseDelay + 1,
+          });
+        }
+        continue;
+      }
+
+      for (const turn of stageTurns) {
+        pushTurn(turn.role, turn.text, baseDelay);
+      }
+    }
+
+    return messages;
+  }
+
+  private async assembleScriptDialog(params: {
+    legend: ClientLegend;
+    managerScript: z.infer<typeof managerScriptSchema>;
+    vars: Record<string, string | number>;
+    agentContext: {
+      clientName: string;
+      managerName: string;
+      deposit: number;
+      profitFinal: number;
+    };
+    stagesToUse: readonly string[];
+    isUniqueCircle: boolean;
+  }): Promise<DialogMessage[]> {
+    const { legend, managerScript, vars, agentContext, stagesToUse, isUniqueCircle } = params;
+    const messages: DialogMessage[] = [];
+    const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg);
+    let msgIndex = 0;
+
+    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
 
     if (legend.openingPhrase) {
       push({
@@ -264,6 +491,7 @@ export class DialogGenerator {
           metadata: { legendId: legend.id },
         });
       }
+      msgIndex++;
     });
 
     if (legend.motivation && problemParts.length < 3) {
@@ -275,16 +503,10 @@ export class DialogGenerator {
       });
     }
 
-    const isSmallReview = params.reviewType === "small";
-    const isUniqueCircle = params.reviewType === "unique_circle";
-    const stagesToUse = isSmallReview
-      ? STAGE_ORDER.slice(0, 6)
-      : STAGE_ORDER;
-
     for (const stageName of stagesToUse) {
       const stageMessages = managerScript.stages[stageName] ?? [];
       for (const stageMsg of stageMessages) {
-        push(this.buildManagerMessage(stageMsg, vars));
+        push(await this.buildManagerMessage(stageMsg, stageName, vars, agentContext));
       }
 
       const clientReply = managerScript.clientReplies[stageName];
@@ -301,7 +523,11 @@ export class DialogGenerator {
             }
           }
         } else {
-          const content = await this.resolveClientReply(legend, clientReply as string | string[]);
+          const content = await this.resolveClientReply(
+            legend,
+            clientReply as string | string[],
+            agentContext,
+          );
           push({
             role: "client",
             type: "text",
@@ -331,7 +557,7 @@ export class DialogGenerator {
     }
 
     if (isUniqueCircle) {
-      const extraThanks = await this.resolveClientReply(legend, "gratitude");
+      const extraThanks = await this.resolveClientReply(legend, "gratitude", agentContext);
       push({
         role: "client",
         type: "text",
@@ -340,21 +566,165 @@ export class DialogGenerator {
       });
     }
 
+    return messages;
+  }
+
+  async generate(params: {
+    projectId: string;
+    scenarioId?: string;
+    reviewType?: "small" | "big" | "unique_circle";
+  }): Promise<GeneratedDialog> {
+    const config = await loadAppConfig();
+    const project = config.projects.projects.find((p) => p.id === params.projectId);
+    if (!project) throw new Error(`Project not found: ${params.projectId}`);
+
+    const [scenarios, legends, managerScript] = await Promise.all([
+      this.loadScenarios(),
+      this.loadLegends(),
+      this.loadManagerScript(),
+    ]);
+
+    const scenario =
+      scenarios.find((s) => s.id === params.scenarioId && s.enabled) ??
+      scenarios.find((s) => s.projectId === params.projectId && s.enabled);
+    if (!scenario) throw new Error(`No scenario for project: ${params.projectId}`);
+
+    const availableLegends = legends.filter((l) => scenario.legendIds.includes(l.id));
+    if (availableLegends.length === 0) throw new Error("No legends for scenario");
+
+    const namePool = config.geo.clientNamePools[project.locale] ?? ["Cliente"];
+    const bankCountry = project.locale.toLowerCase().startsWith("ru") ? "RU" : "MX";
+    const depositBanks = config.banks.depositBanks.filter((b) => b.country === bankCountry);
+    const payoutBanks = config.banks.payoutBanks.filter((b) => b.country === bankCountry);
+    const amountPackIds = config.amounts.packs
+      .filter((p) => p.currency === project.currency)
+      .map((p) => p.id);
+    const combination = await pickUnusedCombination({
+      projectId: params.projectId,
+      legendIds: availableLegends.map((l) => l.id),
+      amountPackIds: amountPackIds.length > 0 ? amountPackIds : config.amounts.packs.map((p) => p.id),
+      clientNames: namePool,
+    });
+
+    const seedLegend =
+      availableLegends.find((l) => l.id === combination.legendId) ?? availableLegends[0]!;
+    const amountPack =
+      config.amounts.packs.find((p) => p.id === combination.amountPackId) ??
+      config.amounts.packs.find((p) => p.currency === project.currency) ??
+      config.amounts.packs[0]!;
+
+    const depositBank = pickRandom(depositBanks.length > 0 ? depositBanks : config.banks.depositBanks);
+    const payoutBank = pickRandom(payoutBanks.length > 0 ? payoutBanks : config.banks.payoutBanks);
+    const accountLastDigits = await pickUniqueAccountDigits({
+      min: config.amounts.accountLastDigits.min,
+      max: config.amounts.accountLastDigits.max,
+      projectId: params.projectId,
+    });
+    const clabe = generateClabe(depositBank.clabePrefix, accountLastDigits);
+
+    const amountVars = amountPackToVars(amountPack);
+    const bankName = depositBank.shortName ?? depositBank.name;
+    const depositMessage = injectTemplate(project.depositMessageTemplate, {
+      clabe,
+      bankName,
+      bank: bankName,
+      ...amountVars,
+    });
+    const completionMessage = injectTemplate(project.completionMessageTemplate, {
+      clabe,
+      bankName,
+      bank: bankName,
+      ...amountVars,
+    });
+    const payoutMessage = injectTemplate(project.payoutMessageTemplate, {
+      clabe,
+      bankName,
+      bank: bankName,
+      ...amountVars,
+    });
+
+    const vars = buildDialogVars({
+      deposit: amountPack.deposit,
+      profitFinal: amountPack.profitFinal,
+      clabe,
+      depositMessage,
+      completionMessage,
+      payoutMessage,
+    });
+
+    const clientName = combination.clientName.split(" ")[0] ?? combination.clientName;
+    const agentContext = {
+      clientName,
+      managerName: project.managerName,
+      deposit: amountPack.deposit,
+      profitFinal: amountPack.profitFinal,
+    };
+
+    const isSmallReview = params.reviewType === "small";
+    const isUniqueCircle = params.reviewType === "unique_circle";
+    const stagesToUse = isSmallReview ? STAGE_ORDER.slice(0, 6) : STAGE_ORDER;
+
+    const dialogAiOn = getEnv().AI_DIALOG !== "off";
+    const aiBundle = dialogAiOn
+      ? await generateFullDialogBundle({
+          clientName,
+          managerName: project.managerName,
+          deposit: amountPack.deposit,
+          profit1: amountPack.profit1,
+          profit2: amountPack.profit2,
+          profitFinal: amountPack.profitFinal,
+          currency: project.currency,
+          locale: project.locale,
+          reviewType: params.reviewType ?? "big",
+          depositMessage,
+          completionMessage,
+          payoutMessage,
+        })
+      : null;
+
+    const legendId = aiBundle ? `ai_${randomUUID().slice(0, 8)}` : seedLegend.id;
+    let messages: DialogMessage[];
+    let aiAuthored = false;
+
+    if (aiBundle) {
+      messages = this.assembleAiDialog({
+        bundle: aiBundle,
+        legendId,
+        stagesToUse,
+        depositMessage,
+        completionMessage,
+        payoutMessage,
+        includeConditionsImage: Boolean(project.conditionsImagePath),
+        ...(project.conditionsTexts?.length ? { conditionsTexts: project.conditionsTexts } : {}),
+      });
+      aiAuthored = true;
+    } else {
+      messages = await this.assembleScriptDialog({
+        legend: seedLegend,
+        managerScript,
+        vars,
+        agentContext,
+        stagesToUse,
+        isUniqueCircle,
+      });
+    }
+
     await markCombinationUsed(params.projectId, combination);
     await logger.info("Dialog generated", {
       projectId: params.projectId,
       scenarioId: scenario.id,
-      legendId: legend.id,
+      legendId,
       messagesCount: messages.length,
       reviewType: params.reviewType ?? "big",
+      aiAuthored,
     });
 
     return {
       id: randomUUID(),
       projectId: params.projectId,
       scenarioId: scenario.id,
-      legendId: legend.id,
-      clientName: combination.clientName.split(" ")[0] ?? combination.clientName,
+      legendId,
+      clientName,
       amountPackId: amountPack.id,
       deposit: amountPack.deposit,
       profit1: amountPack.profit1,
@@ -366,6 +736,7 @@ export class DialogGenerator {
       payoutBankId: payoutBank.id,
       messages,
       createdAt: new Date().toISOString(),
+      aiAuthored,
     };
   }
 }

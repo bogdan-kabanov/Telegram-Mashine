@@ -5,12 +5,16 @@
     { "id": "mercado_pago", "name": "Mercado Pago Wallet", "shortName": "Mercado Pago W", "country": "MX", "supportsTransfer": true },
     { "id": "spin", "name": "Spin by OXXO", "shortName": "Spin", "country": "MX", "supportsTransfer": true },
     { "id": "nu", "name": "Nu México", "shortName": "Nu", "country": "MX", "supportsTransfer": true },
-    { "id": "okx", "name": "OKX Wallet", "shortName": "OKX", "country": "MX", "supportsTransfer": true }
+    { "id": "okx", "name": "OKX Wallet", "shortName": "OKX", "country": "MX", "supportsTransfer": true },
+    { "id": "sber", "name": "Сбербанк", "shortName": "Сбер", "country": "RU", "supportsTransfer": true },
+    { "id": "tinkoff", "name": "Т-Банк", "shortName": "Т-Банк", "country": "RU", "supportsTransfer": true }
   ],
   "depositBanks": [
     { "id": "bbva", "name": "BBVA México", "shortName": "BBVA", "country": "MX", "clabePrefix": "012", "supportsTransfer": true },
     { "id": "spin", "name": "Spin by OXXO", "shortName": "Spin", "country": "MX", "supportsTransfer": true },
     { "id": "mercado_pago", "name": "Mercado Pago Wallet", "shortName": "Mercado Pago W", "country": "MX", "supportsTransfer": true },
-    { "id": "okx", "name": "OKX Wallet", "shortName": "OKX", "country": "MX", "supportsTransfer": true }
+    { "id": "okx", "name": "OKX Wallet", "shortName": "OKX", "country": "MX", "supportsTransfer": true },
+    { "id": "sber", "name": "Сбербанк", "shortName": "Сбер", "country": "RU", "supportsTransfer": true },
+    { "id": "tinkoff", "name": "Т-Банк", "shortName": "Т-Банк", "country": "RU", "supportsTransfer": true }
   ]
 }

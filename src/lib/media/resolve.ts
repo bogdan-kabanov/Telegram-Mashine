@@ -41,7 +41,15 @@ export function resolveMediaFilePath(filePath: string): string | null {
   return fromCwd;
 }
 
-export async function resolveClientAvatarForProject(projectId: string): Promise<string | null> {
+export async function resolveClientAvatarForProject(
+  projectId: string,
+  preferredPath?: string | null,
+): Promise<string | null> {
+  if (preferredPath) {
+    const preferred = fileToDataUri(preferredPath);
+    if (preferred) return preferred;
+  }
+
   const db = getDb();
   const assets = await db
     .select()
@@ -62,10 +70,18 @@ export async function resolveClientAvatarForProject(projectId: string): Promise<
   return fileToDataUri(path.join(process.env.DATA_DIR ?? "data", "media/avatars/preview-default.png"));
 }
 
-export async function pickRandomClientAvatar(projectId: string): Promise<{
+export async function pickRandomClientAvatar(
+  projectId: string,
+  preferredPath?: string | null,
+): Promise<{
   dataUri: string | null;
   filePath: string | null;
 }> {
+  if (preferredPath) {
+    const dataUri = fileToDataUri(preferredPath);
+    if (dataUri) return { dataUri, filePath: preferredPath };
+  }
+
   const db = getDb();
   const assets = await db
     .select()
@@ -118,9 +134,39 @@ export async function resolveWallpaperForProject(
   return null;
 }
 
-export async function resolveImageForRender(filePath: string | null | undefined): Promise<string | null> {
+export async function resolveImageForRender(
+  filePath: string | null | undefined,
+  options?: { trimWhitespace?: boolean; removeWhiteBackground?: boolean },
+): Promise<string | null> {
   if (!filePath) return null;
-  return fileToDataUri(filePath);
+
+  let pathToLoad = filePath;
+  const resolved = resolveMediaFilePath(filePath);
+
+  if (options?.removeWhiteBackground && resolved) {
+    try {
+      const { removeWhiteBackgroundImage } = await import("@/lib/media/trim-image");
+      const keyed = await removeWhiteBackgroundImage(resolved, { threshold: 242 });
+      pathToLoad = keyed.path;
+    } catch {
+      pathToLoad = filePath;
+    }
+  }
+
+  if (options?.trimWhitespace) {
+    try {
+      const { trimWhitespaceImage } = await import("@/lib/media/trim-image");
+      const base = resolveMediaFilePath(pathToLoad) ?? resolved;
+      if (base) {
+        const trimmed = await trimWhitespaceImage(base, { threshold: 22, padding: 6 });
+        pathToLoad = trimmed.path;
+      }
+    } catch {
+      // keep pathToLoad
+    }
+  }
+
+  return fileToDataUri(pathToLoad);
 }
 
 export async function pickRandomMediaFromDb(

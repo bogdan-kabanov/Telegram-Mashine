@@ -6,7 +6,26 @@ export const projectThemeSchema = z.object({
   outgoingBubbleAlt: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   headerBg: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#F7F7F7"),
-  statusBarStyle: z.enum(["light", "dark"]).default("dark"),
+  /** Optional second stop for header gradient (Telegram-like). */
+  headerBgEnd: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  statusBarStyle: z.enum(["light", "dark"]).default("light"),
+});
+
+/** HTML fallback style when AI receipt generation is unavailable. */
+export const receiptStyleSchema = z.enum([
+  "spin",
+  "mercado_pago",
+  "okx",
+  "bbva",
+  "generic",
+]);
+
+/** Reference JPG/PNG filenames under data/media/receipt_templates/{projectId}/ */
+export const receiptTemplatesSchema = z.object({
+  /** Captura (client → manager deposit proof). */
+  client: z.array(z.string().min(1)).min(1),
+  /** Receipt (manager → client payout proof). */
+  manager: z.array(z.string().min(1)).min(1),
 });
 
 export const projectConfigSchema = z.object({
@@ -17,8 +36,23 @@ export const projectConfigSchema = z.object({
   managerName: z.string().min(1),
   managerHandle: z.string().min(1),
   managerAvatarPath: z.string().optional(),
+  /** Client photo in chat header (from media library). */
+  clientAvatarPath: z.string().optional(),
   wallpaperPath: z.string().optional(),
   conditionsImagePath: z.string().optional(),
+  /**
+   * Exact manager message(s) for the conditions stage (Vlad copy).
+   * When set, these replace AI-generated conditions text.
+   * Image still sent separately if conditionsImagePath / media exists.
+   */
+  conditionsTexts: z.array(z.string().min(1)).optional(),
+  /** Telegram addtheme id (t.me/addtheme/...). */
+  telegramThemeId: z.string().optional(),
+  /** Preferred HTML fallback look (overrides bank mapping when set). */
+  receiptStyle: receiptStyleSchema.optional(),
+  capturaStyle: receiptStyleSchema.optional(),
+  /** Per-role AI reference templates (Vlad rules: which slips client vs manager may use). */
+  receiptTemplates: receiptTemplatesSchema.optional(),
   theme: projectThemeSchema,
   depositMessageTemplate: z.string().min(1),
   completionMessageTemplate: z.string().min(1),
@@ -34,3 +68,4 @@ export const projectsConfigSchema = z.object({
 export type ProjectTheme = z.infer<typeof projectThemeSchema>;
 export type ProjectConfig = z.infer<typeof projectConfigSchema>;
 export type ProjectsConfig = z.infer<typeof projectsConfigSchema>;
+export type ReceiptTemplates = z.infer<typeof receiptTemplatesSchema>;

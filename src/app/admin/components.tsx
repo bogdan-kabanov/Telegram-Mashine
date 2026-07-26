@@ -2,34 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
-import { colors, styles } from "./styles";
+import { HelpTip } from "./ui/HelpTip";
+import { HelpNavLink, RestartTourButton } from "./ui/Onboarding";
+
+export { colors } from "./styles";
 
 const LINKS = [
-  { href: "/admin", label: "Обзор" },
-  { href: "/admin/projects", label: "Проекты" },
-  { href: "/admin/media", label: "Медиа" },
-  { href: "/admin/settings", label: "Легенды" },
-  { href: "/admin/schedule", label: "Расписание" },
+  { href: "/admin", label: "Главная", tour: "tour-nav-home" },
+  { href: "/admin/constructor", label: "Конструктор", tour: "tour-nav-constructor" },
+  { href: "/admin/media", label: "Медиатека", tour: "tour-nav-media" },
+  { href: "/admin/projects", label: "Проекты", tour: "tour-nav-projects" },
+  { href: "/admin/settings", label: "Истории", tour: "tour-nav-stories" },
+  { href: "/admin/ai", label: "Настройки", tour: "tour-nav-ai" },
+  { href: "/admin/schedule", label: "Расписание", tour: "tour-nav-schedule" },
+  { href: "/admin/help", label: "Справка", tour: "tour-nav-help" },
 ];
 
-export function AdminNav() {
+function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav style={styles.nav}>
+    <nav className="admin-nav" aria-label="Разделы панели" data-tour="tour-nav">
       {LINKS.map((link) => {
-        const active = pathname === link.href;
+        const isActive =
+          link.href === "/admin"
+            ? pathname === "/admin"
+            : pathname === link.href || pathname.startsWith(`${link.href}/`);
+
         return (
           <Link
             key={link.href}
             href={link.href}
-            style={{
-              ...styles.navLink,
-              ...(active ? styles.navLinkActive : {}),
-            }}
+            className={`admin-nav-link${isActive ? " is-active" : ""}`}
+            data-tour={link.tour}
           >
-            {link.label}
+            <strong>{link.label}</strong>
           </Link>
         );
       })}
@@ -37,27 +46,109 @@ export function AdminNav() {
   );
 }
 
-export function AdminShell({ title, children }: { title: string; children: React.ReactNode }) {
+export function AdminShell({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <header style={{ marginBottom: "0.75rem" }}>
-          <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 600 }}>{title}</h1>
-        </header>
+    <div className="admin-root">
+      <aside className="admin-side">
+        <div className="admin-side-brand">
+          <div className="admin-side-brand-mark">BOT AI</div>
+        </div>
         <AdminNav />
-        {children}
+        <div className="admin-side-foot">
+          <RestartTourButton />
+          <HelpNavLink />
+        </div>
+      </aside>
+
+      <div className="admin-main">
+        <div className="admin-main-inner">
+          <header className="admin-topbar">
+            <div>
+              <div className="admin-brand-kicker">Раздел</div>
+              <h1 className="admin-brand-title">{title}</h1>
+              {description ? <p className="admin-brand-sub">{description}</p> : null}
+            </div>
+          </header>
+          {children}
+        </div>
       </div>
     </div>
   );
 }
 
-export function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
+export function StatCard({
+  label,
+  value,
+  color,
+  tip,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+  tip?: string;
+}) {
   return (
-    <div style={styles.card}>
-      <div style={{ color: colors.muted, fontSize: "0.75rem", marginBottom: "0.25rem" }}>{label}</div>
-      <div style={{ fontSize: "1.125rem", fontWeight: 600, color: color ?? colors.text, textTransform: "capitalize" }}>
+    <div className="admin-stat">
+      <div className="admin-stat-label">
+        {label}
+        {tip ? <HelpTip text={tip} placement="below" /> : null}
+      </div>
+      <div className="admin-stat-value" style={color ? { color } : undefined}>
         {value}
       </div>
     </div>
+  );
+}
+
+export function PageIntro({
+  title,
+  tip,
+  children,
+}: {
+  title: string;
+  tip?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="page-intro">
+      <h1>
+        {title}
+        {tip ? <HelpTip text={tip} placement="below" /> : null}
+      </h1>
+      <p>{children}</p>
+    </div>
+  );
+}
+
+export function SectionCard({
+  title,
+  tip,
+  description,
+  children,
+  tourId,
+}: {
+  title: string;
+  tip?: string;
+  description?: string;
+  children: ReactNode;
+  tourId?: string;
+}) {
+  return (
+    <section className="admin-card" {...(tourId ? { "data-tour": tourId } : {})}>
+      <h2 className="admin-card-title">
+        {title}
+        {tip ? <HelpTip text={tip} placement="below" /> : null}
+      </h2>
+      {description ? <p className="admin-card-desc">{description}</p> : null}
+      {children}
+    </section>
   );
 }

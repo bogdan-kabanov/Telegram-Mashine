@@ -2,26 +2,74 @@
   "timezone": "America/Mexico_City",
   "postsPerDay": 15,
   "phaseDelayMinutes": 90,
-  "slots": [
-    { "id": "slot_01", "hour": 7, "minute": 0, "reviewType": "small", "projectId": "nancy" },
-    { "id": "slot_02", "hour": 8, "minute": 30, "reviewType": "small", "projectId": "maya" },
-    { "id": "slot_03", "hour": 10, "minute": 0, "reviewType": "big", "projectId": "luna" },
-    { "id": "slot_04", "hour": 11, "minute": 30, "reviewType": "small", "projectId": "sofia" },
-    { "id": "slot_05", "hour": 13, "minute": 0, "reviewType": "small", "projectId": "valeria" },
-    { "id": "slot_06", "hour": 14, "minute": 30, "reviewType": "big", "projectId": "nancy" },
-    { "id": "slot_07", "hour": 16, "minute": 0, "reviewType": "small", "projectId": "maya" },
-    { "id": "slot_08", "hour": 17, "minute": 30, "reviewType": "small", "projectId": "luna" },
-    { "id": "slot_09", "hour": 19, "minute": 0, "reviewType": "big", "projectId": "sofia" },
-    { "id": "slot_10", "hour": 20, "minute": 30, "reviewType": "small", "projectId": "valeria" },
-    { "id": "slot_11", "hour": 22, "minute": 0, "reviewType": "small", "projectId": "nancy" },
-    { "id": "slot_12", "hour": 23, "minute": 30, "reviewType": "small", "projectId": "maya" },
-    { "id": "slot_13", "hour": 1, "minute": 0, "reviewType": "small", "projectId": "luna" },
-    { "id": "slot_14", "hour": 3, "minute": 0, "reviewType": "small", "projectId": "sofia" },
-    { "id": "slot_15", "hour": 5, "minute": 0, "reviewType": "small", "projectId": "valeria" }
+  "cycleWeeks": 3,
+  "cycleEpochDate": "2026-07-06",
+  "weeks": [
+    {
+      "label": "Неделя A",
+      "slots": [
+        { "id": "slot_01", "hour": 7, "minute": 0, "reviewType": "small", "projectId": "nancy" },
+        { "id": "slot_02", "hour": 8, "minute": 30, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_03", "hour": 10, "minute": 0, "reviewType": "big", "projectId": "melissa" },
+        { "id": "slot_04", "hour": 11, "minute": 30, "reviewType": "small", "projectId": "paola" },
+        { "id": "slot_05", "hour": 13, "minute": 0, "reviewType": "small", "projectId": "francesca" },
+        { "id": "slot_06", "hour": 14, "minute": 30, "reviewType": "big", "projectId": "nancy" },
+        { "id": "slot_07", "hour": 16, "minute": 0, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_08", "hour": 17, "minute": 30, "reviewType": "small", "projectId": "melissa" },
+        { "id": "slot_09", "hour": 19, "minute": 0, "reviewType": "big", "projectId": "paola" },
+        { "id": "slot_10", "hour": 20, "minute": 30, "reviewType": "small", "projectId": "francesca" },
+        { "id": "slot_11", "hour": 22, "minute": 0, "reviewType": "small", "projectId": "nancy" },
+        { "id": "slot_12", "hour": 23, "minute": 30, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_13", "hour": 1, "minute": 0, "reviewType": "small", "projectId": "melissa" },
+        { "id": "slot_14", "hour": 3, "minute": 0, "reviewType": "small", "projectId": "paola" },
+        { "id": "slot_15", "hour": 5, "minute": 0, "reviewType": "small", "projectId": "francesca" }
+      ]
+    },
+    {
+      "label": "Неделя B",
+      "slots": [
+        { "id": "slot_01", "hour": 7, "minute": 0, "reviewType": "big", "projectId": "grisel" },
+        { "id": "slot_02", "hour": 8, "minute": 30, "reviewType": "small", "projectId": "melissa" },
+        { "id": "slot_03", "hour": 10, "minute": 0, "reviewType": "small", "projectId": "paola" },
+        { "id": "slot_04", "hour": 11, "minute": 30, "reviewType": "big", "projectId": "francesca" },
+        { "id": "slot_05", "hour": 13, "minute": 0, "reviewType": "small", "projectId": "nancy" },
+        { "id": "slot_06", "hour": 14, "minute": 30, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_07", "hour": 16, "minute": 0, "reviewType": "big", "projectId": "melissa" },
+        { "id": "slot_08", "hour": 17, "minute": 30, "reviewType": "small", "projectId": "paola" },
+        { "id": "slot_09", "hour": 19, "minute": 0, "reviewType": "small", "projectId": "francesca" },
+        { "id": "slot_10", "hour": 20, "minute": 30, "reviewType": "big", "projectId": "nancy" },
+        { "id": "slot_11", "hour": 22, "minute": 0, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_12", "hour": 23, "minute": 30, "reviewType": "small", "projectId": "melissa" },
+        { "id": "slot_13", "hour": 1, "minute": 0, "reviewType": "small", "projectId": "paola" },
+        { "id": "slot_14", "hour": 3, "minute": 0, "reviewType": "small", "projectId": "francesca" },
+        { "id": "slot_15", "hour": 5, "minute": 0, "reviewType": "small", "projectId": "nancy" }
+      ]
+    },
+    {
+      "label": "Неделя C",
+      "slots": [
+        { "id": "slot_01", "hour": 7, "minute": 0, "reviewType": "small", "projectId": "paola" },
+        { "id": "slot_02", "hour": 8, "minute": 30, "reviewType": "big", "projectId": "francesca" },
+        { "id": "slot_03", "hour": 10, "minute": 0, "reviewType": "small", "projectId": "nancy" },
+        { "id": "slot_04", "hour": 11, "minute": 30, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_05", "hour": 13, "minute": 0, "reviewType": "big", "projectId": "melissa" },
+        { "id": "slot_06", "hour": 14, "minute": 30, "reviewType": "small", "projectId": "paola" },
+        { "id": "slot_07", "hour": 16, "minute": 0, "reviewType": "small", "projectId": "francesca" },
+        { "id": "slot_08", "hour": 17, "minute": 30, "reviewType": "big", "projectId": "nancy" },
+        { "id": "slot_09", "hour": 19, "minute": 0, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_10", "hour": 20, "minute": 30, "reviewType": "small", "projectId": "melissa" },
+        { "id": "slot_11", "hour": 22, "minute": 0, "reviewType": "big", "projectId": "paola" },
+        { "id": "slot_12", "hour": 23, "minute": 30, "reviewType": "small", "projectId": "francesca" },
+        { "id": "slot_13", "hour": 1, "minute": 0, "reviewType": "small", "projectId": "nancy" },
+        { "id": "slot_14", "hour": 3, "minute": 0, "reviewType": "small", "projectId": "grisel" },
+        { "id": "slot_15", "hour": 5, "minute": 0, "reviewType": "small", "projectId": "melissa" }
+      ]
+    }
   ],
   "weeklyUniqueCircle": {
     "dayOfWeek": 1,
     "hour": 12,
-    "minute": 0
+    "minute": 0,
+    "projectId": "nancy"
   }
 }

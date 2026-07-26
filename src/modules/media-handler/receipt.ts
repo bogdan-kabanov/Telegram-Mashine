@@ -115,15 +115,14 @@ export function bankIdToReceiptStyle(bankId: string): ReceiptBankStyle {
 }
 
 export async function renderReceiptPng(params: ReceiptParams, outputPath: string): Promise<string> {
-  const { chromium } = await import("playwright");
-  const { getChromiumLaunchOptions } = await import("@/lib/playwright");
+  const { launchChromium } = await import("@/lib/playwright");
   const html = buildReceiptHtml(params);
   const htmlPath = outputPath.replace(/\.png$/, ".html");
 
   mkdirSync(path.dirname(outputPath), { recursive: true });
   writeFileSync(htmlPath, html, "utf-8");
 
-  const browser = await chromium.launch(getChromiumLaunchOptions());
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: "load" });

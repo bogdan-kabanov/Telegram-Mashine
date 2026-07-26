@@ -8,6 +8,30 @@
       "currency": "MXN",
       "dateFormat": "d 'de' MMMM yyyy",
       "timeFormat": "HH:mm"
+    },
+    {
+      "code": "es-AR",
+      "name": "Español (Argentina)",
+      "timezone": "America/Argentina/Buenos_Aires",
+      "currency": "ARS",
+      "dateFormat": "d 'de' MMMM yyyy",
+      "timeFormat": "HH:mm"
+    },
+    {
+      "code": "es-VE",
+      "name": "Español (Venezuela)",
+      "timezone": "America/Caracas",
+      "currency": "VES",
+      "dateFormat": "dd/MM/yyyy",
+      "timeFormat": "HH:mm"
+    },
+    {
+      "code": "ru-RU",
+      "name": "Русский (тест)",
+      "timezone": "Europe/Moscow",
+      "currency": "RUB",
+      "dateFormat": "d MMMM yyyy",
+      "timeFormat": "HH:mm"
     }
   ],
   "clientNamePools": {
@@ -22,6 +46,31 @@
       "Luis Alberto Campos",
       "Miguel Ángel Ríos",
       "Roberto Carlos Salinas"
+    ],
+    "es-AR": [
+      "Thiago Lautaro Ledesma",
+      "Nicolás Ferreyra Salas",
+      "Olga Rivero",
+      "Martina Soledad Paz",
+      "Facundo Ariel Gómez",
+      "Camila Belén Suárez"
+    ],
+    "es-VE": [
+      "Emma Gutiérrez",
+      "Carlos Andrés Mendoza",
+      "Valentina Rojas",
+      "José Luis Paredes",
+      "Mariana del Carmen Díaz"
+    ],
+    "ru-RU": [
+      "Алексей",
+      "Дмитрий",
+      "Игорь",
+      "Сергей",
+      "Андрей",
+      "Максим",
+      "Николай",
+      "Павел"
     ]
   }
 }

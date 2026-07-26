@@ -14,7 +14,9 @@
     { "id": "pack_12", "deposit": 2000, "profit1": 50200, "profit2": 89800, "profitFinal": 181200, "currency": "MXN" },
     { "id": "pack_13", "deposit": 2200, "profit1": 54800, "profit2": 97600, "profitFinal": 197800, "currency": "MXN" },
     { "id": "pack_14", "deposit": 2500, "profit1": 61200, "profit2": 108400, "profitFinal": 219600, "currency": "MXN" },
-    { "id": "pack_15", "deposit": 2800, "profit1": 67800, "profit2": 119800, "profitFinal": 242400, "currency": "MXN" }
+    { "id": "pack_15", "deposit": 2800, "profit1": 67800, "profit2": 119800, "profitFinal": 242400, "currency": "MXN" },
+    { "id": "pack_ru_01", "deposit": 5000, "profit1": 28000, "profit2": 52000, "profitFinal": 98000, "currency": "RUB" },
+    { "id": "pack_ru_02", "deposit": 7500, "profit1": 41000, "profit2": 78000, "profitFinal": 145000, "currency": "RUB" }
   ],
   "accountLastDigits": {
     "min": 1000,

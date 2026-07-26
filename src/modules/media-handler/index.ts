@@ -5,10 +5,12 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
+import { generateAiReceipt, getAiReceiptsMode } from "@/lib/openai/receipts";
 import { createLogger } from "@/lib/runtime/manager";
+import type { ProjectConfig } from "@/lib/schemas/projects";
 import { getFileStore } from "@/lib/storage/file-store";
-import { bankIdToCapturaStyle, renderCapturaPng } from "./captura";
-import { bankIdToReceiptStyle, renderReceiptPng } from "./receipt";
+import { bankIdToCapturaStyle, renderCapturaPng, type CapturaBankStyle } from "./captura";
+import { bankIdToReceiptStyle, renderReceiptPng, type ReceiptBankStyle } from "./receipt";
 
 const logger = createLogger("media-handler");
 
@@ -19,6 +21,7 @@ export type MediaType =
   | "wallpaper"
   | "sticker"
   | "story_photo"
+  | "avatar"
   | "voice"
   | "receipt"
   | "captura";
@@ -39,6 +42,7 @@ const MEDIA_DIRS: Record<Exclude<MediaType, "receipt" | "captura">, string> = {
   wallpaper: "media/wallpapers",
   sticker: "media/stickers",
   story_photo: "media/story_photos",
+  avatar: "media/avatars",
   voice: "media/voices",
 };
 
@@ -105,16 +109,33 @@ export class MediaHandler {
     const dir = MEDIA_DIRS[type as Exclude<MediaType, "receipt" | "captura">];
     if (!dir) return [];
 
-    const files = (await this.store.listFiles(dir)).filter((f) =>
-      isValidMediaFile(f, `data/${dir}/${f}`),
+    // Prefer project subfolder: media/bets/nancy/...
+    const relativeDir = projectId && type !== "sticker" && type !== "story_photo" ? `${dir}/${projectId}` : dir;
+    const files = (await this.store.listFiles(relativeDir)).filter((f) =>
+      isValidMediaFile(f, `data/${relativeDir}/${f}`),
     );
+
+    // Wallpapers are flat files named {projectId}.ext
+    if (type === "wallpaper" && projectId) {
+      const all = (await this.store.listFiles(dir)).filter((f) =>
+        isValidMediaFile(f, `data/${dir}/${f}`),
+      );
+      const match = all.filter((f) => path.parse(f).name === projectId);
+      return match.map((filename) => ({
+        id: randomUUID(),
+        type,
+        filename,
+        path: `data/${dir}/${filename}`,
+        projectId,
+      }));
+    }
 
     return files.map((filename) => ({
       id: randomUUID(),
       type,
       filename,
-      path: `data/${dir}/${filename}`,
-      projectId: null,
+      path: `data/${relativeDir}/${filename}`,
+      projectId: projectId ?? null,
     }));
   }
 
@@ -205,6 +226,52 @@ export class MediaHandler {
     return this.pickRandom("sticker", projectId);
   }
 
+  /**
+   * Pick from library, or generate via AI when AI_MEDIA=fallback/always.
+   */
+  async resolveProjectImage(
+    type: "bet" | "conditions" | "sticker" | "avatar",
+    params: {
+      projectId: string;
+      projectName?: string;
+      locale?: string;
+      currency?: string;
+      clientName?: string;
+      reviewId?: string | null;
+    },
+  ): Promise<MediaAsset | null> {
+    const { getAiMediaMode, generateSceneMedia } = await import("@/lib/openai/scene-media");
+    const mode = getAiMediaMode();
+
+    if (mode !== "always") {
+      const existing =
+        type === "sticker"
+          ? await this.pickSticker(params.projectId)
+          : await this.pickRandomFromDb(type, params.projectId);
+      if (existing) return existing;
+      if (mode === "off") return null;
+    }
+
+    const generated = await generateSceneMedia({
+      kind: type,
+      projectId: type === "sticker" ? null : params.projectId,
+      ...(params.projectName ? { projectName: params.projectName } : {}),
+      ...(params.locale ? { locale: params.locale } : {}),
+      ...(params.currency ? { currency: params.currency } : {}),
+      ...(params.clientName ? { clientName: params.clientName } : {}),
+      ...(params.reviewId !== undefined ? { reviewId: params.reviewId } : {}),
+    });
+    if (!generated) return null;
+
+    return {
+      id: generated.assetId,
+      type,
+      filename: generated.filename,
+      path: generated.path,
+      projectId: type === "sticker" ? null : params.projectId,
+    };
+  }
+
   async generateReceipt(params: {
     amount: number;
     currency: string;
@@ -215,10 +282,39 @@ export class MediaHandler {
     accountLastDigits: string;
     date: string;
     time?: string;
-  }): Promise<{ id: string; path: string }> {
+    /** Project-level style overrides bank mapping when set. */
+    style?: ReceiptBankStyle;
+    project?: ProjectConfig;
+  }): Promise<{ id: string; path: string; source: "ai" | "html" }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/receipts");
     const outputPath = path.join(outputDir, `${id}.png`);
+    const time = params.time ?? "14:32";
+    const mode = getAiReceiptsMode();
+
+    if (params.project && mode !== "off") {
+      const ai = await generateAiReceipt({
+        project: params.project,
+        role: "manager",
+        amount: params.amount,
+        currency: params.currency,
+        senderName: params.senderName,
+        recipientName: params.recipientName,
+        accountLastDigits: params.accountLastDigits,
+        date: params.date,
+        time,
+        bankName: params.bankName,
+        outputPath,
+      });
+      if (ai) {
+        return { id, path: outputPath, source: "ai" };
+      }
+      if (mode === "always") {
+        await logger.warn("AI receipt required but failed — falling back to HTML", {
+          projectId: params.project.id,
+        });
+      }
+    }
 
     await renderReceiptPng(
       {
@@ -227,17 +323,17 @@ export class MediaHandler {
         senderName: params.senderName,
         recipientName: params.recipientName,
         bankName: params.bankName,
-        bankStyle: bankIdToReceiptStyle(params.bankId),
+        bankStyle: params.style ?? bankIdToReceiptStyle(params.bankId),
         accountLastDigits: params.accountLastDigits,
         date: params.date,
-        time: params.time ?? "14:32",
+        time,
         reference: id.slice(0, 8).toUpperCase(),
       },
       outputPath,
     );
 
-    await logger.info("Receipt generated", { id, path: outputPath, bankId: params.bankId });
-    return { id, path: outputPath };
+    await logger.info("Receipt generated", { id, path: outputPath, bankId: params.bankId, source: "html" });
+    return { id, path: outputPath, source: "html" };
   }
 
   async generateCaptura(params: {
@@ -250,10 +346,43 @@ export class MediaHandler {
     bankName: string;
     date: string;
     time?: string;
-  }): Promise<{ id: string; path: string }> {
+    style?: CapturaBankStyle;
+    project?: ProjectConfig;
+    accountLastDigits?: string;
+  }): Promise<{ id: string; path: string; source: "ai" | "html" }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/capturas");
     const outputPath = path.join(outputDir, `${id}.png`);
+    const time = params.time ?? "17:18";
+    const mode = getAiReceiptsMode();
+    const digits =
+      params.accountLastDigits ??
+      params.clabe.replace(/\D/g, "").slice(-4).padStart(4, "0");
+
+    if (params.project && mode !== "off") {
+      const ai = await generateAiReceipt({
+        project: params.project,
+        role: "client",
+        amount: params.amount,
+        currency: params.currency,
+        senderName: params.senderName,
+        recipientName: params.recipientLabel,
+        accountLastDigits: digits,
+        date: params.date,
+        time,
+        bankName: params.bankName,
+        clabe: params.clabe,
+        outputPath,
+      });
+      if (ai) {
+        return { id, path: outputPath, source: "ai" };
+      }
+      if (mode === "always") {
+        await logger.warn("AI captura required but failed — falling back to HTML", {
+          projectId: params.project.id,
+        });
+      }
+    }
 
     await renderCapturaPng(
       {
@@ -262,17 +391,17 @@ export class MediaHandler {
         senderName: params.senderName,
         recipientLabel: params.recipientLabel,
         clabe: params.clabe,
-        bankStyle: bankIdToCapturaStyle(params.bankId),
+        bankStyle: params.style ?? bankIdToCapturaStyle(params.bankId),
         bankName: params.bankName,
         date: params.date,
-        time: params.time ?? "17:18",
+        time,
         reference: id.slice(0, 10).toUpperCase(),
       },
       outputPath,
     );
 
-    await logger.info("Captura generated", { id, path: outputPath, bankId: params.bankId });
-    return { id, path: outputPath };
+    await logger.info("Captura generated", { id, path: outputPath, bankId: params.bankId, source: "html" });
+    return { id, path: outputPath, source: "html" };
   }
 }
 

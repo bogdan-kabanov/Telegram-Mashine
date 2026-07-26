@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { bootstrapApp } from "@/lib/bootstrap";
 import { loadAppConfig } from "@/lib/config/loader";
 import { getRuntimeManager } from "@/lib/runtime/manager";
+import { getActiveCycleWeekInfo } from "@/lib/schedule/cycle";
 import { getScheduler } from "@/modules/scheduler";
 
 export async function GET() {
@@ -17,6 +18,8 @@ export async function GET() {
       getScheduler().getUpcomingTasks(5),
     ]);
 
+    const cycle = getActiveCycleWeekInfo(config.schedule);
+
     return NextResponse.json({
       state,
       logs,
@@ -26,6 +29,10 @@ export async function GET() {
           postsPerDay: config.schedule.postsPerDay,
           phaseDelayMinutes: config.schedule.phaseDelayMinutes,
           timezone: config.schedule.timezone,
+          cycleWeeks: config.schedule.cycleWeeks ?? 3,
+          cycleWeekIndex: cycle.weekIndex,
+          cycleLabel: cycle.label,
+          isoWeek: cycle.isoWeek,
         },
         amounts: {
           packsCount: config.amounts.packs.length,

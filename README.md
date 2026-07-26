@@ -1,26 +1,26 @@
 # Bot AI — Генератор отзывов
 
-Автоматизированная система генерации мобильных скриншотов Telegram-чатов, чеков и публикации отзывов.
+Автоматизированная система генерации мобильных скриншотов Telegram-чатов, чеков и публикации отзывов в канал.
 
-## Этап 1 (текущий)
+## Статус по ТЗ
 
-Модульный каркас на **Next.js 15** + **SQLite** + **HTML/CSS рендер** + **веб-админка**.
-
-### Что реализовано
-
-- **База данных SQLite** — очередь задач, логи, runtime state, медиа, загрузки конфигов
-- **Веб-админка** — Dashboard, Проекты, Медиа, Настройки, Расписание
-- **5 проектов** с индивидуальными темами (фон, цвета пузырей)
-- **Chat Renderer** — HTML-шаблон мобильного Telegram → PNG через Playwright
-- **OpenAI** — клиент-заглушка (gpt-4o-mini)
-- **Telegram API** — только для публикации в канал (этап 5)
-- Zod-валидация всех конфигов
+| Этап | Статус |
+|------|--------|
+| 1 Архитектура | готово |
+| 2 Диалоги (+ AI agents) | готово |
+| 3 Скриншоты (HTML → Playwright) | готово |
+| 4 Чеки / медиапакет | готово (чеки — ИИ по образцам `receipt_templates`; ставки/кружки — upload / `seed:media`) |
+| 5 Планировщик + публикация | готово |
+| 6 Тесты / приёмка | готово (`npm test`) |
 
 ## Быстрый старт
 
 ```bash
 npm install
 cp .env.example .env
+
+npm run seed:media   # placeholder PNG (ставки, условия, обои)
+# реальные кружки (MP4) — загрузить в /admin/media
 
 npm run dev
 # http://localhost:PORT/admin
@@ -29,21 +29,40 @@ npm run dev
 ## Docker (production)
 
 ```bash
-# 1. Env
 cp .env.docker.example .env
-# заполнить TELEGRAM_*, OPENAI_*, APP_URL (публичный HTTPS)
+# TELEGRAM_*, OPENAI_*, APP_URL (публичный HTTPS)
 
-# 2. Сборка и запуск
 docker compose up -d --build
-
-# 3. Webhook (если AUTO_SETUP_WEBHOOK=0)
 curl -X POST http://localhost:3000/api/telegram/setup
-
-# Админка: http://localhost:3000/admin
-# Логи:    docker compose logs -f app
 ```
 
-Тома: `./data`, `./config`, `./public/renders`. Для Chromium в compose задан `shm_size: 256mb`.
+## Ключевые правила (ТЗ)
+
+- **Двухфаза** — только Nancy, задержка 90 мин; фаза 2 = полный альбом + медиа
+- **Last 4** — уникальные в SQLite (`used_account_digits`)
+- **Фото клиента** — каждое `story_photo` используется **один раз** (`used_client_photos`); при пустом пуле можно генерировать через OpenAI (`AI_CLIENT_PHOTOS=fallback|always`)
+- **Трёхнедельный цикл** — `config/schedule.json` → `weeks[A/B/C]`, **15 отзывов/день** (3×5 проектов)
+- **~9 скринов** на полный отзыв (пагинация подстраивается под длину диалога)
+- **Еженедельный круг** — уникальный video note + `pinChatMessage`
+- **OpenAI** — пишет **легенду + весь диалог**; без ключа — fallback на JSON-скрипты
+- **Чеки** — ИИ (`gpt-image-1`) правит образцы из `data/media/receipt_templates/{project}`; без ключа/шаблона — HTML Playwright
+- **Операционка** — раз в неделю загружать кружки и ставки; фото клиентов — в общий пул
+
+## Что ждём от автора (ассеты)
+
+- Фоны чата на 5 проектов
+- Темы Telegram (дизайн чатов) на каждый проект
+- Примеры готовых отзывов / фото клиентов
+- (чеки уже заведены как `receipt_templates` по проектам)
+
+## Команды
+
+| Script | Описание |
+|--------|----------|
+| `npm run dev` | Dev-сервер |
+| `npm test` | Vitest (цикл, last4, two-phase) |
+| `npm run seed:media` | Placeholder-медиа |
+| `npm run typecheck` | `tsc --noEmit` |
 
 ## Админка
 
@@ -53,4 +72,4 @@ curl -X POST http://localhost:3000/api/telegram/setup
 | `/admin/projects` | 5 проектов, превью PNG чата |
 | `/admin/media` | Загрузка кружков, ставок, обоев |
 | `/admin/settings` | Загрузка JSON (скрипты, легенды, банки) |
-| `/admin/schedule` | Расписание 15 постов/день |
+| `/admin/schedule` | Цикл 3 недели, 15 слотов/день |

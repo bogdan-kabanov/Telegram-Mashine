@@ -195,6 +195,18 @@ export class TelegramClient {
     );
   }
 
+  async pinChatMessage(params: {
+    chatId: number | string;
+    messageId: number;
+    disableNotification?: boolean;
+  }): Promise<boolean> {
+    return this.request<boolean>("pinChatMessage", {
+      chat_id: params.chatId,
+      message_id: params.messageId,
+      disable_notification: params.disableNotification ?? true,
+    });
+  }
+
   async setWebhook(url: string, secretToken: string): Promise<boolean> {
     return this.request<boolean>("setWebhook", {
       url,

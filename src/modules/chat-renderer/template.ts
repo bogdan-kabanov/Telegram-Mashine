@@ -1,3 +1,6 @@
+import { formatChatTextHtml } from "@/lib/emoji/apple-server";
+import { sfProFontFaceCss } from "@/lib/fonts/sf-pro";
+import { chatUiForLocale } from "@/lib/i18n/chat-ui";
 import type { ProjectConfig, ProjectTheme } from "@/lib/schemas/projects";
 
 export interface RenderMessage {
@@ -8,6 +11,8 @@ export interface RenderMessage {
   time: string;
   read?: boolean;
   imageUrl?: string;
+  /** Distinguishes conditions / bets / receipts for sizing. */
+  mediaKind?: "conditions" | "bet" | "receipt" | "captura" | "story";
 }
 
 export interface RenderChatParams {
@@ -22,45 +27,48 @@ export interface RenderChatParams {
 }
 
 const ICONS = {
+  /* Telegram iOS attach — vertical paperclip (not Lucide diagonal) */
   paperclip: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M16.5 6.5V14.5C16.5 17.26 14.26 19.5 11.5 19.5C8.74 19.5 6.5 17.26 6.5 14.5V6.5C6.5 4.57 8.07 3 10 3C11.93 3 13.5 4.57 13.5 6.5V13.5C13.5 14.33 12.83 15 12 15C11.17 15 10.5 14.33 10.5 13.5V7.5" stroke="#8E8E93" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M18.2 9.35v7.05c0 2.65-2.15 4.8-4.8 4.8s-4.8-2.15-4.8-4.8V7.55c0-1.75 1.4-3.15 3.15-3.15s3.15 1.4 3.15 3.15v8a1.5 1.5 0 01-3 0V9.2" stroke="#000" stroke-width="2.15" stroke-linecap="round"/>
   </svg>`,
-  stickerInput: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="8.6" stroke="#AEAEB2" stroke-width="1.35"/>
-    <path d="M14.2 4.8C10.8 4.8 8.8 8 8.8 12C8.8 16 10.8 19.2 14.2 19.2" stroke="#AEAEB2" stroke-width="1.35" stroke-linecap="round"/>
+  stickerInput: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="8.4" stroke="#636366" stroke-width="1.85"/>
+    <path d="M15.35 5.85C11.85 5.85 9.85 9.05 9.85 12.15C9.85 15.25 11.85 18.45 15.35 18.45" stroke="#636366" stroke-width="1.85" stroke-linecap="round"/>
+    <circle cx="9.7" cy="10.15" r="1.15" fill="#636366"/>
+    <path d="M11.55 14.55C12.25 15.3 13.25 15.75 14.4 15.75" stroke="#636366" stroke-width="1.7" stroke-linecap="round"/>
   </svg>`,
-  microphone: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="9" y="3" width="6" height="11" rx="3" stroke="#007AFF" stroke-width="1.6"/>
-    <path d="M6 11.5C6 14.53 8.24 17 11 17H13C15.76 17 18 14.53 18 11.5" stroke="#007AFF" stroke-width="1.6" stroke-linecap="round"/>
-    <path d="M12 17V20.5" stroke="#007AFF" stroke-width="1.6" stroke-linecap="round"/>
-    <path d="M9.5 20.5H14.5" stroke="#007AFF" stroke-width="1.6" stroke-linecap="round"/>
+  microphone: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z" stroke="#007AFF" stroke-width="2.1"/>
+    <path d="M5.9 11.4c0 3.2 2.5 5.85 5.6 6.2v2.4h1v-2.4c3.1-.35 5.6-3 5.6-6.2" stroke="#007AFF" stroke-width="2.1" stroke-linecap="round"/>
   </svg>`,
   telegramPlane: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M22 2L11 13" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
-  chevronBack: `<svg width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M7 1L1 7L7 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  /* iOS SF-style chevron — thicker stroke */
+  chevronBack: `<svg width="12" height="20" viewBox="0 0 12 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9.2 1.6L1.7 10l7.5 8.4" stroke="#1C1C1E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   checks: `<svg width="16" height="11" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M1.5 5.5L4.5 8.5L10.5 2.5" stroke="#34C759" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M5.5 5.5L8.5 8.5L14.5 2.5" stroke="#34C759" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
-  signal: `<svg width="18" height="12" viewBox="0 0 18 12" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0.5" y="7.5" width="3" height="4" rx="0.6" fill="#000"/>
-    <rect x="5" y="5.5" width="3" height="6" rx="0.6" fill="#000"/>
-    <rect x="9.5" y="3.5" width="3" height="8" rx="0.6" fill="#000"/>
-    <rect x="14" y="1.5" width="3" height="10" rx="0.6" fill="#000" fill-opacity="0.28"/>
+  signal: `<svg width="19.5" height="12" viewBox="0 0 19.5 12" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="8.5" width="3.2" height="3.5" rx="0.7" fill="currentColor"/>
+    <rect x="4.8" y="6" width="3.2" height="6" rx="0.7" fill="currentColor"/>
+    <rect x="9.6" y="3.2" width="3.2" height="8.8" rx="0.7" fill="currentColor"/>
+    <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" fill="currentColor" fill-opacity="0.35"/>
   </svg>`,
-  wifi: `<svg width="16" height="12" viewBox="0 0 16 12" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8 10.2C8.55 10.2 9 9.75 9 9.2C9 8.65 8.55 8.2 8 8.2C7.45 8.2 7 8.65 7 9.2C7 9.75 7.45 10.2 8 10.2Z" fill="#000"/>
-    <path d="M4.8 6.4C6 5.2 7.4 4.6 8 4.6C8.6 4.6 10 5.2 11.2 6.4" stroke="#000" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-    <path d="M1.6 3.2C3.6 1.2 6.2 0 8 0C9.8 0 12.4 1.2 14.4 3.2" stroke="#000" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+  wifi: `<svg width="17" height="12" viewBox="0 0 17 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8.5" cy="10.4" r="1.15" fill="currentColor"/>
+    <path d="M5.1 7.55C6.05 6.55 7.2 6 8.5 6C9.8 6 10.95 6.55 11.9 7.55" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
+    <path d="M2.55 5.05C4.2 3.25 6.2 2.3 8.5 2.3C10.8 2.3 12.8 3.25 14.45 5.05" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
+    <path d="M0.75 2.55C3 0.55 5.55 0 8.5 0C11.45 0 14 0.55 16.25 2.55" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
   </svg>`,
   battery: `<svg width="27" height="13" viewBox="0 0 27 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0.5" y="0.5" width="22" height="12" rx="3" stroke="#000" stroke-opacity="0.35"/>
-    <rect x="2" y="2" width="18" height="9" rx="2" fill="#000"/>
-    <path d="M24.5 4.5V8.5C25.5 8.1 26 7.2 26 6.5C26 5.8 25.5 4.9 24.5 4.5Z" fill="#000" fill-opacity="0.4"/>
+    <rect x="0.6" y="0.6" width="23" height="11.8" rx="2.6" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.4"/>
+    <rect x="2.1" y="2.15" width="18.5" height="8.7" rx="1.5" fill="currentColor"/>
+    <path d="M25.1 4.1C25.95 4.45 26.5 5.25 26.5 6.5C26.5 7.75 25.95 8.55 25.1 8.9V4.1Z" fill="currentColor" fill-opacity="0.45"/>
   </svg>`,
   avatarPlaceholder: `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
     <circle cx="18" cy="18" r="18" fill="#C4C4C6"/>
@@ -88,12 +96,22 @@ function avatarBlock(url: string | null | undefined, fallback: string): string {
 
 function navAvatarBlock(url: string | null | undefined): string {
   if (url) {
-    return `<img class="nav-avatar" src="${url}" alt="" />`;
+    return `<div class="nav-avatar-wrap nav-glass"><img class="nav-avatar" src="${url}" alt="" /></div>`;
   }
-  return `<div class="nav-avatar nav-avatar-placeholder">${ICONS.avatarPlaceholder}</div>`;
+  return `<div class="nav-avatar-wrap nav-glass nav-avatar-placeholder">${ICONS.avatarPlaceholder}</div>`;
+}
+function metaHtml(msg: RenderMessage, isOutgoing: boolean, variant: "inline" | "overlay"): string {
+  const checks =
+    isOutgoing && msg.read ? `<span class="checks" aria-hidden="true">${ICONS.checks}</span>` : "";
+  return `<span class="meta meta-${variant}"><span class="time">${msg.time}</span>${checks}</span>`;
 }
 
-function renderBubble(msg: RenderMessage, theme: ProjectTheme, clientAvatarUrl?: string | null): string {
+function renderBubble(
+  msg: RenderMessage,
+  theme: ProjectTheme,
+  clientAvatarUrl: string | null | undefined,
+  opts: { firstInGroup: boolean; lastInGroup: boolean },
+): string {
   const isOutgoing = msg.role === "manager";
   const bubbleColor = isOutgoing
     ? msg.type === "image"
@@ -101,90 +119,229 @@ function renderBubble(msg: RenderMessage, theme: ProjectTheme, clientAvatarUrl?:
       : theme.outgoingBubble
     : theme.incomingBubble;
 
-  const checks = isOutgoing && msg.read ? `<span class="checks">${ICONS.checks}</span>` : "";
+  const groupClass = [
+    "message",
+    isOutgoing ? "outgoing" : "incoming",
+    opts.firstInGroup ? "group-first" : "group-mid",
+    opts.lastInGroup ? "group-last" : "group-continued",
+  ].join(" ");
+
+  // Telegram: avatar only on the last bubble of an incoming group; spacer keeps column straight.
+  const avatarSlot = !isOutgoing
+    ? opts.lastInGroup
+      ? avatarBlock(clientAvatarUrl, "C")
+      : `<div class="avatar avatar-spacer" aria-hidden="true"></div>`
+    : "";
 
   if (msg.type === "sticker" && msg.imageUrl) {
     return `
-    <div class="message ${isOutgoing ? "outgoing" : "incoming"}">
-      ${!isOutgoing ? avatarBlock(clientAvatarUrl, "C") : ""}
+    <div class="${groupClass}">
+      ${avatarSlot}
       <div class="bubble-wrap">
         <div class="sticker-wrap">
           <img class="sticker-image" src="${msg.imageUrl}" alt="" />
-          <span class="sticker-time">${msg.time}</span>
+          ${metaHtml(msg, isOutgoing, "overlay")}
         </div>
       </div>
     </div>
   `;
   }
 
-  const body =
-    msg.type === "image" && msg.imageUrl
-      ? `<img class="bubble-image" src="${msg.imageUrl}" alt="" />`
-      : msg.type === "image"
-        ? `<div class="image-placeholder">📷 ${escapeHtml(msg.content)}</div>`
-        : `<span class="text">${escapeHtml(msg.content)}</span>`;
+  if (msg.type === "image") {
+    const kindClass = msg.mediaKind ? ` bubble-image-${msg.mediaKind}` : "";
+    const media =
+      msg.imageUrl != null
+        ? `<img class="bubble-image${kindClass}" src="${msg.imageUrl}" alt="" />`
+        : `<div class="image-placeholder">📷 ${escapeHtml(msg.content)}</div>`;
+    return `
+    <div class="${groupClass}">
+      ${avatarSlot}
+      <div class="bubble-wrap">
+        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} bubble-media" style="background:${bubbleColor}">
+          ${media}
+          ${metaHtml(msg, isOutgoing, "overlay")}
+        </div>
+      </div>
+    </div>
+  `;
+  }
 
+  // Text: time (+ ticks) float to the end of the last line — like Telegram, not absolute pad.
   return `
-    <div class="message ${isOutgoing ? "outgoing" : "incoming"}">
-      ${!isOutgoing ? avatarBlock(clientAvatarUrl, "C") : ""}
+    <div class="${groupClass}">
+      ${avatarSlot}
       <div class="bubble-wrap">
         <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"}" style="background:${bubbleColor}">
-          ${body}
-          <span class="time">${msg.time}</span>
+          <div class="text">${formatChatTextHtml(msg.content)}${metaHtml(msg, isOutgoing, "inline")}</div>
         </div>
-        ${isOutgoing ? `<div class="meta-out">${checks}</div>` : ""}
       </div>
     </div>
   `;
 }
 
+function renderMessageList(
+  messages: RenderMessage[],
+  theme: ProjectTheme,
+  clientAvatarUrl?: string | null,
+): string {
+  return messages
+    .map((msg, i) => {
+      const prev = messages[i - 1];
+      const next = messages[i + 1];
+      return renderBubble(msg, theme, clientAvatarUrl, {
+        firstInGroup: !prev || prev.role !== msg.role,
+        lastInGroup: !next || next.role !== msg.role,
+      });
+    })
+    .join("");
+}
+
 export function buildChatHtml(params: RenderChatParams): string {
+  const ui = chatUiForLocale(params.project.locale);
   const {
     project,
     clientName,
     messages,
-    statusText = "últ. vez recientemente",
+    statusText = ui.statusRecently,
     statusBarTime = "18:55",
   } = params;
   const theme = project.theme;
-  const accent = theme.accentColor ?? "#34C759";
-  const wallpaper = params.wallpaperUrl
-    ? `background-image:url("${params.wallpaperUrl}");`
-    : "background: linear-gradient(180deg, #6ba3be 0%, #4a8fa8 100%);";
+  const statusLight = theme.statusBarStyle === "light";
+  const statusFg = statusLight ? "#fff" : "#000";
+  const wallpaperCss = params.wallpaperUrl
+    ? `url("${params.wallpaperUrl}")`
+    : "linear-gradient(180deg, #6ba3be 0%, #4a8fa8 100%)";
 
-  const messageHtml = messages.map((m) => renderBubble(m, theme, params.clientAvatarUrl)).join("");
+  const messageHtml = renderMessageList(messages, theme, params.clientAvatarUrl);
 
   return `<!DOCTYPE html>
-<html lang="es">
+<html lang="${ui.lang}">
 <head>
   <meta charset="UTF-8" />
   <style>
+    ${sfProFontFaceCss()}
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
     body {
       width: 390px;
       height: 844px;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
       overflow: hidden;
       background: #000;
     }
     .phone {
+      --chat-wallpaper: ${wallpaperCss};
       width: 390px;
       height: 844px;
-      display: flex;
-      flex-direction: column;
       position: relative;
       overflow: hidden;
     }
+    /* Wallpaper + messages only — overflow here does not wrap the glass header */
+    .phone-stage {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      overflow: hidden;
+    }
+    .wallpaper {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background-image: var(--chat-wallpaper);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      pointer-events: none;
+    }
 
-    /* Header block — status + nav */
+    /* Frosted header band above chat — like real Telegram iOS */
+    .header-frost {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 128px;
+      z-index: 8;
+      pointer-events: none;
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
+    }
+    .header-frost::before {
+      content: "";
+      position: absolute;
+      left: -16%;
+      width: 132%;
+      top: 0;
+      height: 280%;
+      background-image: var(--chat-wallpaper);
+      background-size: cover;
+      background-position: center top;
+      background-repeat: no-repeat;
+      filter: blur(72px) saturate(180%);
+      transform: scale(1.18);
+      transform-origin: center top;
+    }
+    .header-frost::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.22) 0%,
+        rgba(255, 255, 255, 0.14) 42%,
+        rgba(255, 255, 255, 0) 100%
+      );
+    }
+
+    /* Strong frosted band behind input controls */
+    .input-frost {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 118px;
+      z-index: 15;
+      pointer-events: none;
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
+      mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
+    }
+    .input-frost::before {
+      content: "";
+      position: absolute;
+      left: -16%;
+      width: 132%;
+      bottom: 0;
+      height: 320%;
+      background-image: var(--chat-wallpaper);
+      background-size: cover;
+      background-position: center bottom;
+      background-repeat: no-repeat;
+      filter: blur(80px) saturate(180%);
+      transform: scale(1.2);
+      transform-origin: center bottom;
+    }
+    .input-frost::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to top,
+        rgba(255, 255, 255, 0.22) 0%,
+        rgba(200, 230, 240, 0.12) 45%,
+        rgba(255, 255, 255, 0) 100%
+      );
+    }
+
     .header-wrap {
-      position: relative;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
       z-index: 10;
-      background: linear-gradient(180deg,
-        #fafdfe 0%,
-        #e8f5f8 48%,
-        #d4ecf2 100%);
-      border-bottom: 0.33px solid rgba(60, 60, 67, 0.18);
+      background: transparent;
+      color: ${statusFg};
+      pointer-events: none;
     }
 
     /* iOS Status Bar */
@@ -200,7 +357,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.32px;
-      color: #000;
+      color: ${statusFg};
       line-height: 20px;
       min-width: 54px;
     }
@@ -233,20 +390,48 @@ export function buildChatHtml(params: RenderChatParams): string {
       justify-content: flex-end;
       padding-top: 1px;
     }
+    .status-icons svg {
+      color: ${statusFg};
+    }
 
-    /* Navigation Bar */
+    /* Floating nav — three separate glass pills (Telegram iOS) */
     .nav-bar {
       height: 44px;
       display: flex;
       align-items: center;
-      padding: 0 8px 4px;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 10px 4px;
+      padding: 0;
       position: relative;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+    .nav-glass,
+    .glass-circle,
+    .input-pill {
+      position: relative;
+      /* Semi-transparent so strong frost band shows through — no hard outline */
+      background: rgba(255, 255, 255, 0.38);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
+      backdrop-filter: blur(28px) saturate(160%);
+      box-shadow:
+        0 0.5px 0 rgba(255, 255, 255, 0.35) inset,
+        0 1px 3px rgba(0, 0, 0, 0.08);
+      border: none;
+    }
+    .glass-circle:last-child {
+      background: rgba(170, 215, 240, 0.45);
     }
     .nav-back {
       display: flex;
       align-items: center;
-      gap: 2px;
-      color: ${accent};
+      gap: 6px;
+      height: 34px;
+      padding: 4px 6px 4px 8px;
+      border-radius: 17px;
+      color: #000;
       font-size: 17px;
       font-weight: 400;
       letter-spacing: -0.4px;
@@ -254,41 +439,60 @@ export function buildChatHtml(params: RenderChatParams): string {
       flex-shrink: 0;
       z-index: 1;
     }
-    .nav-back svg { color: ${accent}; flex-shrink: 0; width: 7px; height: 13px; margin-top: 0; }
+    .nav-back svg {
+      flex-shrink: 0;
+      width: 9px;
+      height: 16px;
+      display: block;
+      overflow: visible;
+    }
     .nav-center {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
+      position: relative;
+      left: auto;
+      transform: none;
       text-align: center;
       min-width: 0;
-      max-width: 58%;
+      max-width: none;
+      flex: 1;
+      height: 40px;
+      padding: 3px 16px 2px;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       pointer-events: none;
     }
     .nav-name {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.41px;
       color: #000;
-      line-height: 20px;
+      line-height: 19px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      max-width: 100%;
     }
     .nav-status {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 400;
       color: #8E8E93;
       letter-spacing: -0.08px;
-      line-height: 16px;
-      margin-top: 1px;
+      line-height: 15px;
+      margin-top: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
     }
     .nav-avatar {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       object-fit: cover;
       flex-shrink: 0;
-      margin-left: auto;
+      margin-left: 0;
       z-index: 1;
     }
     .nav-avatar-placeholder {
@@ -296,41 +500,77 @@ export function buildChatHtml(params: RenderChatParams): string {
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      background: #C4C4C6;
-      margin-left: auto;
+      background: transparent;
+      margin-left: 0;
       z-index: 1;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
     }
     .nav-avatar-placeholder svg {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
+    }
+    .nav-avatar-wrap {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    /* Chat Area */
+    /* Chat Area — wallpaper is sibling .wallpaper; spacer pins thread to input */
     .chat-bg {
-      flex: 1;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
       overflow-y: auto;
-      padding: 6px 10px 62px;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      ${wallpaper}
+      padding: 100px 7px 112px;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-spacer {
+      flex: 1 1 auto;
+      min-height: 0;
+      pointer-events: none;
+    }
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      flex: 0 0 auto;
     }
 
-    /* Messages */
+    /* Messages — even left/right columns like Telegram iOS */
     .message {
       display: flex;
       align-items: flex-end;
       gap: 6px;
       margin-bottom: 2px;
+      width: 100%;
     }
-    .message.outgoing { justify-content: flex-end; }
+    .message.group-last { margin-bottom: 7px; }
+    .message.group-first.group-last { margin-bottom: 7px; }
+    .message.incoming { padding-right: 52px; }
+    .message.outgoing {
+      justify-content: flex-end;
+      padding-left: 52px;
+    }
     .avatar {
       width: 28px;
       height: 28px;
       border-radius: 50%;
       object-fit: cover;
       flex-shrink: 0;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
+    }
+    .avatar-spacer {
+      visibility: hidden;
+      pointer-events: none;
     }
     .avatar-fallback {
       background: #C7C7CC;
@@ -341,48 +581,93 @@ export function buildChatHtml(params: RenderChatParams): string {
       font-size: 12px;
       font-weight: 600;
     }
-    .bubble-wrap { max-width: 78%; display: flex; flex-direction: column; }
-    .message.outgoing .bubble-wrap { align-items: flex-end; }
+    .bubble-wrap {
+      max-width: calc(100% - 34px);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .message.outgoing .bubble-wrap {
+      align-items: flex-end;
+      max-width: 100%;
+    }
+    .message.incoming .bubble-wrap { max-width: calc(100% - 34px); }
     .bubble {
-      padding: 7px 12px 5px;
+      padding: 6px 10px 5px;
       position: relative;
       display: inline-block;
       max-width: 100%;
       box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+      vertical-align: top;
     }
-    .bubble-in {
-      border-radius: 18px;
-      border-bottom-left-radius: 4px;
-    }
+    .bubble-in,
     .bubble-out {
-      border-radius: 18px;
-      border-bottom-right-radius: 4px;
+      border-radius: 16px;
     }
+    /* Tail only on last bubble of a group (Telegram) */
+    .incoming.group-last .bubble-in { border-bottom-left-radius: 4px; }
+    .outgoing.group-last .bubble-out { border-bottom-right-radius: 4px; }
     .text {
       font-size: 17px;
       line-height: 22px;
-      letter-spacing: -0.4px;
+      letter-spacing: -0.41px;
       color: #000;
       word-wrap: break-word;
-      padding-right: 44px;
-      display: block;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
     }
-    .bubble .time {
-      font-size: 11px;
-      color: rgba(60,60,67,0.45);
-      letter-spacing: -0.1px;
-      position: absolute;
-      bottom: 5px;
-      right: 10px;
+    img.apple-emoji {
+      height: 1.2em;
+      width: 1.2em;
+      margin: 0 0.05em;
+      vertical-align: -0.2em;
+      display: inline-block;
+      object-fit: contain;
+    }
+    /* Time (+ ticks) sit on the last line — no fake padding-right strip */
+    .meta-inline {
+      float: right;
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 3px;
+      margin: 5px 0 -1px 10px;
+      position: relative;
+      top: 3px;
+      line-height: 1;
       white-space: nowrap;
     }
-    .meta-out {
-      display: flex;
-      align-items: center;
-      margin-top: 1px;
-      margin-right: 4px;
+    .meta-inline .time {
+      font-size: 11px;
+      font-weight: 400;
+      color: rgba(60,60,67,0.45);
+      letter-spacing: 0.06px;
     }
-    .checks { display: flex; align-items: center; }
+    .meta-overlay {
+      position: absolute;
+      right: 7px;
+      bottom: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 6px 2px 7px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.28);
+      line-height: 1;
+      z-index: 1;
+    }
+    .meta-overlay .time {
+      font-size: 11px;
+      color: rgba(255,255,255,0.95);
+      letter-spacing: 0.06px;
+      text-shadow: none;
+    }
+    .checks {
+      display: inline-flex;
+      align-items: center;
+      line-height: 0;
+    }
+    .checks svg { display: block; }
+    .meta-overlay .checks path { stroke: #fff; }
     .image-placeholder {
       background: rgba(0,0,0,0.06);
       border-radius: 12px;
@@ -390,104 +675,163 @@ export function buildChatHtml(params: RenderChatParams): string {
       text-align: center;
       font-size: 14px;
       color: #666;
-      min-width: 200px;
+      min-width: 180px;
     }
+    /* Telegram iOS photo message: portrait-friendly, no floating white pad */
     .bubble-image {
       display: block;
-      max-width: 240px;
-      border-radius: 12px;
-      margin-bottom: 2px;
+      width: 240px;
+      max-width: min(240px, 100%);
+      height: auto;
+      max-height: 360px;
+      object-fit: contain;
+      object-position: top center;
+      border-radius: 14px;
+      background: transparent;
     }
-    .bubble:has(.bubble-image) {
-      padding: 4px;
+    .bubble-image-conditions {
+      width: 278px;
+      max-width: min(278px, 100%);
+      max-height: 400px;
+    }
+    .bubble-image-bet,
+    .bubble-image-receipt,
+    .bubble-image-captura {
+      width: 250px;
+      max-width: min(250px, 100%);
+      max-height: 340px;
+    }
+    .bubble-media {
+      padding: 2px 2px 22px 2px !important;
       background: transparent !important;
-      box-shadow: none;
+      box-shadow: 0 1px 0.5px rgba(0,0,0,0.13) !important;
+      overflow: hidden;
+      border-radius: 16px;
+      line-height: 0;
+      position: relative;
     }
-    .bubble:has(.bubble-image) .time {
-      bottom: 8px;
-      right: 14px;
-      color: rgba(255,255,255,0.9);
-      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    .outgoing.group-last .bubble-media { border-bottom-right-radius: 4px; }
+    .incoming.group-last .bubble-media { border-bottom-left-radius: 4px; }
+    .bubble-media .bubble-image { border-radius: 14px; margin: 0; }
+    .outgoing.group-last .bubble-media .bubble-image { border-bottom-right-radius: 4px; }
+    .incoming.group-last .bubble-media .bubble-image { border-bottom-left-radius: 4px; }
+    .bubble-media .meta-overlay {
+      bottom: 4px;
+      right: 6px;
     }
     .sticker-wrap {
       position: relative;
       display: inline-block;
       max-width: 180px;
+      background: transparent;
     }
     .sticker-image {
       display: block;
-      width: 168px;
+      width: 148px;
       height: auto;
       object-fit: contain;
+      background: transparent;
+      mix-blend-mode: normal;
     }
-    .sticker-time {
-      position: absolute;
-      bottom: 4px;
-      right: 6px;
-      font-size: 11px;
-      color: rgba(255,255,255,0.92);
-      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
-      white-space: nowrap;
+    .sticker-wrap .meta-overlay {
+      background: rgba(0,0,0,0.32);
     }
 
-    /* iOS Input Bar — glassmorphism */
+    /* iOS Input Bar — attach = input height; mic larger + blue */
     .input-bar {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      padding: 6px 8px 28px;
+      padding: 6px 10px 28px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       z-index: 20;
     }
     .glass-circle {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: rgba(255,255,255,0.72);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      box-shadow: 0 0.5px 0 rgba(0,0,0,0.08);
     }
-    .glass-circle-blue {
-      background: rgba(200,220,255,0.75);
+    .glass-circle svg {
+      display: block;
+      position: relative;
+      z-index: 2;
+      shape-rendering: geometricPrecision;
     }
     .input-pill {
       flex: 1;
       height: 40px;
       border-radius: 20px;
-      background: rgba(255,255,255,0.72);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
       display: flex;
       align-items: center;
-      padding: 0 12px 0 16px;
-      box-shadow: 0 0.5px 0 rgba(0,0,0,0.08);
+      padding: 0 8px 0 16px;
       min-width: 0;
     }
     .input-placeholder {
       flex: 1;
+      position: relative;
+      z-index: 2;
       font-size: 17px;
-      color: #8E8E93;
-      letter-spacing: -0.4px;
+      font-weight: 500;
+      color: #636366;
+      letter-spacing: -0.41px;
+      line-height: 22px;
+      -webkit-font-smoothing: antialiased;
     }
     .input-sticker {
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      margin-left: 4px;
+      position: relative;
+      z-index: 2;
+      width: 32px;
+      height: 32px;
+      margin-left: 2px;
+    }
+    .input-sticker svg {
+      shape-rendering: geometricPrecision;
+    }
+    .nav-back-badge {
+      /* Exact same height as chevron */
+      min-width: 16px;
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      flex-shrink: 0;
     }
   </style>
 </head>
 <body>
   <div class="phone">
+    <div class="phone-stage">
+      <div class="wallpaper" aria-hidden="true"></div>
+      <div class="chat-bg">
+        <div class="chat-spacer" aria-hidden="true"></div>
+        <div class="chat-messages">
+        ${messageHtml}
+        </div>
+      </div>
+    </div>
+
+    <div class="header-frost" aria-hidden="true"></div>
+
     <div class="header-wrap">
       <div class="status-bar">
         <span class="status-time">${statusBarTime}</span>
@@ -502,11 +846,11 @@ export function buildChatHtml(params: RenderChatParams): string {
       </div>
 
       <div class="nav-bar">
-        <div class="nav-back">
+        <div class="nav-back nav-glass">
           ${ICONS.chevronBack}
-          <span>Atrás</span>
+          <span class="nav-back-badge">1</span>
         </div>
-        <div class="nav-center">
+        <div class="nav-center nav-glass">
           <div class="nav-name">${escapeHtml(clientName)}</div>
           <div class="nav-status">${escapeHtml(statusText)}</div>
         </div>
@@ -514,53 +858,25 @@ export function buildChatHtml(params: RenderChatParams): string {
       </div>
     </div>
 
-    <div class="chat-bg">
-      ${messageHtml}
-    </div>
+    <div class="input-frost" aria-hidden="true"></div>
 
     <div class="input-bar">
-      <div class="glass-circle">${ICONS.paperclip}</div>
+      <div class="glass-circle">
+        ${ICONS.paperclip}
+      </div>
       <div class="input-pill">
-        <span class="input-placeholder">Mensaje</span>
+        <span class="input-placeholder">${escapeHtml(ui.inputPlaceholder)}</span>
         <div class="input-sticker">${ICONS.stickerInput}</div>
       </div>
-      <div class="glass-circle glass-circle-blue">${ICONS.microphone}</div>
+      <div class="glass-circle">
+        ${ICONS.microphone}
+      </div>
     </div>
   </div>
 </body>
 </html>`;
 }
 
-export function getSampleMessages(): RenderMessage[] {
-  return [
-    {
-      id: "1",
-      role: "client",
-      type: "text",
-      content: "Necesito tu ayuda",
-      time: "17:08",
-    },
-    {
-      id: "2",
-      role: "client",
-      type: "text",
-      content: "Me lesioné en el trabajo",
-      time: "17:08",
-    },
-    {
-      id: "3",
-      role: "client",
-      type: "text",
-      content: "No tengo dinero para pagar el tratamiento",
-      time: "17:08",
-    },
-    {
-      id: "4",
-      role: "manager",
-      type: "text",
-      content: "Hola\nTe lo contaré todo",
-      time: "17:09",
-      read: true,
-    },
-  ];
+export function getSampleMessages(locale?: string): RenderMessage[] {
+  return chatUiForLocale(locale).sampleMessages.map((m) => ({ ...m }));
 }

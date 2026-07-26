@@ -60,13 +60,16 @@ export function computeMessageTimes(
   _baseDate = new Date(),
 ): string[] {
   const baseMinutes = 17 * 60 + 8;
+  let cursor = baseMinutes;
 
-  return messages.map((msg) => {
-    const total = baseMinutes + msg.delayMinutes;
-    const h = Math.floor((total / 60) % 24)
+  return messages.map((msg, index) => {
+    const target = baseMinutes + Math.max(0, msg.delayMinutes);
+    // Never go backwards — AI stage delays can be non-monotonic vs message order.
+    cursor = index === 0 ? target : Math.max(cursor, target);
+    const h = Math.floor((cursor / 60) % 24)
       .toString()
       .padStart(2, "0");
-    const m = (total % 60).toString().padStart(2, "0");
+    const m = (cursor % 60).toString().padStart(2, "0");
     return `${h}:${m}`;
   });
 }
