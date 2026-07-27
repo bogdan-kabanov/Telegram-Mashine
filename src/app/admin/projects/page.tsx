@@ -1,6 +1,7 @@
 import { bootstrapApp } from "@/lib/bootstrap";
 import { loadAppConfig } from "@/lib/config/loader";
 import { getRecentReviewsByProject } from "@/lib/db/reviews";
+import { listLocalesFromConfig } from "@/lib/i18n/locale-profile";
 import { toPublicScreenshotUrl } from "@/lib/media/screenshot-url";
 
 import { AdminShell, SectionCard } from "../components";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ProjectsPage() {
   await bootstrapApp();
   const config = await loadAppConfig();
+  const locales = listLocalesFromConfig(config.geo);
 
   const projectsWithReviews = await Promise.all(
     config.projects.projects.map(async (project) => {
@@ -57,7 +59,7 @@ export default async function ProjectsPage() {
             <div className="admin-step-num">3</div>
             <div>
               <h3>При желании откройте «Настройки»</h3>
-              <p>Здесь задаются фон чата, имя, тексты реквизитов и цвета пузырей сообщений.</p>
+              <p>Здесь задаются язык/валюта, фон чата, имя, тексты реквизитов и цвета пузырей сообщений.</p>
             </div>
           </div>
         </div>
@@ -66,6 +68,7 @@ export default async function ProjectsPage() {
       {projectsWithReviews.map(({ project, initialReview }) => (
         <ProjectWorkspace
           key={project.id}
+          locales={locales}
           project={{
             id: project.id,
             name: project.name,

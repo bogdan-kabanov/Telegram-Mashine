@@ -6,6 +6,10 @@
     { "id": "spin", "name": "Spin by OXXO", "shortName": "Spin", "country": "MX", "supportsTransfer": true },
     { "id": "nu", "name": "Nu México", "shortName": "Nu", "country": "MX", "supportsTransfer": true },
     { "id": "okx", "name": "OKX Wallet", "shortName": "OKX", "country": "MX", "supportsTransfer": true },
+    { "id": "mercado_pago_ar", "name": "Mercado Pago", "shortName": "Mercado Pago", "country": "AR", "supportsTransfer": true },
+    { "id": "belo_ar", "name": "Belo", "shortName": "Belo", "country": "AR", "supportsTransfer": true },
+    { "id": "mercantil_ve", "name": "Mercantil", "shortName": "Mercantil", "country": "VE", "supportsTransfer": true },
+    { "id": "bdv_ve", "name": "Banco de Venezuela", "shortName": "BDV", "country": "VE", "supportsTransfer": true },
     { "id": "sber", "name": "Сбербанк", "shortName": "Сбер", "country": "RU", "supportsTransfer": true },
     { "id": "tinkoff", "name": "Т-Банк", "shortName": "Т-Банк", "country": "RU", "supportsTransfer": true }
   ],
@@ -14,6 +18,10 @@
     { "id": "spin", "name": "Spin by OXXO", "shortName": "Spin", "country": "MX", "supportsTransfer": true },
     { "id": "mercado_pago", "name": "Mercado Pago Wallet", "shortName": "Mercado Pago W", "country": "MX", "supportsTransfer": true },
     { "id": "okx", "name": "OKX Wallet", "shortName": "OKX", "country": "MX", "supportsTransfer": true },
+    { "id": "mercado_pago_ar", "name": "Mercado Pago", "shortName": "Mercado Pago", "country": "AR", "supportsTransfer": true },
+    { "id": "belo_ar", "name": "Belo", "shortName": "Belo", "country": "AR", "supportsTransfer": true },
+    { "id": "mercantil_ve", "name": "Mercantil", "shortName": "Mercantil", "country": "VE", "supportsTransfer": true },
+    { "id": "bdv_ve", "name": "Banco de Venezuela", "shortName": "BDV", "country": "VE", "supportsTransfer": true },
     { "id": "sber", "name": "Сбербанк", "shortName": "Сбер", "country": "RU", "supportsTransfer": true },
     { "id": "tinkoff", "name": "Т-Банк", "shortName": "Т-Банк", "country": "RU", "supportsTransfer": true }
   ]

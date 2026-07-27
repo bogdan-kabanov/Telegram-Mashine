@@ -18,6 +18,12 @@ export const scheduleConfigSchema = z
     timezone: z.string().min(1),
     postsPerDay: z.number().int().positive(),
     phaseDelayMinutes: z.number().int().positive(),
+    /**
+     * Days before the same bet screenshot may be reused.
+     * 0 = no cooldown (only sequential pack walk 1→N→1).
+     * Default 5 ≈ Vlad’s pack cycle length.
+     */
+    betReuseDays: z.number().int().min(0).max(90).default(5),
     /** Length of the rotating schedule cycle (TZ: 3 weeks). */
     cycleWeeks: z.number().int().min(1).max(12).default(3),
     /** Mexico-local YYYY-MM-DD of any day in cycle week 0 (Monday of that week is used). */

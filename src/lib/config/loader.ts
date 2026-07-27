@@ -56,6 +56,12 @@ export function resetConfigCache(): void {
   cachedConfig = null;
 }
 
+/** Sync access to last loaded config (null before first loadAppConfig). */
+export function getCachedAppConfig(): AppConfig | null {
+  return cachedConfig;
+}
+
+
 export async function getProjectById(projectId: string) {
   const config = await loadAppConfig();
   const project = config.projects.projects.find((p) => p.id === projectId);

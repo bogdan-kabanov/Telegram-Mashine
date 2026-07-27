@@ -3,12 +3,29 @@ import { existsSync, statSync } from "fs";
 import path from "path";
 import { and, desc, eq, gte } from "drizzle-orm";
 
+import { loadAppConfig } from "@/lib/config/loader";
 import { getDb } from "@/lib/db";
 import { mediaAssets, usedBets } from "@/lib/db/schema";
 import type { MediaAsset } from "@/modules/media-handler";
 
-/** Days before a bet screenshot may be reused in a new review. */
-export const BET_REUSE_DAYS = 10;
+/** Fallback when schedule.json has no betReuseDays (Vlad ≈ 5-day pack cycle). */
+export const BET_REUSE_DAYS_DEFAULT = 5;
+
+/** @deprecated use getConfiguredBetReuseDays() — kept for tests/imports */
+export const BET_REUSE_DAYS = BET_REUSE_DAYS_DEFAULT;
+
+export async function getConfiguredBetReuseDays(): Promise<number> {
+  try {
+    const config = await loadAppConfig();
+    const days = config.schedule.betReuseDays;
+    if (typeof days === "number" && Number.isFinite(days) && days >= 0) {
+      return Math.min(90, Math.floor(days));
+    }
+  } catch {
+    // config not ready in isolated tests
+  }
+  return BET_REUSE_DAYS_DEFAULT;
+}
 
 function isUsableBetFile(filename: string, filePath: string): boolean {
   if (!/\.(jpg|jpeg|png|webp|gif)$/i.test(filename)) return false;
@@ -36,7 +53,7 @@ function sortBetsStable(assets: MediaAsset[]): MediaAsset[] {
   });
 }
 
-function cooldownMs(days = BET_REUSE_DAYS): number {
+function cooldownMs(days: number): number {
   return days * 24 * 60 * 60 * 1000;
 }
 
@@ -60,7 +77,8 @@ async function listProjectBets(projectId: string): Promise<MediaAsset[]> {
   );
 }
 
-async function recentBetPaths(projectId: string, days = BET_REUSE_DAYS): Promise<Set<string>> {
+async function recentBetPaths(projectId: string, days: number): Promise<Set<string>> {
+  if (days <= 0) return new Set();
   const db = getDb();
   const since = new Date(Date.now() - cooldownMs(days)).toISOString();
   const rows = await db
@@ -90,8 +108,8 @@ export async function markBetsUsed(params: {
 }
 
 /**
- * Pick sequential bet screenshots (1→N by filename) for a review.
- * Prefers assets not used in the last ~10 days; wraps the ordered pool when needed.
+ * Pick sequential bet screenshots (1 pack = 3 images) for a review.
+ * Walks filename order; skips paths used within betReuseDays; wraps when needed.
  */
 export async function pickSequentialBets(params: {
   projectId: string;
@@ -100,7 +118,8 @@ export async function pickSequentialBets(params: {
   reviewId?: string | null;
 }): Promise<MediaAsset[]> {
   const count = params.count ?? 3;
-  const reuseDays = params.reuseDays ?? BET_REUSE_DAYS;
+  const reuseDays =
+    params.reuseDays !== undefined ? params.reuseDays : await getConfiguredBetReuseDays();
   const pool = await listProjectBets(params.projectId);
   if (pool.length === 0) return [];
 

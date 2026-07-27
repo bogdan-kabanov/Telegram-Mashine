@@ -3,10 +3,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import { chatUiForLocale } from "@/lib/i18n/chat-ui";
@@ -16,6 +19,7 @@ import { ScreenshotGallery } from "./screenshot-gallery";
 import { colors, inputStyle } from "./styles";
 import { HelpTip, LabelWithHelp } from "./ui/HelpTip";
 import { MediaPicker, type PickerMediaAsset } from "./ui/MediaPicker";
+import { ZoomPhotoLightbox } from "./ui/ZoomPhotoLightbox";
 
 export interface ProjectWorkspaceProps {
   project: {
@@ -35,6 +39,12 @@ export interface ProjectWorkspaceProps {
     depositMessageTemplate: string;
     payoutMessageTemplate: string;
   };
+  locales: Array<{
+    code: string;
+    name: string;
+    currency: string;
+    bankCountry: string;
+  }>;
   initialReview?: {
     id: string;
     screenshots: string[];
@@ -48,12 +58,48 @@ function wallpaperPreviewUrl(path: string | null | undefined): string | null {
 
 type Tab = "preview" | "settings";
 
-/** Frosted glass pill — blur lives on ::after (backdrop-filter), content stays sharp. */
-function GlassPill({ className, children }: { className: string; children: ReactNode }) {
-  return <div className={`project-glass-pill ${className}`}>{children}</div>;
+/**
+ * Frosted glass via clipped blurred wallpaper (not backdrop-filter — flat in many
+ * Chromium/screenshot paths). Positions frost layer to phone origin.
+ */
+function GlassPill({
+  className,
+  phoneRef,
+  children,
+}: {
+  className: string;
+  phoneRef: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const frostRef = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const sync = () => {
+      const phone = phoneRef.current;
+      const host = hostRef.current;
+      const frost = frostRef.current;
+      if (!phone || !host || !frost) return;
+      const pr = phone.getBoundingClientRect();
+      const r = host.getBoundingClientRect();
+      frost.style.setProperty("--frost-left", `${pr.left - r.left}px`);
+      frost.style.setProperty("--frost-top", `${pr.top - r.top}px`);
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, [phoneRef]);
+
+  return (
+    <div ref={hostRef} className={`project-glass-pill ${className}`}>
+      <span ref={frostRef} className="project-glass-frost" aria-hidden />
+      <span className="project-glass-tint" aria-hidden />
+      <span className="project-glass-content">{children}</span>
+    </div>
+  );
 }
 
-export function ProjectWorkspace({ project, initialReview }: ProjectWorkspaceProps) {
+export function ProjectWorkspace({ project, locales, initialReview }: ProjectWorkspaceProps) {
   const [tab, setTab] = useState<Tab>("preview");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +111,10 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
   const [useAiWallpaper, setUseAiWallpaper] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [mediaAssets, setMediaAssets] = useState<PickerMediaAsset[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [form, setForm] = useState({
+    locale: project.locale,
     managerHandle: project.managerHandle,
     managerName: project.managerName,
     depositMessageTemplate: project.depositMessageTemplate,
@@ -75,6 +124,12 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
     accentColor: project.theme.accentColor,
     twoPhaseReview: project.twoPhaseReview,
   });
+
+  const selectedLocale = useMemo(
+    () => locales.find((l) => l.code === form.locale) ?? locales[0],
+    [locales, form.locale],
+  );
+  const displayCurrency = selectedLocale?.currency ?? project.currency;
 
   const loadLastReview = useCallback(async () => {
     try {
@@ -171,6 +226,7 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          locale: form.locale,
           managerHandle: form.managerHandle,
           managerName: form.managerName,
           depositMessageTemplate: form.depositMessageTemplate,
@@ -191,6 +247,52 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Full-size Playwright PNG (390×844 @3x) — for zoom compare with real Telegram. */
+  async function openAsPhoto() {
+    setPhotoBusy(true);
+    setError(null);
+    try {
+      // Persist current settings so the renderer matches the live form.
+      const saveRes = await fetch(`/api/admin/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locale: form.locale,
+          managerHandle: form.managerHandle,
+          managerName: form.managerName,
+          depositMessageTemplate: form.depositMessageTemplate,
+          payoutMessageTemplate: form.payoutMessageTemplate,
+          twoPhaseReview: form.twoPhaseReview,
+          wallpaperPath,
+          theme: {
+            incomingBubble: form.incomingBubble,
+            outgoingBubble: form.outgoingBubble,
+            accentColor: form.accentColor,
+            headerBg: "#F7F7F7",
+            statusBarStyle: "light",
+          },
+        }),
+      });
+      if (!saveRes.ok) {
+        const data = (await saveRes.json()) as { error?: string };
+        throw new Error(data.error ?? "Не удалось сохранить перед рендером");
+      }
+
+      const res = await fetch("/api/renderer/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id }),
+      });
+      const data = (await res.json()) as { error?: string; pngUrl?: string };
+      if (!res.ok || !data.pngUrl) throw new Error(data.error ?? "Ошибка рендера превью");
+      setPhotoUrl(`${data.pngUrl}?t=${Date.now()}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setPhotoBusy(false);
     }
   }
 
@@ -257,9 +359,10 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
   }
 
   const fieldInput = inputStyle();
-  const chatUi = useMemo(() => chatUiForLocale(project.locale), [project.locale]);
+  const chatUi = useMemo(() => chatUiForLocale(form.locale), [form.locale]);
   const sampleIn = chatUi.sampleMessages.filter((m) => m.role === "client");
   const sampleOut = chatUi.sampleMessages.filter((m) => m.role === "manager");
+  const phoneRef = useRef<HTMLDivElement>(null);
   const wallpaperImage = wallpaperUrl
     ? `url("${wallpaperUrl}")`
     : "linear-gradient(180deg, #6ba3be, #4a8fa8)";
@@ -273,7 +376,7 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
             <HelpTip text="Это менеджер (актриса) в чате. Отзывы публикуются от её имени." />
           </h2>
           <p style={{ color: colors.muted, margin: "0.25rem 0 0", fontSize: "0.82rem" }}>
-            {project.managerHandle} · {project.locale} · {project.currency}
+            {form.managerHandle} · {form.locale} · {displayCurrency}
             {project.id === "nancy" ? " · двухчастные отзывы" : ""}
           </p>
         </div>
@@ -311,6 +414,36 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
       {tab === "settings" && (
         <form onSubmit={handleSaveSettings} className="project-settings-layout">
           <div className="project-settings-fields">
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Язык / регион"
+                  tip="Меняет рынок проекта: валюту, пул имён клиентов, банки и формат сумм. Тексты отзывов не переводятся автоматически — их правьте отдельно."
+                />
+              }
+            >
+              <select
+                style={fieldInput}
+                value={form.locale}
+                onChange={(e) => setForm({ ...form, locale: e.target.value })}
+              >
+                {locales.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name} ({l.currency})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Валюта"
+                  tip="Подставляется автоматически из языка/региона (config/geo.json)."
+                />
+              }
+            >
+              <input style={{ ...fieldInput, opacity: 0.85 }} value={displayCurrency} readOnly />
+            </Field>
             <Field
               label={<LabelWithHelp label="Ник в Telegram" tip="Как отображается менеджер, например @Maya_Nancy." />}
             >
@@ -435,6 +568,7 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
               <span>Живой пример без генерации отзыва</span>
             </div>
             <div
+              ref={phoneRef}
               className="project-phone"
               style={{ ["--chat-wallpaper" as string]: wallpaperImage } as CSSProperties}
             >
@@ -473,14 +607,80 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
                     </div>
                   </div>
                 </div>
-              </div>
+                <div className="project-phone-header-frost" aria-hidden />
 
-              <div className="project-phone-header-frost" aria-hidden />
+                {/* Inside stage so backdrop-filter samples wallpaper */}
+                <div className="project-phone-input">
+                  <GlassPill className="project-phone-attach" phoneRef={phoneRef}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                        stroke="#1C1C1E"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </GlassPill>
+                  <GlassPill className="project-phone-input-pill" phoneRef={phoneRef}>
+                    <span>{chatUi.inputPlaceholder}</span>
+                    <span className="project-phone-sticker" aria-hidden>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M19.4 16.28A8.55 8.55 0 1 1 12 3.45"
+                          stroke="#636366"
+                          strokeWidth="1.55"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M12 3.45C15.5 4.5 18.5 9 19.4 16.28"
+                          stroke="#636366"
+                          strokeWidth="1.55"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M12 3.45C10.5 8 14 14 19.4 16.28"
+                          stroke="#636366"
+                          strokeWidth="1.55"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </span>
+                  </GlassPill>
+                  <GlassPill className="project-phone-mic" phoneRef={phoneRef}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z"
+                        stroke="#1C1C1E"
+                        strokeWidth="1.45"
+                      />
+                      <path
+                        d="M5.9 11.4c0 3.2 2.5 5.85 5.6 6.2v2.4h1v-2.4c3.1-.35 5.6-3 5.6-6.2"
+                        stroke="#1C1C1E"
+                        strokeWidth="1.45"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </GlassPill>
+                </div>
+              </div>
 
               <div className="project-phone-header">
                 <div className="project-phone-status">
                   <span>9:41</span>
-                  <span className="project-phone-tg-pill">TELEGRAM</span>
+                  <span className="project-phone-tg-pill">
+                    <svg viewBox="48 68 130 115" aria-hidden>
+                      <path
+                        fill="#fff"
+                        d="M81.486 130.178 52.2 120.636s-3.5-1.42-2.373-4.64c.232-.664.7-1.229 2.1-2.2 6.489-4.523 120.106-45.36 120.106-45.36s3.208-1.081 5.1-.362a2.766 2.766 0 0 1 1.885 2.055 9.357 9.357 0 0 1 .254 2.585c-.009.752-.1 1.449-.169 2.542-.692 11.165-21.4 94.493-21.4 94.493s-1.239 4.876-5.678 5.043a8.13 8.13 0 0 1-4.925-1.542c-8.711-7.493-38.819-27.727-45.472-32.177a1.27 1.27 0 0 1-.546-.9c-.093-.469.417-1.05.417-1.05s52.426-46.6 53.821-51.492c.108-.379-.3-.566-.848-.4-3.482 1.281-63.844 39.4-70.506 43.607a3.21 3.21 0 0 1-1.38.79Z"
+                      />
+                      <path
+                        fill="rgba(255,255,255,0.45)"
+                        d="M81.229 128.772 95.466 168.178s1.78 3.687 3.686 3.687 30.255-29.492 30.255-29.492l31.525-60.89L81.737 118.6Z"
+                      />
+                    </svg>
+                    TELEGRAM
+                  </span>
                   <span className="project-phone-status-icons" aria-hidden>
                     <svg width="14" height="9" viewBox="0 0 19.5 12" fill="currentColor">
                       <rect x="0" y="8.5" width="3.2" height="3.5" rx="0.7" />
@@ -488,11 +688,11 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
                       <rect x="9.6" y="3.2" width="3.2" height="8.8" rx="0.7" />
                       <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" opacity="0.35" />
                     </svg>
-                    <svg width="12" height="9" viewBox="0 0 17 12" fill="none">
-                      <circle cx="8.5" cy="10.4" r="1.15" fill="currentColor" />
-                      <path d="M5.1 7.55C6.05 6.55 7.2 6 8.5 6C9.8 6 10.95 6.55 11.9 7.55" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />
-                      <path d="M2.55 5.05C4.2 3.25 6.2 2.3 8.5 2.3C10.8 2.3 12.8 3.25 14.45 5.05" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />
-                      <path d="M0.75 2.55C3 0.55 5.55 0 8.5 0C11.45 0 14 0.55 16.25 2.55" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />
+                    <svg width="12" height="9" viewBox="0 0 16 12" fill="none">
+                      <circle cx="8" cy="10.55" r="1.05" fill="currentColor" />
+                      <path d="M5.4 7.85c.8-.85 1.85-1.35 2.95-1.35s2.15.5 2.95 1.35" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+                      <path d="M3.55 5.55c1.3-1.4 2.95-2.2 4.7-2.2s3.4.8 4.7 2.2" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+                      <path d="M1.85 3.35c1.75-1.75 3.85-2.6 6.4-2.6s4.65.85 6.4 2.6" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
                     </svg>
                     <svg width="19" height="9" viewBox="0 0 27 13" fill="none">
                       <rect x="0.6" y="0.6" width="23" height="11.8" rx="2.6" stroke="currentColor" strokeWidth="1.2" opacity="0.4" />
@@ -502,67 +702,40 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
                   </span>
                 </div>
                 <div className="project-phone-nav">
-                  <GlassPill className="project-phone-back">
+                  <GlassPill className="project-phone-back" phoneRef={phoneRef}>
                     <svg className="project-phone-back-chevron" viewBox="0 0 12 20" fill="none" aria-hidden>
                       <path
                         d="M9.2 1.6L1.7 10l7.5 8.4"
-                        stroke="#1C1C1E"
-                        strokeWidth="3.2"
+                        stroke="#000"
+                        strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
                     </svg>
                     <span className="project-phone-badge">1</span>
                   </GlassPill>
-                  <GlassPill className="project-phone-title">
+                  <GlassPill className="project-phone-title" phoneRef={phoneRef}>
                     <strong>{chatUi.sampleClientName}</strong>
                     <em>{chatUi.statusRecently}</em>
                   </GlassPill>
-                  <GlassPill className="project-phone-avatar">
+                  <GlassPill className="project-phone-avatar" phoneRef={phoneRef}>
                     <span>{chatUi.sampleClientName.slice(0, 1).toUpperCase()}</span>
                   </GlassPill>
                 </div>
               </div>
-
-              <div className="project-phone-input-frost" aria-hidden />
-
-              <div className="project-phone-input">
-                <GlassPill className="project-phone-attach">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M18.2 9.35v7.05c0 2.65-2.15 4.8-4.8 4.8s-4.8-2.15-4.8-4.8V7.55c0-1.75 1.4-3.15 3.15-3.15s3.15 1.4 3.15 3.15v8a1.5 1.5 0 01-3 0V9.2"
-                      stroke="#000"
-                      strokeWidth="2.15"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </GlassPill>
-                <GlassPill className="project-phone-input-pill">
-                  <span>{chatUi.inputPlaceholder}</span>
-                  <span className="project-phone-sticker" aria-hidden>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="8.4" stroke="#636366" strokeWidth="1.85" />
-                      <path d="M15.35 5.85C11.85 5.85 9.85 9.05 9.85 12.15C9.85 15.25 11.85 18.45 15.35 18.45" stroke="#636366" strokeWidth="1.85" strokeLinecap="round" />
-                      <circle cx="9.7" cy="10.15" r="1.15" fill="#636366" />
-                    </svg>
-                  </span>
-                </GlassPill>
-                <GlassPill className="project-phone-mic">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z"
-                      stroke="#007AFF"
-                      strokeWidth="2.1"
-                    />
-                    <path
-                      d="M5.9 11.4c0 3.2 2.5 5.85 5.6 6.2v2.4h1v-2.4c3.1-.35 5.6-3 5.6-6.2"
-                      stroke="#007AFF"
-                      strokeWidth="2.1"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </GlassPill>
-              </div>
+            </div>
+            <div className="project-live-preview-actions">
+              <button
+                type="button"
+                className="project-photo-btn"
+                disabled={photoBusy}
+                onClick={() => void openAsPhoto()}
+              >
+                {photoBusy ? "Рендер…" : "Открыть как фото"}
+              </button>
+              <p className="project-live-preview-foot">
+                Реальный PNG 390×844 @3x (1170×2532) — зумить и сравнить с оригиналом
+              </p>
             </div>
             <p className="project-live-preview-foot">
               {form.managerHandle || project.managerHandle} · фон и цвета обновляются сразу
@@ -570,6 +743,14 @@ export function ProjectWorkspace({ project, initialReview }: ProjectWorkspacePro
           </aside>
         </form>
       )}
+
+      {photoUrl ? (
+        <ZoomPhotoLightbox
+          src={photoUrl}
+          title="Превью чата (полный размер)"
+          onClose={() => setPhotoUrl(null)}
+        />
+      ) : null}
 
       <MediaPicker
         open={pickerOpen}

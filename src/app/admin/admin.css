@@ -346,6 +346,30 @@
   white-space: nowrap;
 }
 
+.schedule-bet-reuse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+}
+
+.schedule-bet-reuse-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+
+.schedule-bet-reuse-label input {
+  width: 6rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  font: inherit;
+}
+
 @media (max-width: 640px) {
   .schedule-meta {
     grid-template-columns: 1fr;
@@ -1369,6 +1393,123 @@ textarea.admin-input:focus {
   margin: 0;
 }
 
+.project-live-preview-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 280px;
+}
+
+.project-photo-btn {
+  appearance: none;
+  border: 1px solid var(--line-strong, #d1d5db);
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.project-photo-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.project-photo-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* Full-res PNG viewer for zoom compare */
+.zoom-photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 12, 16, 0.92);
+}
+
+.zoom-photo-lightbox-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 1rem;
+  padding: 0.7rem 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.zoom-photo-lightbox-toolbar strong {
+  font-size: 0.9rem;
+}
+
+.zoom-photo-lightbox-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+  flex: 1 1 auto;
+}
+
+.zoom-photo-lightbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.zoom-photo-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.zoom-photo-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.zoom-photo-lightbox-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.zoom-photo-lightbox-stage:active {
+  cursor: grabbing;
+}
+
+.zoom-photo-lightbox-img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  background: #111;
+  transform-origin: center center;
+  will-change: transform;
+  pointer-events: none;
+}
+
 .project-phone {
   width: 100%;
   max-width: 280px;
@@ -1402,88 +1543,66 @@ textarea.admin-input:focus {
   pointer-events: none;
 }
 
-/* Frosted header band above chat (messages tuck under) — like real Telegram iOS */
+/* Soft header frost only — weak but visible */
 .project-phone-header-frost {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  height: 7.2rem;
+  height: 7rem;
   z-index: 4;
   pointer-events: none;
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
+  background: rgba(255, 255, 255, 0.03);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 38%,
+    rgba(0, 0, 0, 0.5) 68%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 38%,
+    rgba(0, 0, 0, 0.5) 68%,
+    transparent 100%
+  );
 }
 
 .project-phone-header-frost::before {
   content: "";
   position: absolute;
-  left: -16%;
-  width: 132%;
+  left: -12%;
+  width: 124%;
   top: 0;
-  height: 280%;
+  height: 260%;
   background-image: var(--chat-wallpaper);
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
-  filter: blur(72px) saturate(180%);
-  transform: scale(1.18);
+  filter: blur(22px) saturate(150%);
+  transform: scale(1.12);
   transform-origin: center top;
+  opacity: 0.2;
 }
 
 .project-phone-header-frost::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.22) 0%,
-    rgba(255, 255, 255, 0.14) 42%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  content: none;
+  display: none;
 }
 
-/* Strong frosted band behind input controls */
+.project-phone-header-frost::before,
+.project-phone-header-frost::after {
+  content: none;
+  display: none;
+}
+
+/* No bottom frost */
 .project-phone-input-frost {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 5.8rem;
-  z-index: 4;
-  pointer-events: none;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
-}
-
-.project-phone-input-frost::before {
-  content: "";
-  position: absolute;
-  left: -16%;
-  width: 132%;
-  bottom: 0;
-  height: 320%;
-  background-image: var(--chat-wallpaper);
-  background-size: cover;
-  background-position: center bottom;
-  background-repeat: no-repeat;
-  filter: blur(80px) saturate(180%);
-  transform: scale(1.2);
-  transform-origin: center bottom;
-}
-
-.project-phone-input-frost::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to top,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(200, 230, 240, 0.12) 45%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  display: none;
 }
 
 .project-phone-header {
@@ -1499,10 +1618,10 @@ textarea.admin-input:focus {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 0.55rem 0.75rem 0.15rem;
+  padding: 10px 14px 2px;
   background: transparent;
-  font-size: 0.72rem;
-  font-weight: 650;
+  font-size: 11px;
+  font-weight: 600;
   color: #fff;
   position: relative;
   text-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.25);
@@ -1511,17 +1630,29 @@ textarea.admin-input:focus {
 .project-phone-tg-pill {
   position: absolute;
   left: 50%;
-  top: 0.45rem;
+  top: 4px;
   transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 14px;
   background: #007aff;
   color: #fff;
-  font-size: 0.55rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  padding: 0.18rem 0.45rem;
+  font-size: 0.5rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  padding: 0 0.38rem 0 0.25rem;
   border-radius: 999px;
   line-height: 1;
   text-shadow: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.project-phone-tg-pill svg {
+  width: 10px;
+  height: 10px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .project-phone-status-icons {
@@ -1539,11 +1670,11 @@ textarea.admin-input:focus {
 }
 
 .project-phone-nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem;
-  margin: 0 0.45rem 0.2rem;
+  column-gap: 10px;
+  margin: 0 8px 3px;
   padding: 0;
   position: relative;
   background: transparent;
@@ -1558,17 +1689,51 @@ textarea.admin-input:focus {
 .project-phone-mic,
 .project-phone-input-pill {
   position: relative;
-  background: rgba(255, 255, 255, 0.38);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
-  box-shadow:
-    0 0.5px 0 rgba(255, 255, 255, 0.35) inset,
-    0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  isolation: isolate;
+  background: transparent;
   border: none;
+  box-shadow:
+    0 0.5px 0 rgba(255, 255, 255, 0.55) inset,
+    0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
-.project-phone-mic {
-  background: rgba(170, 215, 240, 0.45);
+/* Clipped blurred wallpaper — real glass without backdrop-filter */
+.project-glass-frost {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.project-glass-frost::before {
+  content: "";
+  position: absolute;
+  left: var(--frost-left, 0);
+  top: var(--frost-top, 0);
+  width: 280px;
+  height: 480px;
+  background-image: var(--chat-wallpaper);
+  background-size: cover;
+  background-position: center;
+  filter: blur(18px) saturate(175%) brightness(1.06);
+  transform: scale(1.14);
+  transform-origin: center center;
+}
+
+.project-glass-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.project-phone-mic .project-glass-tint {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .project-phone-back.project-glass-pill,
@@ -1597,16 +1762,53 @@ textarea.admin-input:focus {
   place-items: center;
 }
 
+.project-phone-back .project-glass-content,
+.project-phone-attach .project-glass-content,
+.project-phone-mic .project-glass-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  width: 100%;
+  height: 100%;
+}
+
+.project-phone-title .project-glass-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.project-phone-input-pill .project-glass-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 0 6px 0 12px;
+  box-sizing: border-box;
+}
+
+.project-phone-avatar .project-glass-content {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
 .project-phone-back {
   display: inline-flex;
   align-items: center;
-  gap: 0.32rem;
-  height: 1.9rem;
-  padding: 0.2rem 0.28rem 0.2rem 0.45rem;
+  gap: 4px;
+  height: 28px;
+  padding: 0 7px 0 8px;
   border-radius: 999px;
   color: #000;
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
   line-height: 1;
   white-space: nowrap;
   z-index: 1;
@@ -1615,22 +1817,22 @@ textarea.admin-input:focus {
 
 .project-phone-back-chevron {
   display: block;
-  width: 0.48rem;
-  height: 0.85rem;
+  width: 7px;
+  height: 13px;
   flex-shrink: 0;
 }
 
 .project-phone-badge {
-  /* Exact same height as chevron */
-  min-width: 0.85rem;
-  width: 0.85rem;
-  height: 0.85rem;
+  /* 18×18 @ 390 → ~13×13 @ 280 preview */
+  min-width: 13px;
+  width: 13px;
+  height: 13px;
   padding: 0;
   border-radius: 50%;
   background: #000;
   color: #fff;
-  font-size: 0.52rem;
-  font-weight: 650;
+  font-size: 9px;
+  font-weight: 400;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1643,59 +1845,65 @@ textarea.admin-input:focus {
   left: auto;
   transform: none;
   text-align: center;
-  min-width: 0;
-  max-width: none;
-  flex: 1;
-  height: 2rem;
-  padding: 0.15rem 0.65rem;
+  width: max-content;
+  max-width: 100%;
+  justify-self: center;
+  height: 28px;
+  padding: 2px 11px 3px;
   border-radius: 999px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1px;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .project-phone-title strong {
   display: block;
-  font-size: 0.74rem;
-  font-weight: 650;
-  color: #111;
+  font-size: 12px;
+  font-weight: 600;
+  color: #000;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.15;
+  line-height: 14px;
   max-width: 100%;
 }
 
 .project-phone-title em {
   display: block;
   font-style: normal;
-  font-size: 0.58rem;
-  color: #8e8e93;
-  line-height: 1.15;
+  font-size: 9px;
+  font-weight: 400;
+  color: #787878;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 11px;
   max-width: 100%;
 }
 
 .project-phone-avatar {
-  width: 2rem;
-  height: 2rem;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   color: #111;
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   margin-left: 0;
   z-index: 1;
   flex-shrink: 0;
+  justify-self: end;
+  border: 2px solid rgba(200, 230, 245, 0.92);
+  box-sizing: border-box;
 }
 
 .project-phone-chat {
   position: absolute;
   inset: 0;
-  padding: 4.6rem 0.5rem 3.4rem;
+  padding: 4.6rem 0.5rem 2.35rem;
   display: flex;
   flex-direction: column;
   background: transparent;
@@ -1718,13 +1926,15 @@ textarea.admin-input:focus {
 
 .project-phone-bubble {
   max-width: 82%;
-  padding: 0.42rem 0.55rem;
-  font-size: 0.78rem;
-  line-height: 1.35;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
+  border-radius: 12px;
 }
 
 .project-phone-bubble .apple-emoji,
@@ -1739,15 +1949,15 @@ img.apple-emoji {
 
 .project-phone-bubble.is-in {
   align-self: flex-start;
-  border-radius: 12px 12px 12px 4px;
-  color: #111;
+  border-radius: 12px 12px 12px 3px;
+  color: #000;
 }
 
 .project-phone-bubble.is-out {
   align-self: flex-end;
-  border-radius: 12px 12px 4px 12px;
-  color: #111;
-  padding-right: 1.35rem;
+  border-radius: 12px 12px 3px 12px;
+  color: #000;
+  padding-right: 1.2rem;
 }
 
 .project-phone-checks {
@@ -1767,13 +1977,14 @@ img.apple-emoji {
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.45rem 0.7rem;
+  gap: 6px;
+  padding: 5px 10px 10px;
   background: transparent;
-  color: #636366;
-  font-size: 0.78rem;
-  font-weight: 500;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
+  pointer-events: none;
 }
 
 .project-phone-attach,
@@ -1801,10 +2012,10 @@ img.apple-emoji {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0.35rem 0 0.7rem;
+  padding: 0 6px 0 12px;
   min-width: 0;
-  color: #636366;
-  font-weight: 500;
+  color: rgba(0, 0, 0, 0.45);
+  font-weight: 400;
 }
 
 .project-phone-sticker {

@@ -6,6 +6,7 @@
       "name": "Español (México)",
       "timezone": "America/Mexico_City",
       "currency": "MXN",
+      "bankCountry": "MX",
       "dateFormat": "d 'de' MMMM yyyy",
       "timeFormat": "HH:mm"
     },
@@ -14,6 +15,7 @@
       "name": "Español (Argentina)",
       "timezone": "America/Argentina/Buenos_Aires",
       "currency": "ARS",
+      "bankCountry": "AR",
       "dateFormat": "d 'de' MMMM yyyy",
       "timeFormat": "HH:mm"
     },
@@ -22,6 +24,7 @@
       "name": "Español (Venezuela)",
       "timezone": "America/Caracas",
       "currency": "VES",
+      "bankCountry": "VE",
       "dateFormat": "dd/MM/yyyy",
       "timeFormat": "HH:mm"
     },
@@ -30,6 +33,7 @@
       "name": "Русский (тест)",
       "timezone": "Europe/Moscow",
       "currency": "RUB",
+      "bankCountry": "RU",
       "dateFormat": "d MMMM yyyy",
       "timeFormat": "HH:mm"
     }

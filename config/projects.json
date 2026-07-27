@@ -10,6 +10,15 @@
       "clientAvatarPath": "data/media/story_photos/pool/ai_1784812785611_4c17ee23.png",
       "wallpaperPath": "data/media/wallpapers/nancy.jpg",
       "conditionsImagePath": "data/media/conditions/nancy/condiciones.jpg",
+      "conditionsTexts": [
+        "Permítame contarle brevemente todo para que le quede más claro. Usted invierte sus fondos, luego yo los transfiero a la bolsa, después de eso busco pares comerciales estables y seguros, como consecuencia de lo cual aumento sus ganancias 💰",
+        "Mi trabajo dura de 1 a 4 horas, y mientras trabajo, te informaré sobre los resultados parciales"
+      ],
+      "betCaptionTemplates": [
+        "La primera inversión nos trae exitosamente {{profit1}} MXN 💰",
+        "La ganancia de la segunda inversión es de {{profit2}} MXN 💕",
+        "Las inversiones finales te han generado exitosamente {{profitFinal}} MXN ❤️‍🔥💸"
+      ],
       "telegramThemeId": "PJ6uSlD87ipPf7Ci",
       "receiptStyle": "spin",
       "capturaStyle": "spin",
@@ -31,9 +40,9 @@
         "headerBg": "#F7F7F7",
         "statusBarStyle": "light"
       },
-      "depositMessageTemplate": "💳 Banco: {{bankName}}\nCLABE: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
-      "completionMessageTemplate": "El trabajo está terminado, con {{deposit}} pesos ganamos {{profitFinal}} pesos 📈💰\nEnvíeme el número de su tarjeta para enviarle la ganancia💸",
-      "payoutMessageTemplate": "Te transfirió dinero 🩵\nPuedes comprobar tus beneficios 💸",
+      "depositMessageTemplate": "💳 Debe pagar a esta dirección:\n\n135788754225789985432\n\nEnvíame una captura de pantalla después del pago por favor 🩵",
+      "completionMessageTemplate": "El trabajo está terminado, con {{deposit}} pesos ganamos {{profitFinal}} pesos 📈💰\nEnvíeme el número de su tarjeta para enviarle la ganancia 💸",
+      "payoutMessageTemplate": "Te transfirió dinero 🩵",
       "twoPhaseReview": true,
       "phaseDelayMinutes": 90
     },
@@ -46,7 +55,13 @@
       "managerHandle": "@Grisel_A",
       "wallpaperPath": "data/media/wallpapers/grisel.jpg",
       "conditionsTexts": [
+        "A continuación se presentan los términos y condiciones de trabajar conmigo para que usted pueda revisar 🔖\nSi tienes alguna pregunta, no dudes en hacérmela, estaré encantada de responderte 😉🤗",
         "😊 Condiciones para trabajar conmigo:\n\n👮‍♂️ El trabajo se realiza dentro del marco legal\n⏰ El proceso toma de 2 a 4 horas \n💛 Estoy disponible 24/7, siempre lista para escucharle y responder sus preguntas \n\n💸 Depósitos para invertir\n\n600 pesos >>> 70,000 pesos 🇲🇽\n850 pesos >>> 180,000 pesos 🇲🇽\n1,000 pesos >>> 250,000 pesos 🇲🇽\n\nListos para empezar a invertir? 🥰"
+      ],
+      "betCaptionTemplates": [
+        "Su primera inversión ya generó {{profit1}} pesos 🤩",
+        "Su ganancia aumentó a {{profit2}} pesos 🔥",
+        "Su resultado final fue de {{profitFinal}} pesos 💸\nEl trabajo terminó con una ganancia muy bonita! ✨"
       ],
       "telegramThemeId": "T8EEcizSz3R4drfb",
       "receiptStyle": "mercado_pago",
@@ -68,9 +83,9 @@
         "headerBgEnd": "#D6EBFF",
         "statusBarStyle": "light"
       },
-      "depositMessageTemplate": "💳 Banco: {{bankName}}\nCLABE: {{clabe}}\nEnvíame una captura de pantalla después del pago por favor 💙",
-      "completionMessageTemplate": "El trabajo está terminado, con {{deposit}} pesos ganamos {{profitFinal}} pesos 📈💰",
-      "payoutMessageTemplate": "Te transfirió dinero 🩵",
+      "depositMessageTemplate": "🥰 El depósito inicial se realiza a esta cuenta 👇🏻\n\n892029281899919001991\n\nUna vez que envíes el depósito inicial, envíanos el comprobante de pago 💛",
+      "completionMessageTemplate": "Estimado cliente, el trabajo se completó con éxito 🥰\n\n💛 Su depósito inicial: {{deposit}} pesos \n💸 Su ganancia: {{profitFinal}} pesos \n\nEstá satisfecho con el trabajo realizado? 😊\n\nQuedo atenta a su número de cuenta para poder enviarle su ganancia 💳",
+      "payoutMessageTemplate": "Transferencia completada con éxito! \n✅ Puede consultar el saldo de su cuenta)",
       "twoPhaseReview": false,
       "phaseDelayMinutes": 90
     },
@@ -85,6 +100,11 @@
       "conditionsTexts": [
         "Ahora te contaré mi historia ❤️\n1️⃣ Soy de Argentina 🇦🇷 y nací en Puerto Madero 🇦🇷\n2️⃣ Actualmente reside en Puerto Madero 🏠\n3️⃣ Mi trabajo no es apostar y no es un casino. Trabajo en los mercados financieros de criptomonedas. 📈\n4️⃣ Mi experiencia en el mercado de criptomonedas: 5 años 🤑\n5️⃣ Estoy entre las 100 personas más ricas del Argentina 💵\nNo siempre he sido rica. Nací en un barrio pobre. En mi casa, cuando llovía, el techo goteaba. Esa vida no me convenía. Y comencé a explorar el mundo de las criptomonedas. Sé lo malo que es vivir sin dinero. Y es por eso que quiero ayudar a mis conciudadanos a ganar dinero para que haya menos gente pobre en nuestro país 🇦🇷❤️",
         "Aquí tienes las opciones de inversión disponibles para hoy, sin riesgo, tu depósito está asegurado, no puedes perder dinero 🏦🤗\n\n📈 Plan de ganancias:\n🔷 Con 40.000Ars obtendrás 2.200.000Ars 🇦🇷 💰\n🔷 Con 50.000Ars obtendrás 3.500.000Ars 🇦🇷 💰\n🔷 Con 120.000Ars obtendrás 7.500.000Ars 🇦🇷 💰\nMayormente mis clientes toman la segunda opción, es la más rentable 💵❤️\n\nCuánto estás dispuesto a invertir? 👌🇦🇷"
+      ],
+      "betCaptionTemplates": [
+        "La primera inversión ya nos dio {{profit1}} 📈",
+        "Seguimos: la ganancia subió a {{profit2}} 🔥",
+        "Resultado final: {{profitFinal}} 💸❤️"
       ],
       "telegramThemeId": "YtZOfPeUAPfNifBt",
       "receiptStyle": "mercado_pago",
@@ -109,7 +129,7 @@
         "headerBgEnd": "#EBD9FF",
         "statusBarStyle": "light"
       },
-      "depositMessageTemplate": "💳 Banco: {{bankName}}\nCLABE / alias: {{clabe}}\nMandame una captura después del pago 💙",
+      "depositMessageTemplate": "💳 Banco: {{bankName}}\nAlias / CBU: {{clabe}}\nMandame una captura después del pago 💙",
       "completionMessageTemplate": "El trabajo terminó: con {{deposit}} ganamos {{profitFinal}} 📈💰",
       "payoutMessageTemplate": "Te transferí el dinero 🩵",
       "twoPhaseReview": false,
@@ -125,6 +145,11 @@
       "wallpaperPath": "data/media/wallpapers/paola.jpg",
       "conditionsTexts": [
         "💸 INVERSIONES EN CRIPTO CON\nPAOLA 💸\n\n❗️ Términos de inversión ❗️\n\n💰 Haces un depósito de 850 MXN 🇲🇽\n\n🏦 En 1-3 horas obtienes una ganancia\ngarantizada de ~60,000 MXN 🇲🇽\n\nEsto es posible con mi ayuda! ✅\n\n📊 Me encargo de todas las\noperaciones en el mercado de valores\npara multiplicar tu dinero 📈\n\n🔒 La seguridad total de tus inversiones\nestá garantizada 📑 Todo el trabajo está\nprotegido por el estado ❗️\n\n⬆️ El pago se realiza a través de\ncualquier método electrónico que te\nresulte cómodo 🤝 💳\n\nSi aún tienes alguna duda, escribe, me\nencanta responder ❤️"
+      ],
+      "betCaptionTemplates": [
+        "La primera inversión nos trae exitosamente {{profit1}} MXN 💰",
+        "La ganancia de la segunda inversión es de {{profit2}} MXN 💕",
+        "Las inversiones finales te han generado exitosamente {{profitFinal}} MXN ❤️‍🔥💸"
       ],
       "telegramThemeId": "CfLKWIH0PvOhtiNx",
       "receiptStyle": "bbva",
@@ -160,12 +185,17 @@
       "name": "Francesca",
       "locale": "es-VE",
       "currency": "VES",
-      "managerName": "Francesca",
+      "managerName": "Francesca Castilla",
       "managerHandle": "@Francesca_V",
       "wallpaperPath": "data/media/wallpapers/francesca.jpg",
       "conditionsImagePath": "data/media/conditions/francesca/condiciones.jpg",
       "conditionsTexts": [
         "En este post encontrarás toda la información que necesitas. Y si todavía tiene preguntas, pregúnteme, estoy dispuesto a responder 🥰\n1️⃣ Importe del depósito: 20.000 Bs\n2️⃣ Ingresos: a partir de 700.000 Bs\n3️⃣ Duración del trabajo: de 1 a 5 horas\n4️⃣ Mi comisión: 10% del importe de las\nganancias\n5️⃣ Pago: en tarjeta bancaria, o crypto wallet (a su solicitud)💳💸\n\n🔹 Toda la actividad de trabajo 100% oficial, legal y segura. Listo para empezar a trabajar ahora mismo?❤️"
+      ],
+      "betCaptionTemplates": [
+        "La primera inversión nos trae exitosamente {{profit1}} 💰",
+        "La ganancia de la segunda inversión es de {{profit2}} 💕",
+        "Las inversiones finales te han generado exitosamente {{profitFinal}} ❤️‍🔥💸"
       ],
       "telegramThemeId": "BnVRAAEKyvwewUtW",
       "receiptStyle": "generic",
@@ -187,7 +217,7 @@
         "statusBarStyle": "light"
       },
       "depositMessageTemplate": "💳 Banco: {{bankName}}\nDatos: {{clabe}}\nCaptura por favor 💙",
-      "completionMessageTemplate": "Con {{deposit}} ganamos {{profitFinal}} 📈",
+      "completionMessageTemplate": "El trabajo está terminado 📈\n\nTotal ganado: {{profitFinal}}\nMi parte (10%): {{commission}}\nSu parte (90%): {{clientShare}}\n\nEnvíeme el número de su tarjeta para enviarle la ganancia 💸",
       "payoutMessageTemplate": "Transferencia lista 🩵",
       "twoPhaseReview": false,
       "phaseDelayMinutes": 90

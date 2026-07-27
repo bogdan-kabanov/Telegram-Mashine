@@ -102,6 +102,7 @@ export class ReviewPipeline {
           projectId: params.projectId,
           count: 3,
           reviewId,
+          reuseDays: config.schedule.betReuseDays,
         }),
         videoNotePromise,
         mediaHandler.resolveProjectImage("sticker", {
@@ -180,7 +181,7 @@ export class ReviewPipeline {
           ...(project.capturaStyle ? { style: project.capturaStyle } : {}),
         }),
         mediaHandler.generateReceipt({
-          amount: dialog.profitFinal,
+          amount: dialog.payoutAmount,
           currency: project.currency,
           senderName: project.managerName,
           recipientName: dialog.clientName,

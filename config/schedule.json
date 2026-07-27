@@ -2,6 +2,7 @@
   "timezone": "America/Mexico_City",
   "postsPerDay": 15,
   "phaseDelayMinutes": 90,
+  "betReuseDays": 5,
   "cycleWeeks": 3,
   "cycleEpochDate": "2026-07-06",
   "weeks": [

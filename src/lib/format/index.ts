@@ -1,8 +1,79 @@
 import type { AmountPack } from "@/lib/schemas/amounts";
+import type { Currency } from "@/lib/schemas/currencies";
+import { getCachedAppConfig } from "@/lib/config/loader";
+import { getMexicoCityParts } from "@/lib/timezone";
+
+const FALLBACK_CURRENCIES: Currency[] = [
+  {
+    code: "MXN",
+    symbol: "$",
+    name: "Peso Mexicano",
+    decimals: 2,
+    format: { thousandSeparator: ",", decimalSeparator: ".", symbolPosition: "before" },
+  },
+  {
+    code: "ARS",
+    symbol: "$",
+    name: "Peso Argentino",
+    decimals: 0,
+    format: { thousandSeparator: ".", decimalSeparator: ",", symbolPosition: "before" },
+  },
+  {
+    code: "VES",
+    symbol: "Bs",
+    name: "Bolívar",
+    decimals: 2,
+    format: { thousandSeparator: ".", decimalSeparator: ",", symbolPosition: "after" },
+  },
+  {
+    code: "RUB",
+    symbol: "₽",
+    name: "Российский рубль",
+    decimals: 0,
+    format: { thousandSeparator: " ", decimalSeparator: ",", symbolPosition: "after" },
+  },
+];
+
+function currencyRules(code: string): Currency {
+  const fromConfig = getCachedAppConfig()?.currencies.currencies.find((c) => c.code === code);
+  if (fromConfig) return fromConfig;
+  return FALLBACK_CURRENCIES.find((c) => c.code === code) ?? FALLBACK_CURRENCIES[0]!;
+}
+
+function formatNumberWithSeparators(
+  value: number,
+  thousandSeparator: string,
+  decimalSeparator: string,
+  decimals: number,
+): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  const fixed = abs.toFixed(decimals);
+  const [intRaw, frac = ""] = fixed.split(".");
+  const intGrouped = (intRaw ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, thousandSeparator);
+  if (decimals <= 0 || !frac || Number(frac) === 0) {
+    // Keep whole amounts clean (77,876) even when decimals config is 2
+    if (decimals <= 0 || Number.isInteger(value)) return `${sign}${intGrouped}`;
+  }
+  return `${sign}${intGrouped}${decimalSeparator}${frac}`;
+}
 
 export function formatAmount(value: number, currency = "MXN"): string {
-  const formatted = value.toLocaleString("es-MX");
-  return currency === "MXN" ? `${formatted}` : `${formatted} ${currency}`;
+  const rules = currencyRules(currency);
+  const number = formatNumberWithSeparators(
+    value,
+    rules.format.thousandSeparator,
+    rules.format.decimalSeparator,
+    rules.decimals,
+  );
+
+  // MXN: bare number (legacy chat copy). Other currencies follow currencies.json.
+  if (currency === "MXN") return number;
+
+  if (rules.format.symbolPosition === "before") {
+    return `${rules.symbol}${number}`;
+  }
+  return `${number} ${rules.symbol}`;
 }
 
 export function generateClabe(bankPrefix: string | undefined, lastDigits: string): string {
@@ -52,8 +123,6 @@ export function amountPackToVars(pack: AmountPack): Record<string, number> {
     profitFinal: pack.profitFinal,
   };
 }
-
-import { getMexicoCityParts } from "@/lib/timezone";
 
 export function computeMessageTimes(
   messages: Array<{ delayMinutes: number }>,

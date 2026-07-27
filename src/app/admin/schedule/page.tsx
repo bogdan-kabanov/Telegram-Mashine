@@ -6,6 +6,7 @@ import { getMexicoCityParts, getMexicoDateKey } from "@/lib/timezone";
 
 import { AdminShell, SectionCard } from "../components";
 import { HelpTip } from "../ui/HelpTip";
+import { BetReuseSettings } from "./bet-reuse-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +139,14 @@ export default async function SchedulePage() {
           <span className="schedule-meta-value">{cycle.label}</span>
         </li>
       </ul>
+
+      <SectionCard
+        title="Кулдаун картинок ставок"
+        tip="Настройка из schedule.json → betReuseDays."
+        description="Паки идут по кругу 1→N→1. Кулдаун не даёт взять ту же картинку слишком рано."
+      >
+        <BetReuseSettings initialDays={config.schedule.betReuseDays} />
+      </SectionCard>
 
       <SectionCard
         title="Как читать календарь"

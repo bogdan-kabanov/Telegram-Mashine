@@ -2,13 +2,17 @@ import { promises as fs } from "fs";
 import path from "path";
 
 import { resetConfigCache, loadAppConfig } from "@/lib/config/loader";
+import { resolveLocaleProfileFromConfig } from "@/lib/i18n/locale-profile";
 import {
   clientLegendSchema,
   projectConfigSchema,
+  scheduleConfigSchema,
   type ClientLegend,
   type ProjectConfig,
+  type ScheduleConfig,
 } from "@/lib/schemas";
 import { getEnv } from "@/lib/schemas/env";
+
 
 function dataPath(...parts: string[]): string {
   const env = getEnv();
@@ -44,8 +48,23 @@ export async function loadLegendsFromDisk(): Promise<ClientLegend[]> {
 
 export async function updateProject(projectId: string, patch: Partial<ProjectConfig>): Promise<ProjectConfig> {
   const config = await loadAppConfig();
+  const current = config.projects.projects.find((p) => p.id === projectId);
+  if (!current) throw new Error(`Project not found: ${projectId}`);
+
+  const nextLocale = typeof patch.locale === "string" ? patch.locale : current.locale;
+  const localeProfile = resolveLocaleProfileFromConfig(config.geo, nextLocale);
+
   const projects = config.projects.projects.map((p) =>
-    p.id === projectId ? projectConfigSchema.parse({ ...p, ...patch, id: projectId }) : p,
+    p.id === projectId
+      ? projectConfigSchema.parse({
+          ...p,
+          ...patch,
+          id: projectId,
+          locale: localeProfile.code,
+          // Currency always follows locale from geo.json
+          currency: localeProfile.currency,
+        })
+      : p,
   );
   await fs.writeFile(
     configPath("projects.json"),
@@ -56,4 +75,12 @@ export async function updateProject(projectId: string, patch: Partial<ProjectCon
   const updated = projects.find((p) => p.id === projectId);
   if (!updated) throw new Error(`Project not found: ${projectId}`);
   return updated;
+}
+
+export async function updateSchedule(patch: Partial<ScheduleConfig>): Promise<ScheduleConfig> {
+  const config = await loadAppConfig();
+  const next = scheduleConfigSchema.parse({ ...config.schedule, ...patch });
+  await fs.writeFile(configPath("schedule.json"), `${JSON.stringify(next, null, 2)}\n`, "utf-8");
+  resetConfigCache();
+  return next;
 }

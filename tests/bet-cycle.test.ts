@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 
 import { resetDbForTests, getDb } from "../src/lib/db";
 import { mediaAssets } from "../src/lib/db/schema";
-import { BET_REUSE_DAYS, pickSequentialBets } from "../src/lib/bet-cycle";
+import { BET_REUSE_DAYS, BET_REUSE_DAYS_DEFAULT, pickSequentialBets } from "../src/lib/bet-cycle";
 import {
   messageVisualWeight,
   paginateMessages,
@@ -88,7 +88,8 @@ describe("sequential bet cycle", () => {
       // All recently used — may refill from start but still returns 3
       const third = await pickSequentialBets({ projectId: "nancy", count: 3, reviewId: "r3" });
       expect(third).toHaveLength(3);
-      expect(BET_REUSE_DAYS).toBe(10);
+      expect(BET_REUSE_DAYS).toBe(BET_REUSE_DAYS_DEFAULT);
+      expect(BET_REUSE_DAYS_DEFAULT).toBe(5);
     } finally {
       if (prevDataDir === undefined) delete process.env.DATA_DIR;
       else process.env.DATA_DIR = prevDataDir;

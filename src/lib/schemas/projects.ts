@@ -46,6 +46,12 @@ export const projectConfigSchema = z.object({
    * Image still sent separately if conditionsImagePath / media exists.
    */
   conditionsTexts: z.array(z.string().min(1)).optional(),
+  /**
+   * Exact captions after bet_1 / bet_2 / bet_3 screenshots (Vlad copy).
+   * Supports {{profit1}}, {{profit2}}, {{profitFinal}}, {{deposit}},
+   * {{commission}}, {{clientShare}} (Francesca 10%/90%).
+   */
+  betCaptionTemplates: z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)]).optional(),
   /** Telegram addtheme id (t.me/addtheme/...). */
   telegramThemeId: z.string().optional(),
   /** Preferred HTML fallback look (overrides bank mapping when set). */

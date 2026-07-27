@@ -5,11 +5,12 @@ import { markCombinationUsed, pickUnusedCombination } from "@/lib/combinations";
 import { loadAppConfig } from "@/lib/config/loader";
 import { pickUniqueAccountDigits } from "@/lib/account-digits";
 import {
-  amountPackToVars,
   buildDialogVars,
+  formatAmount,
   generateClabe,
   injectTemplate,
 } from "@/lib/format";
+import { resolveLocaleProfileFromConfig } from "@/lib/i18n/locale-profile";
 import {
   generateFullDialogBundle,
   rephraseClientPhrase,
@@ -23,6 +24,7 @@ import {
   clientLegendSchema,
   dialogMessageSchema,
   scenarioSchema,
+  selectAmountPacksForProject,
   type ClientLegend,
   type DialogMessage,
   type MessageType,
@@ -76,6 +78,8 @@ export interface GeneratedDialog {
   profit1: number;
   profit2: number;
   profitFinal: number;
+  /** Amount sent to client on payout slip (90% for Francesca). */
+  payoutAmount: number;
   clabe: string;
   accountLastDigits: string;
   depositBankId: string;
@@ -235,6 +239,8 @@ export class DialogGenerator {
     completionMessage: string;
     payoutMessage: string;
     conditionsTexts?: string[];
+    /** Fixed Vlad captions after bet_1 / bet_2 / bet_3 (already interpolated). */
+    betCaptions?: [string, string, string];
     includeConditionsImage?: boolean;
   }): DialogMessage[] {
     const { bundle, legendId, stagesToUse } = params;
@@ -362,8 +368,23 @@ export class DialogGenerator {
           content: stageName,
           delayMinutes: baseDelay,
         });
-        for (const turn of stageTurns) {
-          pushTurn(turn.role, turn.text, baseDelay + 1);
+        const betIndex = stageName === "bet_1" ? 0 : stageName === "bet_2" ? 1 : 2;
+        const fixedCaption = params.betCaptions?.[betIndex]?.trim();
+        if (fixedCaption) {
+          push({
+            role: "manager",
+            type: "text",
+            content: fixedCaption,
+            delayMinutes: baseDelay + 1,
+          });
+          // Keep client reactions from AI if present
+          for (const turn of stageTurns) {
+            if (turn.role === "client") pushTurn(turn.role, turn.text, baseDelay + 2);
+          }
+        } else {
+          for (const turn of stageTurns) {
+            pushTurn(turn.role, turn.text, baseDelay + 1);
+          }
         }
         continue;
       }
@@ -593,25 +614,32 @@ export class DialogGenerator {
     if (availableLegends.length === 0) throw new Error("No legends for scenario");
 
     const namePool = config.geo.clientNamePools[project.locale] ?? ["Cliente"];
-    const bankCountry = project.locale.toLowerCase().startsWith("ru") ? "RU" : "MX";
+    const localeProfile = resolveLocaleProfileFromConfig(config.geo, project.locale);
+    const bankCountry = localeProfile.bankCountry;
     const depositBanks = config.banks.depositBanks.filter((b) => b.country === bankCountry);
     const payoutBanks = config.banks.payoutBanks.filter((b) => b.country === bankCountry);
-    const amountPackIds = config.amounts.packs
-      .filter((p) => p.currency === project.currency)
-      .map((p) => p.id);
+    const projectPacks = selectAmountPacksForProject(
+      config.amounts.packs,
+      params.projectId,
+      project.currency,
+    );
+    if (projectPacks.length === 0) {
+      throw new Error(
+        `No amount packs for project=${params.projectId} currency=${project.currency}`,
+      );
+    }
+    const amountPackIds = projectPacks.map((p) => p.id);
     const combination = await pickUnusedCombination({
       projectId: params.projectId,
       legendIds: availableLegends.map((l) => l.id),
-      amountPackIds: amountPackIds.length > 0 ? amountPackIds : config.amounts.packs.map((p) => p.id),
+      amountPackIds,
       clientNames: namePool,
     });
 
     const seedLegend =
       availableLegends.find((l) => l.id === combination.legendId) ?? availableLegends[0]!;
     const amountPack =
-      config.amounts.packs.find((p) => p.id === combination.amountPackId) ??
-      config.amounts.packs.find((p) => p.currency === project.currency) ??
-      config.amounts.packs[0]!;
+      projectPacks.find((p) => p.id === combination.amountPackId) ?? projectPacks[0]!;
 
     const depositBank = pickRandom(depositBanks.length > 0 ? depositBanks : config.banks.depositBanks);
     const payoutBank = pickRandom(payoutBanks.length > 0 ? payoutBanks : config.banks.payoutBanks);
@@ -622,26 +650,27 @@ export class DialogGenerator {
     });
     const clabe = generateClabe(depositBank.clabePrefix, accountLastDigits);
 
-    const amountVars = amountPackToVars(amountPack);
+    const commissionRate = project.id === "francesca" ? 0.1 : 0;
+    const commissionAmount = Math.round(amountPack.profitFinal * commissionRate);
+    const clientShareAmount =
+      commissionRate > 0 ? amountPack.profitFinal - commissionAmount : amountPack.profitFinal;
+
     const bankName = depositBank.shortName ?? depositBank.name;
-    const depositMessage = injectTemplate(project.depositMessageTemplate, {
+    const displayVars = {
       clabe,
       bankName,
       bank: bankName,
-      ...amountVars,
-    });
-    const completionMessage = injectTemplate(project.completionMessageTemplate, {
-      clabe,
-      bankName,
-      bank: bankName,
-      ...amountVars,
-    });
-    const payoutMessage = injectTemplate(project.payoutMessageTemplate, {
-      clabe,
-      bankName,
-      bank: bankName,
-      ...amountVars,
-    });
+      deposit: formatAmount(amountPack.deposit, project.currency),
+      profit1: formatAmount(amountPack.profit1, project.currency),
+      profit2: formatAmount(amountPack.profit2, project.currency),
+      profitFinal: formatAmount(amountPack.profitFinal, project.currency),
+      commission: formatAmount(commissionAmount, project.currency),
+      clientShare: formatAmount(clientShareAmount, project.currency),
+      currency: project.currency,
+    };
+    const depositMessage = injectTemplate(project.depositMessageTemplate, displayVars);
+    const completionMessage = injectTemplate(project.completionMessageTemplate, displayVars);
+    const payoutMessage = injectTemplate(project.payoutMessageTemplate, displayVars);
 
     const vars = buildDialogVars({
       deposit: amountPack.deposit,
@@ -687,6 +716,24 @@ export class DialogGenerator {
     let aiAuthored = false;
 
     if (aiBundle) {
+      const formatProfit = (n: number) => formatAmount(n, project.currency);
+      const betCaptionVars = {
+        deposit: formatProfit(amountPack.deposit),
+        profit1: formatProfit(amountPack.profit1),
+        profit2: formatProfit(amountPack.profit2),
+        profitFinal: formatProfit(amountPack.profitFinal),
+        commission: formatProfit(commissionAmount),
+        clientShare: formatProfit(clientShareAmount),
+        currency: project.currency,
+      };
+      const betCaptions = project.betCaptionTemplates
+        ? ([
+            injectTemplate(project.betCaptionTemplates[0], betCaptionVars),
+            injectTemplate(project.betCaptionTemplates[1], betCaptionVars),
+            injectTemplate(project.betCaptionTemplates[2], betCaptionVars),
+          ] as [string, string, string])
+        : undefined;
+
       messages = this.assembleAiDialog({
         bundle: aiBundle,
         legendId,
@@ -696,6 +743,7 @@ export class DialogGenerator {
         payoutMessage,
         includeConditionsImage: Boolean(project.conditionsImagePath),
         ...(project.conditionsTexts?.length ? { conditionsTexts: project.conditionsTexts } : {}),
+        ...(betCaptions ? { betCaptions } : {}),
       });
       aiAuthored = true;
     } else {
@@ -730,6 +778,7 @@ export class DialogGenerator {
       profit1: amountPack.profit1,
       profit2: amountPack.profit2,
       profitFinal: amountPack.profitFinal,
+      payoutAmount: clientShareAmount,
       clabe,
       accountLastDigits,
       depositBankId: depositBank.id,
