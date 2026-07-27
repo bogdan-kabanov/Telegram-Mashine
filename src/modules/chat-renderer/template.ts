@@ -27,31 +27,33 @@ export interface RenderChatParams {
 }
 
 const ICONS = {
-  /* Telegram iOS attach — vertical paperclip (not Lucide diagonal) */
+  /* Telegram attach — classic diagonal paperclip */
   paperclip: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M18.2 9.35v7.05c0 2.65-2.15 4.8-4.8 4.8s-4.8-2.15-4.8-4.8V7.55c0-1.75 1.4-3.15 3.15-3.15s3.15 1.4 3.15 3.15v8a1.5 1.5 0 01-3 0V9.2" stroke="#000" stroke-width="2.15" stroke-linecap="round"/>
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke="#1C1C1E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
+  /* Telegram iOS sticker — circle with folded corner (iPhone) */
   stickerInput: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="8.4" stroke="#636366" stroke-width="1.85"/>
-    <path d="M15.35 5.85C11.85 5.85 9.85 9.05 9.85 12.15C9.85 15.25 11.85 18.45 15.35 18.45" stroke="#636366" stroke-width="1.85" stroke-linecap="round"/>
-    <circle cx="9.7" cy="10.15" r="1.15" fill="#636366"/>
-    <path d="M11.55 14.55C12.25 15.3 13.25 15.75 14.4 15.75" stroke="#636366" stroke-width="1.7" stroke-linecap="round"/>
+    <path d="M19.4 16.28A8.55 8.55 0 1 1 12 3.45" stroke="#636366" stroke-width="1.55" stroke-linecap="round"/>
+    <path d="M12 3.45C15.5 4.5 18.5 9 19.4 16.28" stroke="#636366" stroke-width="1.55" stroke-linecap="round"/>
+    <path d="M12 3.45C10.5 8 14 14 19.4 16.28" stroke="#636366" stroke-width="1.55" stroke-linecap="round"/>
   </svg>`,
-  microphone: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z" stroke="#007AFF" stroke-width="2.1"/>
-    <path d="M5.9 11.4c0 3.2 2.5 5.85 5.6 6.2v2.4h1v-2.4c3.1-.35 5.6-3 5.6-6.2" stroke="#007AFF" stroke-width="2.1" stroke-linecap="round"/>
+  microphone: `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z" stroke="#1C1C1E" stroke-width="1.45"/>
+    <path d="M5.9 11.4c0 3.2 2.5 5.85 5.6 6.2v2.4h1v-2.4c3.1-.35 5.6-3 5.6-6.2" stroke="#1C1C1E" stroke-width="1.45" stroke-linecap="round"/>
   </svg>`,
-  telegramPlane: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M22 2L11 13" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  /* Official Telegram logo plane (from brand SVG), cropped — not Lucide send */
+  telegramPlane: `<svg width="14" height="14" viewBox="48 68 130 115" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path fill="#fff" d="M81.486 130.178 52.2 120.636s-3.5-1.42-2.373-4.64c.232-.664.7-1.229 2.1-2.2 6.489-4.523 120.106-45.36 120.106-45.36s3.208-1.081 5.1-.362a2.766 2.766 0 0 1 1.885 2.055 9.357 9.357 0 0 1 .254 2.585c-.009.752-.1 1.449-.169 2.542-.692 11.165-21.4 94.493-21.4 94.493s-1.239 4.876-5.678 5.043a8.13 8.13 0 0 1-4.925-1.542c-8.711-7.493-38.819-27.727-45.472-32.177a1.27 1.27 0 0 1-.546-.9c-.093-.469.417-1.05.417-1.05s52.426-46.6 53.821-51.492c.108-.379-.3-.566-.848-.4-3.482 1.281-63.844 39.4-70.506 43.607a3.21 3.21 0 0 1-1.38.79Z"/>
+    <path fill="rgba(255,255,255,0.45)" d="M81.229 128.772 95.466 168.178s1.78 3.687 3.686 3.687 30.255-29.492 30.255-29.492l31.525-60.89L81.737 118.6Z"/>
+    <path fill="rgba(255,255,255,0.28)" d="M100.106 138.878 97.373 167.924s-1.144 8.9 7.754 0 17.415-15.763 17.415-15.763"/>
   </svg>`,
-  /* iOS SF-style chevron — thicker stroke */
-  chevronBack: `<svg width="12" height="20" viewBox="0 0 12 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9.2 1.6L1.7 10l7.5 8.4" stroke="#1C1C1E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  /* iOS SF-style chevron — thinner stroke like real Telegram */
+  chevronBack: `<svg width="10" height="18" viewBox="0 0 12 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9.2 1.6L1.7 10l7.5 8.4" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   checks: `<svg width="16" height="11" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M1.5 5.5L4.5 8.5L10.5 2.5" stroke="#34C759" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M5.5 5.5L8.5 8.5L14.5 2.5" stroke="#34C759" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M1.5 5.5L4.5 8.5L10.5 2.5" stroke="rgba(0,140,9,0.8)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M5.5 5.5L8.5 8.5L14.5 2.5" stroke="rgba(0,140,9,0.8)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   signal: `<svg width="19.5" height="12" viewBox="0 0 19.5 12" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="8.5" width="3.2" height="3.5" rx="0.7" fill="currentColor"/>
@@ -59,16 +61,20 @@ const ICONS = {
     <rect x="9.6" y="3.2" width="3.2" height="8.8" rx="0.7" fill="currentColor"/>
     <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" fill="currentColor" fill-opacity="0.35"/>
   </svg>`,
-  wifi: `<svg width="17" height="12" viewBox="0 0 17 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="8.5" cy="10.4" r="1.15" fill="currentColor"/>
-    <path d="M5.1 7.55C6.05 6.55 7.2 6 8.5 6C9.8 6 10.95 6.55 11.9 7.55" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
-    <path d="M2.55 5.05C4.2 3.25 6.2 2.3 8.5 2.3C10.8 2.3 12.8 3.25 14.45 5.05" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
-    <path d="M0.75 2.55C3 0.55 5.55 0 8.5 0C11.45 0 14 0.55 16.25 2.55" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
+  /* Wi‑Fi — arcs kept inside viewBox (outer arc was clipping at y<0) */
+  wifi: `<svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="10.55" r="1.05" fill="currentColor"/>
+    <path d="M5.4 7.85c.8-.85 1.85-1.35 2.95-1.35s2.15.5 2.95 1.35" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
+    <path d="M3.55 5.55c1.3-1.4 2.95-2.2 4.7-2.2s3.4.8 4.7 2.2" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
+    <path d="M1.85 3.35c1.75-1.75 3.85-2.6 6.4-2.6s4.65.85 6.4 2.6" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
   </svg>`,
   battery: `<svg width="27" height="13" viewBox="0 0 27 13" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="0.6" y="0.6" width="23" height="11.8" rx="2.6" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.4"/>
     <rect x="2.1" y="2.15" width="18.5" height="8.7" rx="1.5" fill="currentColor"/>
     <path d="M25.1 4.1C25.95 4.45 26.5 5.25 26.5 6.5C26.5 7.75 25.95 8.55 25.1 8.9V4.1Z" fill="currentColor" fill-opacity="0.45"/>
+  </svg>`,
+  chevronDown: `<svg width="14" height="9" viewBox="0 0 14 9" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M1.2 1.4L7 7.2l5.8-5.8" stroke="#1C1C1E" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   avatarPlaceholder: `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
     <circle cx="18" cy="18" r="18" fill="#C4C4C6"/>
@@ -94,11 +100,22 @@ function avatarBlock(url: string | null | undefined, fallback: string): string {
   return `<div class="avatar avatar-fallback">${fallback.charAt(0).toUpperCase()}</div>`;
 }
 
-function navAvatarBlock(url: string | null | undefined): string {
+/**
+ * Real frosted glass for Playwright: backdrop-filter is flat/sharp in headless
+ * Chromium, so each pill clips a blurred wallpaper copy aligned to the phone.
+ */
+function glassFrostHtml(wallpaperSrc: string | null): string {
+  const frost = wallpaperSrc
+    ? `<span class="glass-frost" aria-hidden="true"><img class="glass-frost-img" src="${wallpaperSrc}" alt="" draggable="false" /></span>`
+    : `<span class="glass-frost glass-frost--fallback" aria-hidden="true"></span>`;
+  return `${frost}<span class="glass-tint" aria-hidden="true"></span>`;
+}
+
+function navAvatarBlock(url: string | null | undefined, frost: string): string {
   if (url) {
-    return `<div class="nav-avatar-wrap nav-glass"><img class="nav-avatar" src="${url}" alt="" /></div>`;
+    return `<div class="nav-avatar-wrap nav-glass">${frost}<img class="nav-avatar" src="${url}" alt="" /></div>`;
   }
-  return `<div class="nav-avatar-wrap nav-glass nav-avatar-placeholder">${ICONS.avatarPlaceholder}</div>`;
+  return `<div class="nav-avatar-wrap nav-glass nav-avatar-placeholder">${frost}${ICONS.avatarPlaceholder}</div>`;
 }
 function metaHtml(msg: RenderMessage, isOutgoing: boolean, variant: "inline" | "overlay"): string {
   const checks =
@@ -208,11 +225,16 @@ export function buildChatHtml(params: RenderChatParams): string {
   const theme = project.theme;
   const statusLight = theme.statusBarStyle === "light";
   const statusFg = statusLight ? "#fff" : "#000";
-  const wallpaperCss = params.wallpaperUrl
-    ? `url("${params.wallpaperUrl}")`
-    : "linear-gradient(180deg, #6ba3be 0%, #4a8fa8 100%)";
+  /** Prefer <img src> over CSS url(data:) — Chromium drops huge data-URIs in stylesheets. */
+  const wallpaperSrc = params.wallpaperUrl ?? null;
+  const wallpaperFallbackCss = "linear-gradient(180deg, #6ba3be 0%, #4a8fa8 100%)";
 
   const messageHtml = renderMessageList(messages, theme, params.clientAvatarUrl);
+
+  const wallpaperImg = wallpaperSrc
+    ? `<img class="wallpaper-img" src="${wallpaperSrc}" alt="" draggable="false" />`
+    : "";
+  const frost = glassFrostHtml(wallpaperSrc);
 
   return `<!DOCTYPE html>
 <html lang="${ui.lang}">
@@ -229,13 +251,12 @@ export function buildChatHtml(params: RenderChatParams): string {
       background: #000;
     }
     .phone {
-      --chat-wallpaper: ${wallpaperCss};
       width: 390px;
       height: 844px;
       position: relative;
       overflow: hidden;
     }
-    /* Wallpaper + messages only — overflow here does not wrap the glass header */
+    /* Wallpaper + messages + frost live here so backdrop-filter can sample them */
     .phone-stage {
       position: absolute;
       inset: 0;
@@ -246,91 +267,68 @@ export function buildChatHtml(params: RenderChatParams): string {
       position: absolute;
       inset: 0;
       z-index: 0;
-      background-image: var(--chat-wallpaper);
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
       pointer-events: none;
+      background: ${wallpaperSrc ? "#000" : wallpaperFallbackCss};
+    }
+    .wallpaper-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
     }
 
-    /* Frosted header band above chat — like real Telegram iOS */
+    /* Soft header frost — backdrop + faint wallpaper echo (Playwright-safe) */
     .header-frost {
       position: absolute;
       left: 0;
       right: 0;
       top: 0;
-      height: 128px;
+      height: 130px;
       z-index: 8;
       pointer-events: none;
       overflow: hidden;
-      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
-      mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
+      background: rgba(255, 255, 255, 0.03);
+      -webkit-backdrop-filter: blur(18px) saturate(145%);
+      backdrop-filter: blur(18px) saturate(145%);
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        #000 0%,
+        #000 38%,
+        rgba(0, 0, 0, 0.5) 68%,
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        #000 0%,
+        #000 38%,
+        rgba(0, 0, 0, 0.5) 68%,
+        transparent 100%
+      );
     }
-    .header-frost::before {
-      content: "";
+    .header-frost .frost-img {
       position: absolute;
-      left: -16%;
-      width: 132%;
+      left: -12%;
+      width: 124%;
       top: 0;
-      height: 280%;
-      background-image: var(--chat-wallpaper);
-      background-size: cover;
-      background-position: center top;
-      background-repeat: no-repeat;
-      filter: blur(72px) saturate(180%);
-      transform: scale(1.18);
+      height: 260%;
+      object-fit: cover;
+      object-position: center top;
+      filter: blur(28px) saturate(150%);
+      transform: scale(1.12);
       transform-origin: center top;
+      opacity: 0.22;
+      pointer-events: none;
     }
     .header-frost::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0.22) 0%,
-        rgba(255, 255, 255, 0.14) 42%,
-        rgba(255, 255, 255, 0) 100%
-      );
+      content: none;
     }
 
-    /* Strong frosted band behind input controls */
+    /* No bottom frost */
     .input-frost {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 118px;
-      z-index: 15;
-      pointer-events: none;
-      overflow: hidden;
-      -webkit-mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
-      mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
-    }
-    .input-frost::before {
-      content: "";
-      position: absolute;
-      left: -16%;
-      width: 132%;
-      bottom: 0;
-      height: 320%;
-      background-image: var(--chat-wallpaper);
-      background-size: cover;
-      background-position: center bottom;
-      background-repeat: no-repeat;
-      filter: blur(80px) saturate(180%);
-      transform: scale(1.2);
-      transform-origin: center bottom;
-    }
-    .input-frost::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        to top,
-        rgba(255, 255, 255, 0.22) 0%,
-        rgba(200, 230, 240, 0.12) 45%,
-        rgba(255, 255, 255, 0) 100%
-      );
+      display: none;
     }
 
     .header-wrap {
@@ -356,32 +354,41 @@ export function buildChatHtml(params: RenderChatParams): string {
     .status-time {
       font-size: 16px;
       font-weight: 600;
-      letter-spacing: -0.32px;
+      letter-spacing: 0;
       color: ${statusFg};
-      line-height: 20px;
+      line-height: 21px;
       min-width: 54px;
     }
     .status-center {
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
-      top: 12px;
+      /* Small air under top edge — like Dynamic Island inset */
+      top: 6px;
     }
     .tg-pill {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
+      height: 20px;
       background: #007AFF;
       color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3.5px 9px 3.5px 7px;
-      border-radius: 13px;
-      letter-spacing: 0.15px;
+      /* SF Pro Text Regular reads closer to iOS island label than Semibold */
+      font-size: 11px;
+      font-weight: 400;
+      padding: 0 9px 0 6px;
+      border-radius: 10px;
+      letter-spacing: 0.04em;
       line-height: 1;
       white-space: nowrap;
+      -webkit-font-smoothing: antialiased;
     }
-    .tg-pill svg { flex-shrink: 0; }
+    .tg-pill svg {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      display: block;
+    }
     .status-icons {
       display: flex;
       align-items: center;
@@ -397,52 +404,92 @@ export function buildChatHtml(params: RenderChatParams): string {
     /* Floating nav — three separate glass pills (Telegram iOS) */
     .nav-bar {
       height: 44px;
-      display: flex;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin: 0 10px 4px;
+      column-gap: 14px;
+      margin: 0 12px 4px;
       padding: 0;
       position: relative;
       background: transparent;
       border: none;
       box-shadow: none;
     }
+    /* Glass pills — clipped blurred wallpaper (Playwright-safe), not backdrop-filter */
     .nav-glass,
     .glass-circle,
-    .input-pill {
+    .input-pill,
+    .scroll-down {
       position: relative;
-      /* Semi-transparent so strong frost band shows through — no hard outline */
-      background: rgba(255, 255, 255, 0.38);
-      -webkit-backdrop-filter: blur(28px) saturate(160%);
-      backdrop-filter: blur(28px) saturate(160%);
-      box-shadow:
-        0 0.5px 0 rgba(255, 255, 255, 0.35) inset,
-        0 1px 3px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      isolation: isolate;
+      background: transparent;
       border: none;
+      box-shadow:
+        0 0.5px 0 rgba(255, 255, 255, 0.55) inset,
+        0 1px 2px rgba(0, 0, 0, 0.06);
     }
-    .glass-circle:last-child {
-      background: rgba(170, 215, 240, 0.45);
+    .glass-frost {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+    .glass-frost-img {
+      position: absolute;
+      width: 390px;
+      height: 844px;
+      max-width: none;
+      object-fit: cover;
+      object-position: center;
+      filter: blur(24px) saturate(175%) brightness(1.06);
+      transform: scale(1.14);
+      transform-origin: center center;
+      pointer-events: none;
+      /* left/top aligned by syncGlassFrost() */
+    }
+    .glass-frost--fallback {
+      inset: -30%;
+      background: linear-gradient(180deg, #7eb4c9 0%, #4a8fa8 100%);
+      filter: blur(22px) saturate(160%);
+    }
+    .glass-tint {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      border-radius: inherit;
+      pointer-events: none;
+      background: rgba(255, 255, 255, 0.4);
+    }
+    .nav-glass > :not(.glass-frost):not(.glass-tint),
+    .glass-circle > :not(.glass-frost):not(.glass-tint),
+    .input-pill > :not(.glass-frost):not(.glass-tint),
+    .scroll-down > :not(.glass-frost):not(.glass-tint) {
+      position: relative;
+      z-index: 2;
     }
     .nav-back {
       display: flex;
       align-items: center;
       gap: 6px;
-      height: 34px;
-      padding: 4px 6px 4px 8px;
-      border-radius: 17px;
+      height: 40px;
+      padding: 0 10px 0 12px;
+      border-radius: 20px;
       color: #000;
       font-size: 17px;
       font-weight: 400;
-      letter-spacing: -0.4px;
+      letter-spacing: 0;
       line-height: 1;
       flex-shrink: 0;
       z-index: 1;
+      justify-self: start;
     }
     .nav-back svg {
       flex-shrink: 0;
-      width: 9px;
-      height: 16px;
+      width: 10px;
+      height: 18px;
       display: block;
       overflow: visible;
     }
@@ -451,34 +498,37 @@ export function buildChatHtml(params: RenderChatParams): string {
       left: auto;
       transform: none;
       text-align: center;
-      min-width: 0;
-      max-width: none;
-      flex: 1;
+      /* Hug content — do not stretch across the row */
+      width: max-content;
+      max-width: 100%;
+      justify-self: center;
       height: 40px;
-      padding: 3px 16px 2px;
+      padding: 3px 16px 4px;
       border-radius: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 1px;
       pointer-events: none;
+      overflow: hidden;
     }
     .nav-name {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 600;
-      letter-spacing: -0.41px;
+      letter-spacing: 0;
       color: #000;
-      line-height: 19px;
+      line-height: 20px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 100%;
     }
     .nav-status {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 400;
-      color: #8E8E93;
-      letter-spacing: -0.08px;
+      color: #787878;
+      letter-spacing: 0;
       line-height: 15px;
       margin-top: 0;
       white-space: nowrap;
@@ -494,6 +544,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       flex-shrink: 0;
       margin-left: 0;
       z-index: 1;
+      display: block;
     }
     .nav-avatar-placeholder {
       display: flex;
@@ -520,6 +571,13 @@ export function buildChatHtml(params: RenderChatParams): string {
       display: flex;
       align-items: center;
       justify-content: center;
+      justify-self: end;
+      /* Thick glass ring like Telegram avatar chrome */
+      border: 2.5px solid rgba(200, 230, 245, 0.92);
+      box-sizing: border-box;
+      box-shadow:
+        0 0 0 0.5px rgba(255, 255, 255, 0.35) inset,
+        0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
     /* Chat Area — wallpaper is sibling .wallpaper; spacer pins thread to input */
@@ -528,7 +586,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       inset: 0;
       z-index: 1;
       overflow-y: auto;
-      padding: 100px 7px 112px;
+      padding: 100px 7px 80px;
       background: transparent;
       display: flex;
       flex-direction: column;
@@ -545,7 +603,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       flex: 0 0 auto;
     }
 
-    /* Messages — even left/right columns like Telegram iOS */
+    /* Messages — Telegram layout: mergedSpacing ≈2, defaultSpacing ≈4 */
     .message {
       display: flex;
       align-items: flex-end;
@@ -553,8 +611,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       margin-bottom: 2px;
       width: 100%;
     }
-    .message.group-last { margin-bottom: 7px; }
-    .message.group-first.group-last { margin-bottom: 7px; }
+    .message.group-last { margin-bottom: 4px; }
+    .message.group-first.group-last { margin-bottom: 4px; }
     .message.incoming { padding-right: 52px; }
     .message.outgoing {
       justify-content: flex-end;
@@ -593,7 +651,7 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .message.incoming .bubble-wrap { max-width: calc(100% - 34px); }
     .bubble {
-      padding: 6px 10px 5px;
+      padding: 6px 12px;
       position: relative;
       display: inline-block;
       max-width: 100%;
@@ -604,13 +662,19 @@ export function buildChatHtml(params: RenderChatParams): string {
     .bubble-out {
       border-radius: 16px;
     }
-    /* Tail only on last bubble of a group (Telegram) */
+    /* Telegram corners: main 16, merge 8, tail 4
+       group-mid = not first → top merge; group-continued = not last → bottom merge */
+    .incoming.group-mid .bubble-in { border-top-left-radius: 8px; }
+    .incoming.group-continued .bubble-in { border-bottom-left-radius: 8px; }
     .incoming.group-last .bubble-in { border-bottom-left-radius: 4px; }
+    .outgoing.group-mid .bubble-out { border-top-right-radius: 8px; }
+    .outgoing.group-continued .bubble-out { border-bottom-right-radius: 8px; }
     .outgoing.group-last .bubble-out { border-bottom-right-radius: 4px; }
     .text {
       font-size: 17px;
+      font-weight: 400;
       line-height: 22px;
-      letter-spacing: -0.41px;
+      letter-spacing: 0;
       color: #000;
       word-wrap: break-word;
       overflow-wrap: anywhere;
@@ -639,8 +703,11 @@ export function buildChatHtml(params: RenderChatParams): string {
     .meta-inline .time {
       font-size: 11px;
       font-weight: 400;
-      color: rgba(60,60,67,0.45);
-      letter-spacing: 0.06px;
+      color: rgba(82, 82, 82, 0.6);
+      letter-spacing: 0;
+    }
+    .outgoing .meta-inline .time {
+      color: rgba(0, 140, 9, 0.8);
     }
     .meta-overlay {
       position: absolute;
@@ -657,8 +724,9 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .meta-overlay .time {
       font-size: 11px;
+      font-weight: 400;
       color: rgba(255,255,255,0.95);
-      letter-spacing: 0.06px;
+      letter-spacing: 0;
       text-shadow: none;
     }
     .checks {
@@ -710,11 +778,13 @@ export function buildChatHtml(params: RenderChatParams): string {
       line-height: 0;
       position: relative;
     }
-    .outgoing.group-last .bubble-media { border-bottom-right-radius: 4px; }
+    .incoming.group-mid .bubble-media { border-top-left-radius: 8px; }
+    .incoming.group-continued .bubble-media { border-bottom-left-radius: 8px; }
     .incoming.group-last .bubble-media { border-bottom-left-radius: 4px; }
-    .bubble-media .bubble-image { border-radius: 14px; margin: 0; }
-    .outgoing.group-last .bubble-media .bubble-image { border-bottom-right-radius: 4px; }
-    .incoming.group-last .bubble-media .bubble-image { border-bottom-left-radius: 4px; }
+    .outgoing.group-mid .bubble-media { border-top-right-radius: 8px; }
+    .outgoing.group-continued .bubble-media { border-bottom-right-radius: 8px; }
+    .outgoing.group-last .bubble-media { border-bottom-right-radius: 4px; }
+    .bubble-media .bubble-image { border-radius: inherit; margin: 0; }
     .bubble-media .meta-overlay {
       bottom: 4px;
       right: 6px;
@@ -737,16 +807,16 @@ export function buildChatHtml(params: RenderChatParams): string {
       background: rgba(0,0,0,0.32);
     }
 
-    /* iOS Input Bar — attach = input height; mic larger + blue */
+    /* iOS Input Bar — Telegram-iOS: attach/input/mic all 40px */
     .input-bar {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      padding: 6px 10px 28px;
+      padding: 6px 14px 28px;
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
       z-index: 20;
     }
     .glass-circle {
@@ -778,9 +848,10 @@ export function buildChatHtml(params: RenderChatParams): string {
       position: relative;
       z-index: 2;
       font-size: 17px;
-      font-weight: 500;
-      color: #636366;
-      letter-spacing: -0.41px;
+      font-weight: 400;
+      /* Darker than #8E8E93 — readable on teal glass */
+      color: rgba(0, 0, 0, 0.45);
+      letter-spacing: 0;
       line-height: 22px;
       -webkit-font-smoothing: antialiased;
     }
@@ -794,22 +865,49 @@ export function buildChatHtml(params: RenderChatParams): string {
       width: 32px;
       height: 32px;
       margin-left: 2px;
+      overflow: visible;
     }
     .input-sticker svg {
+      display: block;
+      width: 24px;
+      height: 24px;
+      overflow: visible;
       shape-rendering: geometricPrecision;
     }
+    /* Scroll-to-bottom — shown when chat is scrolled up */
+    .scroll-down {
+      position: absolute;
+      right: 14px;
+      bottom: 78px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 21;
+      pointer-events: none;
+    }
+    .scroll-down.is-visible {
+      display: flex;
+    }
+    .scroll-down svg {
+      display: block;
+      position: relative;
+      z-index: 2;
+    }
     .nav-back-badge {
-      /* Exact same height as chevron */
-      min-width: 16px;
-      width: 16px;
-      height: 16px;
+      /* Telegram-iOS: 18×18, Font.regular(13) */
+      min-width: 18px;
+      width: 18px;
+      height: 18px;
       padding: 0;
       border-radius: 50%;
       background: #000;
       color: #fff;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: -0.2px;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -821,16 +919,34 @@ export function buildChatHtml(params: RenderChatParams): string {
 <body>
   <div class="phone">
     <div class="phone-stage">
-      <div class="wallpaper" aria-hidden="true"></div>
+      <div class="wallpaper" aria-hidden="true">${wallpaperImg}</div>
       <div class="chat-bg">
         <div class="chat-spacer" aria-hidden="true"></div>
         <div class="chat-messages">
         ${messageHtml}
         </div>
       </div>
-    </div>
+      <!-- Inside stage so backdrop-filter samples wallpaper + messages -->
+      <div class="header-frost" aria-hidden="true">${wallpaperImg ? wallpaperImg.replace('class="wallpaper-img"', 'class="frost-img"') : ""}</div>
 
-    <div class="header-frost" aria-hidden="true"></div>
+      <div class="scroll-down" aria-hidden="true">${frost}${ICONS.chevronDown}</div>
+
+      <div class="input-bar">
+        <div class="glass-circle attach">
+          ${frost}
+          ${ICONS.paperclip}
+        </div>
+        <div class="input-pill">
+          ${frost}
+          <span class="input-placeholder">${escapeHtml(ui.inputPlaceholder)}</span>
+          <div class="input-sticker">${ICONS.stickerInput}</div>
+        </div>
+        <div class="glass-circle mic">
+          ${frost}
+          ${ICONS.microphone}
+        </div>
+      </div>
+    </div>
 
     <div class="header-wrap">
       <div class="status-bar">
@@ -847,32 +963,43 @@ export function buildChatHtml(params: RenderChatParams): string {
 
       <div class="nav-bar">
         <div class="nav-back nav-glass">
+          ${frost}
           ${ICONS.chevronBack}
           <span class="nav-back-badge">1</span>
         </div>
         <div class="nav-center nav-glass">
+          ${frost}
           <div class="nav-name">${escapeHtml(clientName)}</div>
           <div class="nav-status">${escapeHtml(statusText)}</div>
         </div>
-        ${navAvatarBlock(params.clientAvatarUrl)}
-      </div>
-    </div>
-
-    <div class="input-frost" aria-hidden="true"></div>
-
-    <div class="input-bar">
-      <div class="glass-circle">
-        ${ICONS.paperclip}
-      </div>
-      <div class="input-pill">
-        <span class="input-placeholder">${escapeHtml(ui.inputPlaceholder)}</span>
-        <div class="input-sticker">${ICONS.stickerInput}</div>
-      </div>
-      <div class="glass-circle">
-        ${ICONS.microphone}
+        ${navAvatarBlock(params.clientAvatarUrl, frost)}
       </div>
     </div>
   </div>
+  <script>
+    (function () {
+      function syncGlassFrost() {
+        var phone = document.querySelector(".phone");
+        if (!(phone instanceof HTMLElement)) return;
+        var pr = phone.getBoundingClientRect();
+        document.querySelectorAll(".glass-frost-img").forEach(function (img) {
+          if (!(img instanceof HTMLImageElement)) return;
+          var host = img.closest(".nav-glass, .glass-circle, .input-pill, .scroll-down");
+          if (!(host instanceof HTMLElement)) return;
+          var r = host.getBoundingClientRect();
+          img.style.left = (pr.left - r.left) + "px";
+          img.style.top = (pr.top - r.top) + "px";
+        });
+      }
+      window.syncGlassFrost = syncGlassFrost;
+      window.addEventListener("resize", syncGlassFrost);
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", syncGlassFrost);
+      } else {
+        syncGlassFrost();
+      }
+    })();
+  </script>
 </body>
 </html>`;
 }

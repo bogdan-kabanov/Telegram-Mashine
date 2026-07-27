@@ -33,6 +33,8 @@ export interface RenderDialogResult {
 }
 
 const VIEWPORT = { width: 390, height: 844 } as const;
+/** iPhone logical 390×844 @3x → 1170×2532 PNG (sharper than Telegram-compressed chat photos). */
+const DEVICE_SCALE_FACTOR = 3;
 /** Keep this much previous content when scrolling to the next frame. */
 const SCROLL_OVERLAP_PX = 160;
 
@@ -44,19 +46,23 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
   try {
     const page = await browser.newPage({
       viewport: VIEWPORT,
-      deviceScaleFactor: 2,
+      deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
 
     await page.goto(pathToFileURL(path.resolve(htmlPath)).href, { waitUntil: "load" });
     await page.evaluate(async () => {
       await document.fonts.ready;
     });
-    // Wait for Apple emoji PNGs (CDN) so screenshots aren't Segoe fallbacks
+    // Wait for wallpaper + Apple emoji PNGs so screenshots aren't blank/Segoe
     await page
       .waitForFunction(() => {
-        const imgs = [...document.querySelectorAll("img.apple-emoji")] as HTMLImageElement[];
+        const imgs = [
+          ...document.querySelectorAll(
+            "img.wallpaper-img, img.frost-img, img.glass-frost-img, img.apple-emoji",
+          ),
+        ] as HTMLImageElement[];
         return imgs.length === 0 || imgs.every((img) => img.complete && img.naturalWidth > 0);
-      }, { timeout: 8000 })
+      }, { timeout: 15000 })
       .catch(() => undefined);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
@@ -69,7 +75,7 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
 
       if (!(input instanceof HTMLElement) || !(last instanceof HTMLElement)) return;
 
-      const gap = 12;
+      const gap = 8;
       const inputTop = input.getBoundingClientRect().top;
       const lastBottom = last.getBoundingClientRect().bottom;
       const overflow = lastBottom - (inputTop - gap);
@@ -77,6 +83,8 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
         chat.scrollTop = Math.max(0, chat.scrollTop - overflow);
       }
       window.dispatchEvent(new Event("resize"));
+      const sync = (window as unknown as { syncGlassFrost?: () => void }).syncGlassFrost;
+      sync?.();
     });
     await page.waitForTimeout(100);
     await page.screenshot({
@@ -140,7 +148,7 @@ async function screenshotChatByScrolling(params: {
   try {
     const page = await browser.newPage({
       viewport: VIEWPORT,
-      deviceScaleFactor: 2,
+      deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
 
     await page.goto(pathToFileURL(path.resolve(params.htmlPath)).href, { waitUntil: "load" });
@@ -179,11 +187,21 @@ async function screenshotChatByScrolling(params: {
 
     for (let i = 0; i < positions.length; i++) {
       const scrollTop = positions[i]!;
-      await page.evaluate((top) => {
-        const chat = document.querySelector(".chat-bg");
-        if (chat instanceof HTMLElement) chat.scrollTop = top;
-        window.dispatchEvent(new Event("resize"));
-      }, scrollTop);
+      await page.evaluate(
+        ({ top, maxScroll }) => {
+          const chat = document.querySelector(".chat-bg");
+          const scrollDown = document.querySelector(".scroll-down");
+          if (chat instanceof HTMLElement) chat.scrollTop = top;
+          if (scrollDown instanceof HTMLElement) {
+            const nearBottom = top >= maxScroll - 12;
+            scrollDown.classList.toggle("is-visible", maxScroll > 24 && !nearBottom);
+          }
+          window.dispatchEvent(new Event("resize"));
+          const sync = (window as unknown as { syncGlassFrost?: () => void }).syncGlassFrost;
+          sync?.();
+        },
+        { top: scrollTop, maxScroll: metrics.maxScroll },
+      );
       await page.waitForTimeout(80);
 
       const pngPath = path.join(params.publicDir, `${params.reviewId}_screen_${i + 1}.png`);
@@ -218,7 +236,7 @@ export class ChatRenderer {
     writeFileSync(htmlPath, html, "utf-8");
     await screenshotHtmlFile(htmlPath, pngPath);
 
-    return { pngPath, htmlPath, width: VIEWPORT.width, height: VIEWPORT.height };
+    return { pngPath, htmlPath, width: VIEWPORT.width * DEVICE_SCALE_FACTOR, height: VIEWPORT.height * DEVICE_SCALE_FACTOR };
   }
 
   async render(params: RenderChatParams): Promise<RenderResult> {

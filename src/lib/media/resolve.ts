@@ -108,6 +108,12 @@ export async function resolveWallpaperForProject(
   projectId: string,
   configPath?: string,
 ): Promise<string | null> {
+  // Prefer the project's selected wallpaper (admin preview / settings).
+  if (configPath) {
+    const preferred = fileToDataUri(configPath);
+    if (preferred) return preferred;
+  }
+
   const db = getDb();
   const assets = await db
     .select()
@@ -118,11 +124,6 @@ export async function resolveWallpaperForProject(
 
   if (assets[0]) {
     const dataUri = fileToDataUri(assets[0].path);
-    if (dataUri) return dataUri;
-  }
-
-  if (configPath) {
-    const dataUri = fileToDataUri(configPath);
     if (dataUri) return dataUri;
   }
 
