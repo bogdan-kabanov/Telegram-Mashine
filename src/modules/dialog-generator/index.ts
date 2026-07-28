@@ -255,6 +255,8 @@ export class DialogGenerator {
     /** Fixed Vlad captions after bet_1 / bet_2 / bet_3 (already interpolated). */
     betCaptions?: [string, string, string];
     includeConditionsImage?: boolean;
+    /** Script fallbacks when AI under-delivers greeting/trust conversation. */
+    managerScript?: z.infer<typeof managerScriptSchema>;
   }): DialogMessage[] {
     const { bundle, legendId, stagesToUse } = params;
     const messages: DialogMessage[] = [];
@@ -266,39 +268,6 @@ export class DialogGenerator {
       push({ role, type: "text", content, delayMinutes });
     };
 
-    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
-    push({
-      role: "client",
-      type: "text",
-      content: bundle.legend.openingPhrase,
-      delayMinutes: 0,
-    });
-
-    bundle.legend.problemParts.forEach((part, i) => {
-      push({
-        role: "client",
-        type: "text",
-        content: part,
-        delayMinutes: i + 1,
-      });
-      if (i === 0) {
-        push({
-          role: "client",
-          type: "image",
-          content: legendId,
-          delayMinutes: i + 1,
-          metadata: { legendId },
-        });
-      }
-    });
-
-    push({
-      role: "client",
-      type: "text",
-      content: bundle.legend.motivation,
-      delayMinutes: 3,
-    });
-
     const turnsByStage = new Map<string, typeof bundle.turns>();
     for (const turn of bundle.turns) {
       if (!stagesToUse.includes(turn.stage)) continue;
@@ -307,13 +276,110 @@ export class DialogGenerator {
       turnsByStage.set(turn.stage, list);
     }
 
+    // --- Personal legend conversation FIRST (Vlad: not just deposit→bets→payout) ---
+    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
+    push({
+      role: "client",
+      type: "text",
+      content: bundle.legend.openingPhrase,
+      delayMinutes: 0,
+    });
+
+    const greetingTurns = turnsByStage.get("greeting") ?? [];
+    if (greetingTurns.length > 0) {
+      for (const turn of greetingTurns) {
+        pushTurn(turn.role, turn.text, STAGE_DELAY.greeting);
+      }
+    } else {
+      push({
+        role: "manager",
+        type: "text",
+        content: "Hola, cuéntame qué te pasa. Estoy aquí para ayudarte 💙",
+        delayMinutes: STAGE_DELAY.greeting,
+      });
+    }
+
+    bundle.legend.problemParts.forEach((part, i) => {
+      push({
+        role: "client",
+        type: "text",
+        content: part,
+        delayMinutes: STAGE_DELAY.greeting + i + 1,
+      });
+      if (i === 0) {
+        push({
+          role: "client",
+          type: "image",
+          content: legendId,
+          delayMinutes: STAGE_DELAY.greeting + i + 1,
+          metadata: { legendId },
+        });
+      }
+    });
+
+    const trustTurns = turnsByStage.get("trust_building") ?? [];
+    const empathyTurns = trustTurns.slice(0, Math.min(4, trustTurns.length));
+    const restTrustTurns = trustTurns.slice(empathyTurns.length);
+
+    if (empathyTurns.length > 0) {
+      for (const turn of empathyTurns) {
+        pushTurn(turn.role, turn.text, STAGE_DELAY.trust_building);
+      }
+    } else {
+      push({
+        role: "manager",
+        type: "text",
+        content:
+          "Lo siento mucho por lo que estás pasando. Vamos a ver cómo podemos ayudarte con esto 🙏",
+        delayMinutes: STAGE_DELAY.trust_building,
+      });
+      push({
+        role: "client",
+        type: "text",
+        content: pickRandom(bundle.legend.doubtPhrases),
+        delayMinutes: STAGE_DELAY.trust_building + 1,
+      });
+    }
+
+    push({
+      role: "client",
+      type: "text",
+      content: bundle.legend.motivation,
+      delayMinutes: STAGE_DELAY.trust_building + 2,
+    });
+
+    if (restTrustTurns.length > 0) {
+      for (const turn of restTrustTurns) {
+        pushTurn(turn.role, turn.text, STAGE_DELAY.trust_building + 3);
+      }
+    } else if (empathyTurns.length === 0 && params.managerScript) {
+      for (const stageMsg of params.managerScript.stages.trust_building ?? []) {
+        if (stageMsg.type === "text") {
+          push({
+            role: stageMsg.role,
+            type: "text",
+            content: stageMsg.content,
+            delayMinutes: stageMsg.delayMinutes,
+          });
+        }
+      }
+      push({
+        role: "client",
+        type: "text",
+        content: pickRandom(bundle.legend.doubtPhrases),
+        delayMinutes: STAGE_DELAY.trust_building + 4,
+      });
+    }
+
+    // Money/ops stages after the personal story
     for (const stageName of stagesToUse) {
+      if (stageName === "greeting" || stageName === "trust_building") continue;
+
       const baseDelay = STAGE_DELAY[stageName] ?? 10;
       const stageTurns = turnsByStage.get(stageName) ?? [];
 
       if (stageName === "conditions") {
         const fixed = (params.conditionsTexts ?? []).map((t) => t.trim()).filter(Boolean);
-        // Image card first when present (Vlad: photo → copy), then fixed texts.
         if (params.includeConditionsImage) {
           push({
             role: "manager",
@@ -391,7 +457,6 @@ export class DialogGenerator {
             content: fixedCaption,
             delayMinutes: baseDelay + 1,
           });
-          // Keep client reactions from AI if present
           for (const turn of stageTurns) {
             if (turn.role === "client") pushTurn(turn.role, turn.text, baseDelay + 2);
           }
@@ -493,52 +558,8 @@ export class DialogGenerator {
     const { legend, managerScript, vars, agentContext, stagesToUse, isUniqueCircle } = params;
     const messages: DialogMessage[] = [];
     const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg, legend);
-    let msgIndex = 0;
 
-    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
-
-    if (legend.openingPhrase) {
-      push({
-        role: "client",
-        type: "text",
-        content: legend.openingPhrase,
-        delayMinutes: 0,
-      });
-    }
-
-    const problemParts = splitProblem(legend.problem);
-    const photoAfterIndex = legend.photoAfterProblemIndex ?? 0;
-
-    problemParts.forEach((part, i) => {
-      push({
-        role: "client",
-        type: "text",
-        content: part,
-        delayMinutes: i + 1,
-      });
-
-      if (i === photoAfterIndex) {
-        push({
-          role: "client",
-          type: "image",
-          content: legend.id,
-          delayMinutes: i + 1,
-          metadata: { legendId: legend.id },
-        });
-      }
-      msgIndex++;
-    });
-
-    if (legend.motivation && problemParts.length < 3) {
-      push({
-        role: "client",
-        type: "text",
-        content: legend.motivation,
-        delayMinutes: problemParts.length,
-      });
-    }
-
-    for (const stageName of stagesToUse) {
+    const pushStage = async (stageName: string) => {
       const stageMessages = managerScript.stages[stageName] ?? [];
       for (const stageMsg of stageMessages) {
         push(await this.buildManagerMessage(stageMsg, stageName, vars, agentContext));
@@ -569,7 +590,7 @@ export class DialogGenerator {
             content,
             delayMinutes: stageMessages.at(-1)?.delayMinutes
               ? stageMessages.at(-1)!.delayMinutes + 1
-              : msgIndex,
+              : 2,
           });
         }
       }
@@ -589,6 +610,62 @@ export class DialogGenerator {
           }
         }
       }
+    };
+
+    // Personal story first, then money stages (Vlad)
+    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
+
+    if (legend.openingPhrase) {
+      push({
+        role: "client",
+        type: "text",
+        content: legend.openingPhrase,
+        delayMinutes: 0,
+      });
+    }
+
+    if (stagesToUse.includes("greeting")) {
+      await pushStage("greeting");
+    }
+
+    const problemParts = splitProblem(legend.problem);
+    const photoAfterIndex = legend.photoAfterProblemIndex ?? 0;
+
+    problemParts.forEach((part, i) => {
+      push({
+        role: "client",
+        type: "text",
+        content: part,
+        delayMinutes: i + 2,
+      });
+
+      if (i === photoAfterIndex) {
+        push({
+          role: "client",
+          type: "image",
+          content: legend.id,
+          delayMinutes: i + 2,
+          metadata: { legendId: legend.id },
+        });
+      }
+    });
+
+    if (legend.motivation) {
+      push({
+        role: "client",
+        type: "text",
+        content: legend.motivation,
+        delayMinutes: problemParts.length + 2,
+      });
+    }
+
+    if (stagesToUse.includes("trust_building")) {
+      await pushStage("trust_building");
+    }
+
+    for (const stageName of stagesToUse) {
+      if (stageName === "greeting" || stageName === "trust_building") continue;
+      await pushStage(stageName);
     }
 
     if (isUniqueCircle) {
@@ -729,6 +806,14 @@ export class DialogGenerator {
           depositMessage,
           completionMessage,
           payoutMessage,
+          seedLegend: {
+            title: seedLegend.title,
+            openingPhrase: seedLegend.openingPhrase,
+            problem: seedLegend.problem,
+            motivation: seedLegend.motivation,
+            doubtPhrases: seedLegend.doubtPhrases,
+            gratitudePhrases: seedLegend.gratitudePhrases,
+          },
         })
       : null;
 
@@ -763,6 +848,7 @@ export class DialogGenerator {
         completionMessage,
         payoutMessage,
         includeConditionsImage: Boolean(project.conditionsImagePath),
+        managerScript,
         ...(project.conditionsTexts?.length ? { conditionsTexts: project.conditionsTexts } : {}),
         ...(betCaptions ? { betCaptions } : {}),
       });

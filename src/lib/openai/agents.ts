@@ -41,7 +41,7 @@ export const aiDialogTurnSchema = z.object({
 
 export const aiDialogBundleSchema = z.object({
   legend: aiLegendSchema,
-  turns: z.array(aiDialogTurnSchema).min(12),
+  turns: z.array(aiDialogTurnSchema).min(16),
 });
 
 export type AiDialogBundle = z.infer<typeof aiDialogBundleSchema>;
@@ -60,6 +60,15 @@ export interface FullDialogContext {
   depositMessage: string;
   completionMessage: string;
   payoutMessage: string;
+  /** Seed legend from legends.json — AI must expand THIS story, not skip to money. */
+  seedLegend?: {
+    title?: string;
+    openingPhrase: string;
+    problem: string;
+    motivation: string;
+    doubtPhrases: string[];
+    gratitudePhrases: string[];
+  };
 }
 
 /**
@@ -195,6 +204,8 @@ export async function generateFullDialogBundle(
     `Return ONLY valid JSON. No markdown, no English in chat texts.`,
     `Do NOT invent CLABE numbers, bank account digits, payment links, or amounts other than those given.`,
     `When a turn must include deposit/completion/payout details, copy the provided template text VERBATIM.`,
+    `CRITICAL: The chat must feel like a human conversation about the client's life problem FIRST.`,
+    `Forbidden: jumping straight from hello → deposit → bets → payout with no personal talk.`,
     `Texts: short Telegram style (1–3 sentences). Client starts cautious, becomes warmer after wins.`,
   ].join(" ");
 
@@ -213,6 +224,23 @@ export async function generateFullDialogBundle(
         "gratitude",
       ];
 
+  const seed = ctx.seedLegend;
+  const seedBlock = seed
+    ? [
+        `SEED CLIENT LEGEND (expand and keep this story — do not replace with a different plot):`,
+        `title: ${seed.title ?? "client hardship"}`,
+        `openingPhrase seed: ${JSON.stringify(seed.openingPhrase)}`,
+        `problem seed: ${JSON.stringify(seed.problem)}`,
+        `motivation seed: ${JSON.stringify(seed.motivation)}`,
+        `doubt seeds: ${JSON.stringify(seed.doubtPhrases)}`,
+        `gratitude seeds: ${JSON.stringify(seed.gratitudePhrases)}`,
+        ``,
+      ]
+    : [
+        `No seed legend — invent a concrete hardship (sick relative / hospital / medical debt) that fits a phone photo.`,
+        ``,
+      ];
+
   const user = [
     `Client first name: ${ctx.clientName}`,
     `Manager name: ${ctx.managerName}`,
@@ -221,6 +249,7 @@ export async function generateFullDialogBundle(
     `Final profit: ${ctx.profitFinal} ${ctx.currency}`,
     `Review size: ${isSmall ? "small" : "full"}`,
     ``,
+    ...seedBlock,
     `FIXED templates (use verbatim when stage needs them):`,
     `depositMessage: ${JSON.stringify(ctx.depositMessage)}`,
     `completionMessage: ${JSON.stringify(ctx.completionMessage)}`,
@@ -232,10 +261,10 @@ export async function generateFullDialogBundle(
     `{`,
     `  "legend": {`,
     `    "openingPhrase": "short greeting from client",`,
-    `    "problemParts": ["part1", "part2"],`,
+    `    "problemParts": ["part1", "part2", "part3"],`,
     `    "motivation": "why they want to earn",`,
-    `    "doubtPhrases": ["А это точно безопасно?", "А если не получится?"],`,
-    `    "gratitudePhrases": ["Спасибо огромное!", "Вы меня спасли"]`,
+    `    "doubtPhrases": ["...", "..."],`,
+    `    "gratitudePhrases": ["...", "..."]`,
     `  },`,
     `  "turns": [`,
     `    {"stage":"greeting","role":"manager","text":"..."},`,
@@ -243,16 +272,23 @@ export async function generateFullDialogBundle(
     `  ]`,
     `}`,
     ``,
+    `Rules for legend:`,
+    `- problemParts: 2–4 messages telling the hardship in first person (expand the seed problem).`,
+    `- motivation must clearly connect the hardship to needing money.`,
+    `- doubtPhrases / gratitudePhrases: natural variants of the seeds.`,
+    ``,
     `Rules for turns:`,
-    `- Produce 28–40 text turns total so the chat is long enough for ~9 screenshots.`,
-    `- Each stage should have several back-and-forth messages (manager + client).`,
+    `- Produce 32–48 text turns total so the chat is long enough for 9–12 screenshots.`,
+    `- Stages "greeting" and "trust_building" MUST contain a real conversation (≥8 turns combined)`,
+    `  about the client's problem, empathy from the manager, questions, doubts — BEFORE any conditions/deposit talk.`,
+    `- Manager must acknowledge the hardship (sympathy, questions) before pitching investment.`,
+    `- Each later stage should still have several back-and-forth messages (manager + client).`,
     `- Include EXACTLY one manager turn with text equal to depositMessage in stage "deposit".`,
     `- Include EXACTLY one manager turn with text equal to completionMessage in stage "completion" (if full).`,
     `- Include EXACTLY one manager turn with text equal to payoutMessage in stage "payout" (if full).`,
-    `- After bet images the client should react happily; after payout — gratitude.`,
+    `- After bet images the client should react happily; after payout — gratitude tied to the hardship.`,
     `- Do not mention screenshots, AI, or that this is a script.`,
     `- Never output placeholder words like "doubt", "gratitude", "openingPhrase" — only real chat sentences.`,
-    `- Client "problemParts" must be a concrete hardship that can be proven with a phone photo — prefer a sick parent/relative in hospital who needs surgery or expensive medicine (so a hospital-bed photo fits the chat).`,
   ].join("\n");
 
   try {
@@ -262,7 +298,7 @@ export async function generateFullDialogBundle(
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      max_tokens: 3500,
+      max_tokens: 4500,
       temperature: 0.9,
       response_format: { type: "json_object" },
     });

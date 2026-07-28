@@ -4,42 +4,42 @@
       "id": "nancy_injury_story",
       "projectId": "nancy",
       "name": "Historia de lesión laboral",
-      "legendIds": ["injury_work", "medical_debt"],
+      "legendIds": ["injury_work", "medical_debt", "sick_parent"],
       "enabled": true
     },
     {
       "id": "grisel_medical_story",
       "projectId": "grisel",
       "name": "Deuda médica",
-      "legendIds": ["medical_debt", "injury_work"],
+      "legendIds": ["medical_debt", "injury_work", "sick_parent"],
       "enabled": true
     },
     {
       "id": "melissa_injury_story",
       "projectId": "melissa",
       "name": "Lesión laboral",
-      "legendIds": ["injury_work", "medical_debt"],
+      "legendIds": ["injury_work", "medical_debt", "sick_parent"],
       "enabled": true
     },
     {
       "id": "paola_medical_story",
       "projectId": "paola",
       "name": "Gastos médicos",
-      "legendIds": ["medical_debt", "injury_work"],
+      "legendIds": ["medical_debt", "injury_work", "sick_parent"],
       "enabled": true
     },
     {
       "id": "francesca_injury_story",
       "projectId": "francesca",
       "name": "Accidente laboral",
-      "legendIds": ["injury_work", "medical_debt"],
+      "legendIds": ["injury_work", "medical_debt", "sick_parent"],
       "enabled": true
     },
     {
       "id": "demo_ru_story",
       "projectId": "demo-ru",
       "name": "Тестовый отзыв (RU)",
-      "legendIds": ["injury_work", "medical_debt"],
+      "legendIds": ["injury_work", "medical_debt", "sick_parent"],
       "enabled": true
     }
   ]
