@@ -10,6 +10,12 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+# Container runs as pwuser (uid 1000). Host-mounted config/data must be writable
+# or admin saves fail with EACCES on /app/config/projects.json.
+mkdir -p data/logs data/runtime data/reviews data/renders public/renders config
+chown -R 1000:1000 data config public/renders 2>/dev/null || true
+chmod -R u+rwX data config public/renders 2>/dev/null || true
+
 echo "==> docker compose build"
 docker compose build
 
