@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 
-import { appleEmojiFilePath } from "@/lib/emoji/apple-server";
+import { resolveAppleEmojiFileFromCode } from "@/lib/emoji/apple-server";
 
 export const runtime = "nodejs";
 
@@ -13,8 +13,8 @@ export async function GET(_req: Request, { params }: Params) {
     return new Response("Bad request", { status: 400 });
   }
 
-  const file = appleEmojiFilePath(code.toLowerCase());
-  if (!existsSync(file)) {
+  const file = resolveAppleEmojiFileFromCode(code);
+  if (!file || !existsSync(file)) {
     return new Response("Not found", { status: 404 });
   }
 

@@ -24,6 +24,8 @@ export interface RenderChatParams {
   messages: RenderMessage[];
   statusText?: string;
   statusBarTime?: string;
+  /** Telegram Stories ring around the peer avatar (when client photo / story exists). */
+  hasStories?: boolean;
 }
 
 const ICONS = {
@@ -61,12 +63,12 @@ const ICONS = {
     <rect x="9.6" y="3.2" width="3.2" height="8.8" rx="0.7" fill="currentColor"/>
     <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" fill="currentColor" fill-opacity="0.35"/>
   </svg>`,
-  /* Wi‑Fi — arcs kept inside viewBox (outer arc was clipping at y<0) */
-  wifi: `<svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="8" cy="10.55" r="1.05" fill="currentColor"/>
-    <path d="M5.4 7.85c.8-.85 1.85-1.35 2.95-1.35s2.15.5 2.95 1.35" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
-    <path d="M3.55 5.55c1.3-1.4 2.95-2.2 4.7-2.2s3.4.8 4.7 2.2" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
-    <path d="M1.85 3.35c1.75-1.75 3.85-2.6 6.4-2.6s4.65.85 6.4 2.6" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
+  /* iOS status-bar Wi‑Fi — filled SF Symbol wedges (not stroked Android arcs) */
+  wifi: `<svg width="15.5" height="11" viewBox="0 0 15.5 11" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path fill="currentColor" d="M7.75 8.85c.72 0 1.3.58 1.3 1.3s-.58 1.3-1.3 1.3-1.3-.58-1.3-1.3.58-1.3 1.3-1.3z"/>
+    <path fill="currentColor" d="M7.75 5.9c1.35 0 2.58.48 3.55 1.28l-.95 1.02a3.9 3.9 0 0 0-5.2 0L3.2 7.18A5.55 5.55 0 0 1 7.75 5.9z"/>
+    <path fill="currentColor" d="M7.75 3.05c2.15 0 4.1.78 5.62 2.07l-.95 1.02A6.85 6.85 0 0 0 7.75 4.5c-1.7 0-3.25.62-4.47 1.64L2.33 5.12A8.3 8.3 0 0 1 7.75 3.05z"/>
+    <path fill="currentColor" d="M7.75.2c2.95 0 5.62 1.07 7.7 2.85l-.95 1.02A10.05 10.05 0 0 0 7.75 1.65 10.05 10.05 0 0 0 1 4.07L.05 3.05A12.5 12.5 0 0 1 7.75.2z"/>
   </svg>`,
   battery: `<svg width="27" height="13" viewBox="0 0 27 13" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="0.6" y="0.6" width="23" height="11.8" rx="2.6" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.4"/>
@@ -111,11 +113,17 @@ function glassFrostHtml(wallpaperSrc: string | null): string {
   return `${frost}<span class="glass-tint" aria-hidden="true"></span>`;
 }
 
-function navAvatarBlock(url: string | null | undefined, frost: string): string {
+function navAvatarBlock(
+  url: string | null | undefined,
+  frost: string,
+  hasStories: boolean,
+): string {
+  const storyClass = hasStories ? " has-story" : "";
+  const ring = hasStories ? `<span class="story-ring" aria-hidden="true"></span>` : "";
   if (url) {
-    return `<div class="nav-avatar-wrap nav-glass">${frost}<img class="nav-avatar" src="${url}" alt="" /></div>`;
+    return `<div class="nav-avatar-wrap nav-glass${storyClass}">${ring}${frost}<img class="nav-avatar" src="${url}" alt="" /></div>`;
   }
-  return `<div class="nav-avatar-wrap nav-glass nav-avatar-placeholder">${frost}${ICONS.avatarPlaceholder}</div>`;
+  return `<div class="nav-avatar-wrap nav-glass nav-avatar-placeholder${storyClass}">${ring}${frost}${ICONS.avatarPlaceholder}</div>`;
 }
 function metaHtml(msg: RenderMessage, isOutgoing: boolean, variant: "inline" | "overlay"): string {
   const checks =
@@ -352,12 +360,13 @@ export function buildChatHtml(params: RenderChatParams): string {
       position: relative;
     }
     .status-time {
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 0;
+      font-size: 15px;
+      font-weight: 400;
+      letter-spacing: -0.2px;
       color: ${statusFg};
-      line-height: 21px;
+      line-height: 20px;
       min-width: 54px;
+      font-variation-settings: "wght" 400;
     }
     .status-center {
       position: absolute;
@@ -572,12 +581,66 @@ export function buildChatHtml(params: RenderChatParams): string {
       align-items: center;
       justify-content: center;
       justify-self: end;
+      position: relative;
       /* Thick glass ring like Telegram avatar chrome */
       border: 2.5px solid rgba(200, 230, 245, 0.92);
       box-sizing: border-box;
       box-shadow:
         0 0 0 0.5px rgba(255, 255, 255, 0.35) inset,
         0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    .nav-avatar-wrap.has-story {
+      width: 44px;
+      height: 44px;
+      overflow: visible;
+      border: none;
+      box-shadow: none;
+      background: transparent;
+      padding: 0;
+    }
+    .nav-avatar-wrap.has-story .story-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 210deg,
+        #f9ce34 0deg,
+        #ee2a7b 120deg,
+        #6228d7 240deg,
+        #f9ce34 360deg
+      );
+      z-index: 0;
+      pointer-events: none;
+    }
+    .nav-avatar-wrap.has-story .nav-avatar {
+      width: 36px;
+      height: 36px;
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-sizing: border-box;
+      position: relative;
+      z-index: 2;
+    }
+    .nav-avatar-wrap.has-story.nav-avatar-placeholder {
+      width: 44px;
+      height: 44px;
+    }
+    .nav-avatar-wrap.has-story.nav-avatar-placeholder svg {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-sizing: border-box;
+      position: relative;
+      z-index: 2;
+    }
+    .nav-avatar-wrap.has-story .glass-frost,
+    .nav-avatar-wrap.has-story .glass-tint {
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      width: auto;
+      height: auto;
+      z-index: 1;
     }
 
     /* Chat Area — wallpaper is sibling .wallpaper; spacer pins thread to input */
@@ -972,7 +1035,7 @@ export function buildChatHtml(params: RenderChatParams): string {
           <div class="nav-name">${escapeHtml(clientName)}</div>
           <div class="nav-status">${escapeHtml(statusText)}</div>
         </div>
-        ${navAvatarBlock(params.clientAvatarUrl, frost)}
+        ${navAvatarBlock(params.clientAvatarUrl, frost, params.hasStories === true)}
       </div>
     </div>
   </div>

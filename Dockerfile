@@ -54,6 +54,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/assets/fonts ./assets/fonts
+COPY --from=builder /app/node_modules/emoji-datasource-apple/img/apple/64 ./assets/emoji/apple/64
 COPY --from=builder /app/data/scripts ./data/scripts
 COPY --from=builder /app/data/scenarios ./data/scenarios
 COPY --from=builder /app/data/media ./data/media

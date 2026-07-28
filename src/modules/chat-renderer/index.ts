@@ -107,11 +107,18 @@ export function planScrollPositions(
   options?: { targetScreens?: number; overlapPx?: number },
 ): number[] {
   const targetScreens = options?.targetScreens ?? TARGET_SCREENSHOTS;
-  const overlapPx = options?.overlapPx ?? SCROLL_OVERLAP_PX;
+  // Prefer ~9+ frames: step from content length so short chats still get more cuts
+  // when tall, and long chats don't collapse to ~5–6 Android-like page jumps.
+  const overlapPx = options?.overlapPx ?? Math.max(SCROLL_OVERLAP_PX, Math.round(clientHeight * 0.55));
 
   if (maxScroll <= 8) return [0];
 
-  const step = Math.max(120, clientHeight - overlapPx);
+  const minFrames = Math.max(targetScreens, 9);
+  const stepFromTarget = Math.max(90, Math.floor(maxScroll / Math.max(1, minFrames - 1)));
+  const stepFromOverlap = Math.max(90, clientHeight - overlapPx);
+  // Take the smaller step → more screenshots (Vlad: not just ~6).
+  const step = Math.min(stepFromTarget, stepFromOverlap);
+
   const positions: number[] = [];
   for (let y = 0; y < maxScroll; y += step) {
     positions.push(Math.min(y, maxScroll));
@@ -119,11 +126,12 @@ export function planScrollPositions(
   const last = positions[positions.length - 1] ?? 0;
   if (maxScroll - last > 24) positions.push(maxScroll);
 
-  // If we got too many frames, thin toward ~targetScreens while keeping first+last.
-  if (positions.length > targetScreens + 3) {
+  // Cap runaway frames, keep first+last denser than before.
+  const hardCap = targetScreens + 6;
+  if (positions.length > hardCap) {
     const out = [positions[0]!];
     const inner = positions.slice(1, -1);
-    const keep = Math.max(1, targetScreens - 2);
+    const keep = Math.max(1, hardCap - 2);
     for (let i = 0; i < keep; i++) {
       const idx = Math.round((i / Math.max(1, keep - 1)) * (inner.length - 1));
       const v = inner[idx]!;
@@ -315,6 +323,8 @@ export class ChatRenderer {
       wallpaperUrl,
       clientAvatarUrl: avatar.dataUri,
       statusBarTime: lastTime,
+      // Vlad: Stories ring on peer avatar (Telegram iOS). Always on for review screenshots.
+      hasStories: true,
     });
     writeFileSync(htmlPath, html, "utf-8");
 

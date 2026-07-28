@@ -203,22 +203,10 @@ export class DialogGenerator {
     });
   }
 
-  private pushMessage(
-    messages: DialogMessage[],
-    msg: Omit<DialogMessage, "id">,
-  ): void {
-    messages.push(
-      dialogMessageSchema.parse({
-        id: randomUUID(),
-        ...msg,
-      }),
-    );
-  }
-
   /** Replace AI placeholder tokens (e.g. literal "doubt") with real legend phrases. */
   private resolveAiTurnText(
     text: string,
-    legend: AiDialogBundle["legend"],
+    legend: AiDialogBundle["legend"] | { gratitudePhrases: string[]; doubtPhrases: string[] },
   ): string | null {
     const trimmed = text.trim();
     if (!trimmed) return null;
@@ -228,7 +216,31 @@ export class DialogGenerator {
     if (/^(gratitude|thanks|gratitude\d+|thanks\d+)$/i.test(trimmed)) {
       return pickRandom(legend.gratitudePhrases);
     }
+    // Strip accidental placeholder-only lines that AI sometimes emits mid-sentence.
+    if (/^(openingPhrase|problem|motivation)$/i.test(trimmed)) {
+      return null;
+    }
     return text;
+  }
+
+  private pushMessage(
+    messages: DialogMessage[],
+    msg: Omit<DialogMessage, "id">,
+    legend?: { gratitudePhrases: string[]; doubtPhrases: string[] },
+  ): void {
+    let content = msg.content;
+    if (msg.role === "client" && msg.type === "text" && legend) {
+      const fixed = this.resolveAiTurnText(content, legend);
+      if (fixed == null) return;
+      content = fixed;
+    }
+    messages.push(
+      dialogMessageSchema.parse({
+        id: randomUUID(),
+        ...msg,
+        content,
+      }),
+    );
   }
 
   /** Assemble dialog from AI legend + turns, inserting media at fixed stages. */
@@ -246,7 +258,8 @@ export class DialogGenerator {
   }): DialogMessage[] {
     const { bundle, legendId, stagesToUse } = params;
     const messages: DialogMessage[] = [];
-    const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg);
+    const push = (msg: Omit<DialogMessage, "id">) =>
+      this.pushMessage(messages, msg, bundle.legend);
     const pushTurn = (role: "client" | "manager", text: string, delayMinutes: number) => {
       const content = this.resolveAiTurnText(text, bundle.legend);
       if (!content) return;
@@ -479,7 +492,7 @@ export class DialogGenerator {
   }): Promise<DialogMessage[]> {
     const { legend, managerScript, vars, agentContext, stagesToUse, isUniqueCircle } = params;
     const messages: DialogMessage[] = [];
-    const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg);
+    const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg, legend);
     let msgIndex = 0;
 
     push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
