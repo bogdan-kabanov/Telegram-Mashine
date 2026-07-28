@@ -2001,9 +2001,13 @@ img.apple-emoji {
   position: absolute;
   right: 0.35rem;
   bottom: 0.28rem;
-  font-size: 0.62rem;
-  line-height: 1;
-  opacity: 0.9;
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.project-phone-checks svg {
+  display: block;
 }
 
 .project-phone-input {
