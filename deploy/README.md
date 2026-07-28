@@ -45,14 +45,21 @@ Also create a GitHub **Environment** named `production` (Actions → Environment
 
 ### Install deploy key on the server (once)
 
-```bash
-# on your PC — create a dedicated key if you want
-ssh-keygen -t ed25519 -C "github-deploy" -f ./deploy_key -N ""
+A dedicated key already lives at `~/.ssh/github_actions_bot_ai` on the author machine
+(public half is on the VPS). To register secrets:
 
-# put public key on the VPS
-type deploy_key.pub | ssh root@95.142.47.131 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
-
-# put private key into GitHub secret DEPLOY_SSH_KEY (full file contents)
+```powershell
+gh auth login
+pwsh deploy/setup-github-secrets.ps1
+gh workflow run Deploy.yml
 ```
+
+Or manually in GitHub → Settings → Secrets → Actions:
+
+| Secret | Value |
+|--------|--------|
+| `DEPLOY_HOST` | `95.142.47.131` |
+| `DEPLOY_USER` | `root` |
+| `DEPLOY_SSH_KEY` | contents of `~/.ssh/github_actions_bot_ai` (private key) |
 
 Server `.env` is **not** managed by CI — edit it on the VPS only.
