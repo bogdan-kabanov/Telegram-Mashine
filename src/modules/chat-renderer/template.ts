@@ -2,18 +2,9 @@ import { formatChatTextHtml } from "@/lib/emoji/apple-server";
 import { sfProFontFaceCss } from "@/lib/fonts/sf-pro";
 import { chatUiForLocale } from "@/lib/i18n/chat-ui";
 import type { ProjectConfig, ProjectTheme } from "@/lib/schemas/projects";
+import type { RenderMessage } from "./render-types";
 
-export interface RenderMessage {
-  id: string;
-  role: "client" | "manager";
-  type: "text" | "image" | "sticker";
-  content: string;
-  time: string;
-  read?: boolean;
-  imageUrl?: string;
-  /** Distinguishes conditions / bets / receipts for sizing. */
-  mediaKind?: "conditions" | "bet" | "receipt" | "captura" | "story";
-}
+export type { RenderMessage } from "./render-types";
 
 export interface RenderChatParams {
   project: ProjectConfig;

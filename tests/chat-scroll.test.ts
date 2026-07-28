@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { planScrollPositions } from "@/modules/chat-renderer";
+import { planScrollPositions } from "@/modules/chat-renderer/scroll";
 
 describe("planScrollPositions", () => {
   it("returns a single frame when content fits", () => {

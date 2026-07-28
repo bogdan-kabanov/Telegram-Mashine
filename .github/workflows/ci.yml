@@ -30,4 +30,6 @@ jobs:
         run: npm run typecheck
 
       - name: Unit tests
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm test

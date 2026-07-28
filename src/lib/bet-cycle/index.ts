@@ -7,7 +7,15 @@ import { loadAppConfig } from "@/lib/config/loader";
 import { getDb } from "@/lib/db";
 import { mediaAssets, usedBets } from "@/lib/db/schema";
 import type { ScheduleConfig } from "@/lib/schemas";
-import type { MediaAsset } from "@/modules/media-handler";
+/** Minimal asset shape used by bet cycling (avoids loading receipt/captura renderers). */
+export interface MediaAsset {
+  id: string;
+  type: "bet";
+  filename: string;
+  path: string;
+  projectId?: string | null;
+  legendId?: string | null;
+}
 
 /** Fallback when schedule.json has no betReuseDays (Vlad ≈ 5-day pack cycle). */
 export const BET_REUSE_DAYS_DEFAULT = 5;

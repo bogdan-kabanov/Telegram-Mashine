@@ -16,7 +16,10 @@ import {
   TARGET_SCREENSHOTS,
   type DialogMediaAssets,
 } from "./messages";
+import { planScrollPositions } from "./scroll";
 import { buildChatHtml, getSampleMessages, type RenderChatParams, type RenderMessage } from "./template";
+
+export { planScrollPositions } from "./scroll";
 
 const logger = createLogger("chat-renderer");
 
@@ -101,48 +104,7 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
  * One full chat HTML → several PNGs by scrolling down (like reading Telegram).
  * Overlap keeps the previous bubble(s) visible so nothing “vanishes” between frames.
  */
-export function planScrollPositions(
-  maxScroll: number,
-  clientHeight: number,
-  options?: { targetScreens?: number; overlapPx?: number },
-): number[] {
-  const targetScreens = options?.targetScreens ?? TARGET_SCREENSHOTS;
-  // Prefer ~9+ frames: step from content length so short chats still get more cuts
-  // when tall, and long chats don't collapse to ~5–6 Android-like page jumps.
-  const overlapPx = options?.overlapPx ?? Math.max(SCROLL_OVERLAP_PX, Math.round(clientHeight * 0.55));
-
-  if (maxScroll <= 8) return [0];
-
-  const minFrames = Math.max(targetScreens, 9);
-  const stepFromTarget = Math.max(90, Math.floor(maxScroll / Math.max(1, minFrames - 1)));
-  const stepFromOverlap = Math.max(90, clientHeight - overlapPx);
-  // Take the smaller step → more screenshots (Vlad: not just ~6).
-  const step = Math.min(stepFromTarget, stepFromOverlap);
-
-  const positions: number[] = [];
-  for (let y = 0; y < maxScroll; y += step) {
-    positions.push(Math.min(y, maxScroll));
-  }
-  const last = positions[positions.length - 1] ?? 0;
-  if (maxScroll - last > 24) positions.push(maxScroll);
-
-  // Cap runaway frames, keep first+last denser than before.
-  const hardCap = targetScreens + 6;
-  if (positions.length > hardCap) {
-    const out = [positions[0]!];
-    const inner = positions.slice(1, -1);
-    const keep = Math.max(1, hardCap - 2);
-    for (let i = 0; i < keep; i++) {
-      const idx = Math.round((i / Math.max(1, keep - 1)) * (inner.length - 1));
-      const v = inner[idx]!;
-      if (out[out.length - 1] !== v) out.push(v);
-    }
-    if (out[out.length - 1] !== maxScroll) out.push(maxScroll);
-    return out;
-  }
-
-  return positions;
-}
+// planScrollPositions lives in ./scroll (imported above)
 
 async function screenshotChatByScrolling(params: {
   htmlPath: string;
@@ -191,7 +153,10 @@ async function screenshotChatByScrolling(params: {
       };
     });
 
-    const positions = planScrollPositions(metrics.maxScroll, metrics.clientHeight);
+    const positions = planScrollPositions(metrics.maxScroll, metrics.clientHeight, {
+      targetScreens: TARGET_SCREENSHOTS,
+      minOverlapPx: SCROLL_OVERLAP_PX,
+    });
 
     for (let i = 0; i < positions.length; i++) {
       const scrollTop = positions[i]!;

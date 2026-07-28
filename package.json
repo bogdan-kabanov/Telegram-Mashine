@@ -8,7 +8,7 @@
     "start": "node scripts/start.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run",
     "test:watch": "vitest",
     "seed:media": "node scripts/seed-media.mjs",
     "postinstall": "node scripts/playwright-install.mjs",
