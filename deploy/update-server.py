@@ -16,7 +16,7 @@ PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
 REMOTE_DIR = "/opt/bot-ai"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-EXCLUDE_DIRS = {".git", ".next", "node_modules", ".cursor", "agent-transcripts", "terminals", "deploy"}
+EXCLUDE_DIRS = {".git", ".next", "node_modules", ".cursor", "agent-transcripts", "terminals"}
 EXCLUDE_PREFIXES = (
     "data/app.db",
     "data/logs/",
@@ -97,29 +97,19 @@ def main() -> int:
         f"cd {REMOTE_DIR} && tar -xzf {remote_archive} && rm -f {remote_archive}",
         # keep production APP_URL / secrets; only ensure AUTO_SETUP if missing
         f"cd {REMOTE_DIR} && grep -q AUTO_SETUP_WEBHOOK .env || echo AUTO_SETUP_WEBHOOK=0 >> .env",
-        f"mkdir -p {REMOTE_DIR}/data/logs {REMOTE_DIR}/data/runtime {REMOTE_DIR}/data/reviews {REMOTE_DIR}/data/renders {REMOTE_DIR}/public/renders",
-        f"chown -R 1000:1000 {REMOTE_DIR}/data {REMOTE_DIR}/config {REMOTE_DIR}/public/renders",
-        f"cd {REMOTE_DIR} && docker compose build 2>&1 | tail -n 50",
-        f"cd {REMOTE_DIR} && docker compose up -d",
-        "sleep 20 && curl -s http://127.0.0.1:3000/api/health | head -c 400",
+        f"chmod +x {REMOTE_DIR}/deploy/remote-update.sh",
+        f"cd {REMOTE_DIR} && bash deploy/remote-update.sh",
         "curl -s -o /dev/null -w 'admin:%{http_code}\\n' https://95-142-47-131.sslip.io/admin",
         "curl -s -o /dev/null -w 'media:%{http_code}\\n' https://95-142-47-131.sslip.io/admin/media",
         "curl -s -o /dev/null -w 'legends:%{http_code}\\n' https://95-142-47-131.sslip.io/admin/settings",
-        f"cd {REMOTE_DIR} && docker compose ps",
     ]
 
     for cmd in cmds:
         code = run(client, cmd)
-        if "docker compose build" in cmd and code != 0:
+        if "remote-update.sh" in cmd and code != 0:
             client.close()
             archive.unlink(missing_ok=True)
             return code
-
-    # try start bot
-    run(
-        client,
-        'curl -s -X POST http://127.0.0.1:3000/api/admin/control -H "Content-Type: application/json" -d \'{"action":"start"}\'',
-    )
 
     client.close()
     archive.unlink(missing_ok=True)

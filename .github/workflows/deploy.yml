@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build on server
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pack release (keep server .env / DB / renders)
+        run: |
+          tar -czf bot-ai-release.tar.gz \
+            --exclude='.git' \
+            --exclude='.next' \
+            --exclude='node_modules' \
+            --exclude='.cursor' \
+            --exclude='.env' \
+            --exclude='.env.local' \
+            --exclude='data/app.db' \
+            --exclude='data/app.db-shm' \
+            --exclude='data/app.db-wal' \
+            --exclude='data/logs' \
+            --exclude='data/runtime' \
+            --exclude='data/reviews' \
+            --exclude='data/renders' \
+            --exclude='public/renders' \
+            --exclude='.tmp-test-photos' \
+            --exclude='bot-ai-release.tar.gz' \
+            .
+
+      - name: Upload archive to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: bot-ai-release.tar.gz
+          target: /tmp/
+          overwrite: true
+
+      - name: Extract, rebuild, healthcheck
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          command_timeout: 50m
+          script: |
+            set -eu
+            APP_DIR="/opt/bot-ai"
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+            tar -xzf /tmp/bot-ai-release.tar.gz
+            rm -f /tmp/bot-ai-release.tar.gz
+            test -f .env || { echo "ERROR: $APP_DIR/.env missing on server"; exit 1; }
+            chmod 600 .env
+            chmod +x deploy/remote-update.sh
+            bash deploy/remote-update.sh

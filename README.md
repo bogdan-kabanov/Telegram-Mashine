@@ -36,6 +36,8 @@ docker compose up -d --build
 curl -X POST http://localhost:3000/api/telegram/setup
 ```
 
+Деплой на VPS и GitHub Actions: см. [deploy/README.md](deploy/README.md).
+
 ## Ключевые правила (ТЗ)
 
 - **Двухфаза** — только Nancy, задержка 90 мин; фаза 2 = полный альбом + медиа
