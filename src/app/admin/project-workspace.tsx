@@ -66,15 +66,19 @@ function GlassPill({
   className,
   phoneRef,
   children,
+  live,
 }: {
   className: string;
   phoneRef: RefObject<HTMLDivElement | null>;
   children: ReactNode;
+  /** Backdrop glass (input) — no opaque wallpaper frost so bubbles show through */
+  live?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frostRef = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
+    if (live) return;
     const sync = () => {
       const phone = phoneRef.current;
       const host = hostRef.current;
@@ -95,11 +99,11 @@ function GlassPill({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", sync);
     };
-  }, [phoneRef]);
+  }, [phoneRef, live]);
 
   return (
-    <div ref={hostRef} className={`project-glass-pill ${className}`}>
-      <span ref={frostRef} className="project-glass-frost" aria-hidden />
+    <div ref={hostRef} className={`project-glass-pill ${live ? "is-live" : ""} ${className}`}>
+      {!live ? <span ref={frostRef} className="project-glass-frost" aria-hidden /> : null}
       <span className="project-glass-tint" aria-hidden />
       <span className="project-glass-content">{children}</span>
     </div>
@@ -619,7 +623,7 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
 
                 {/* Inside stage so backdrop-filter samples wallpaper */}
                 <div className="project-phone-input">
-                  <GlassPill className="project-phone-attach" phoneRef={phoneRef}>
+                  <GlassPill className="project-phone-attach" phoneRef={phoneRef} live>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                       <path
                         d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
@@ -630,7 +634,7 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                       />
                     </svg>
                   </GlassPill>
-                  <GlassPill className="project-phone-input-pill" phoneRef={phoneRef}>
+                  <GlassPill className="project-phone-input-pill" phoneRef={phoneRef} live>
                     <span>{chatUi.inputPlaceholder}</span>
                     <span className="project-phone-sticker" aria-hidden>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -655,7 +659,7 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                       </svg>
                     </span>
                   </GlassPill>
-                  <GlassPill className="project-phone-mic" phoneRef={phoneRef}>
+                  <GlassPill className="project-phone-mic" phoneRef={phoneRef} live>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                       <path
                         d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z"

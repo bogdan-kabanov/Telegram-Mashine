@@ -27,28 +27,12 @@ export function ensurePlaywrightBrowsersPath(): string {
   return process.env.PLAYWRIGHT_BROWSERS_PATH!;
 }
 
-/** Resolve chrome-headless-shell.exe under the browsers path (bypasses Playwright cache). */
+/** Resolve Chromium executable under the browsers path (bypasses Playwright cache). */
 export function resolveChromiumExecutable(): string | null {
   const root = ensurePlaywrightBrowsersPath();
   if (!existsSync(root)) return null;
 
-  const dirs = readdirSync(root, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name.startsWith("chromium_headless_shell-"))
-    .map((d) => d.name)
-    .sort()
-    .reverse();
-
-  for (const dir of dirs) {
-    const exe = path.join(
-      root,
-      dir,
-      process.platform === "win32" ? "chrome-headless-shell-win64" : "chrome-headless-shell-linux64",
-      process.platform === "win32" ? "chrome-headless-shell.exe" : "chrome-headless-shell",
-    );
-    if (existsSync(exe)) return exe;
-  }
-
-  // Full Chromium build fallback
+  // Prefer full Chromium — headless_shell often flattens backdrop-filter (Telegram glass).
   const fullDirs = readdirSync(root, { withFileTypes: true })
     .filter((d) => d.isDirectory() && /^chromium-\d+$/.test(d.name))
     .map((d) => d.name)
@@ -60,6 +44,22 @@ export function resolveChromiumExecutable(): string | null {
       process.platform === "win32"
         ? path.join(root, dir, "chrome-win64", "chrome.exe")
         : path.join(root, dir, "chrome-linux64", "chrome");
+    if (existsSync(exe)) return exe;
+  }
+
+  const shellDirs = readdirSync(root, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.startsWith("chromium_headless_shell-"))
+    .map((d) => d.name)
+    .sort()
+    .reverse();
+
+  for (const dir of shellDirs) {
+    const exe = path.join(
+      root,
+      dir,
+      process.platform === "win32" ? "chrome-headless-shell-win64" : "chrome-headless-shell-linux64",
+      process.platform === "win32" ? "chrome-headless-shell.exe" : "chrome-headless-shell",
+    );
     if (existsSync(exe)) return exe;
   }
 

@@ -94,9 +94,8 @@ function avatarBlock(url: string | null | undefined, fallback: string): string {
 }
 
 /**
- * Real frosted glass for Playwright: CSS filter / backdrop-filter are unreliable
- * in headless Chromium, so each pill clips a *pre-blurred* wallpaper <img>
- * aligned to the phone (not CSS url(data:) — Chromium drops huge data-URIs in CSS).
+ * Header pills: clipped pre-blurred wallpaper (Playwright-safe).
+ * Input pills must NOT use this — wallpaper frost is opaque and hides chat bubbles.
  */
 function glassFrostHtml(frostSrc: string | null, sharpSrc: string | null): string {
   const src = frostSrc ?? sharpSrc;
@@ -105,6 +104,11 @@ function glassFrostHtml(frostSrc: string | null, sharpSrc: string | null): strin
     ? `<span class="glass-frost" aria-hidden="true"><img class="glass-frost-img${preblurred ? " is-preblurred" : ""}" src="${src}" alt="" draggable="false" /></span>`
     : `<span class="glass-frost glass-frost--fallback" aria-hidden="true"></span>`;
   return `${frost}<span class="glass-tint" aria-hidden="true"></span>`;
+}
+
+/** Input / scroll glass — tint only; real backdrop-filter blurs messages underneath. */
+function glassLiveHtml(): string {
+  return `<span class="glass-tint" aria-hidden="true"></span>`;
 }
 
 function navAvatarBlock(
@@ -252,6 +256,7 @@ export function buildChatHtml(params: RenderChatParams): string {
     ? `<img class="frost-img${frostWallpaperSrc ? " is-preblurred" : ""}" src="${frostLayerSrc}" alt="" draggable="false" />`
     : "";
   const frost = glassFrostHtml(frostWallpaperSrc, wallpaperSrc);
+  const liveGlass = glassLiveHtml();
 
   return `<!DOCTYPE html>
 <html lang="${ui.lang}">
@@ -347,7 +352,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       content: none;
     }
 
-    /* Bottom input frost — mirror header so pills sit on blur, not flat paint */
+    /* Bottom input frost — backdrop only so chat bubbles show through (no opaque wallpaper plate) */
     .input-frost {
       position: absolute;
       left: 0;
@@ -357,41 +362,26 @@ export function buildChatHtml(params: RenderChatParams): string {
       z-index: 15;
       pointer-events: none;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.06);
-      -webkit-backdrop-filter: blur(20px) saturate(140%);
-      backdrop-filter: blur(20px) saturate(140%);
+      background: rgba(255, 255, 255, 0.04);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
+      backdrop-filter: blur(28px) saturate(160%);
       -webkit-mask-image: linear-gradient(
         to top,
         #000 0%,
-        #000 40%,
-        rgba(0, 0, 0, 0.55) 70%,
+        #000 35%,
+        rgba(0, 0, 0, 0.45) 65%,
         transparent 100%
       );
       mask-image: linear-gradient(
         to top,
         #000 0%,
-        #000 40%,
-        rgba(0, 0, 0, 0.55) 70%,
+        #000 35%,
+        rgba(0, 0, 0, 0.45) 65%,
         transparent 100%
       );
     }
     .input-frost .frost-img {
-      position: absolute;
-      left: -12%;
-      width: 124%;
-      bottom: 0;
-      height: 260%;
-      object-fit: cover;
-      object-position: center bottom;
-      filter: blur(28px) saturate(140%);
-      transform: scale(1.12);
-      transform-origin: center bottom;
-      opacity: 0.65;
-      pointer-events: none;
-    }
-    .input-frost .frost-img.is-preblurred {
-      filter: none;
-      opacity: 0.85;
+      display: none;
     }
 
     .header-wrap {
@@ -479,11 +469,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       border: none;
       box-shadow: none;
     }
-    /* Glass pills — clipped pre-blurred wallpaper (Playwright-safe) */
-    .nav-glass,
-    .glass-circle,
-    .input-pill,
-    .scroll-down {
+    /* Header glass — clipped pre-blurred wallpaper (Playwright-safe) */
+    .nav-glass {
       position: relative;
       overflow: hidden;
       isolation: isolate;
@@ -492,6 +479,23 @@ export function buildChatHtml(params: RenderChatParams): string {
       box-shadow:
         0 0.5px 0 rgba(255, 255, 255, 0.55) inset,
         0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    /* Input / scroll glass — MUST use backdrop-filter so bubbles show through */
+    .glass-circle,
+    .input-pill,
+    .scroll-down {
+      position: relative;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.22);
+      border: none;
+      box-shadow:
+        0 0.5px 0 rgba(255, 255, 255, 0.55) inset,
+        0 1px 2px rgba(0, 0, 0, 0.06);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      backdrop-filter: blur(30px) saturate(180%);
+      /* Force compositing layer for backdrop-filter in Chromium screenshots */
+      transform: translateZ(0);
+      will-change: backdrop-filter;
     }
     .glass-frost {
       position: absolute;
@@ -508,12 +512,10 @@ export function buildChatHtml(params: RenderChatParams): string {
       max-width: none;
       object-fit: cover;
       object-position: center;
-      /* Fallback when sharp pre-blur missing — often flat in Playwright */
       filter: blur(28px) saturate(130%) brightness(1.06);
       transform: scale(1.2);
       transform-origin: center center;
       pointer-events: none;
-      /* left/top aligned by syncGlassFrost() */
     }
     .glass-frost-img.is-preblurred {
       filter: none;
@@ -530,8 +532,13 @@ export function buildChatHtml(params: RenderChatParams): string {
       z-index: 1;
       border-radius: inherit;
       pointer-events: none;
-      /* Frosted glass — light so pre-blurred wallpaper color reads through */
-      background: rgba(255, 255, 255, 0.34);
+      background: rgba(255, 255, 255, 0.28);
+    }
+    /* Input tint lighter so green bubble reads through */
+    .glass-circle > .glass-tint,
+    .input-pill > .glass-tint,
+    .scroll-down > .glass-tint {
+      background: rgba(255, 255, 255, 0.18);
     }
     .nav-glass > :not(.glass-frost):not(.glass-tint),
     .glass-circle > :not(.glass-frost):not(.glass-tint),
@@ -1131,20 +1138,20 @@ export function buildChatHtml(params: RenderChatParams): string {
       <div class="header-frost" aria-hidden="true">${frostImg}</div>
       <div class="input-frost" aria-hidden="true">${frostImg}</div>
 
-      <div class="scroll-down" aria-hidden="true">${frost}${ICONS.chevronDown}</div>
+      <div class="scroll-down" aria-hidden="true">${liveGlass}${ICONS.chevronDown}</div>
 
       <div class="input-bar">
         <div class="glass-circle attach">
-          ${frost}
+          ${liveGlass}
           ${ICONS.paperclip}
         </div>
         <div class="input-pill">
-          ${frost}
+          ${liveGlass}
           <span class="input-placeholder">${escapeHtml(ui.inputPlaceholder)}</span>
           <div class="input-sticker">${ICONS.stickerInput}</div>
         </div>
         <div class="glass-circle mic">
-          ${frost}
+          ${liveGlass}
           ${ICONS.microphone}
         </div>
       </div>

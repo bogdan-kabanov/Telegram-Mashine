@@ -1594,7 +1594,7 @@ textarea.admin-input:focus {
   display: none;
 }
 
-/* Bottom input frost — same idea as header */
+/* Bottom input frost — backdrop only (bubbles must show through) */
 .project-phone-input-frost {
   position: absolute;
   left: 0;
@@ -1604,9 +1604,9 @@ textarea.admin-input:focus {
   z-index: 4;
   pointer-events: none;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
+  background: rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
   -webkit-mask-image: linear-gradient(
     to top,
     #000 0%,
@@ -1624,20 +1624,8 @@ textarea.admin-input:focus {
 }
 
 .project-phone-input-frost::before {
-  content: "";
-  position: absolute;
-  left: -12%;
-  width: 124%;
-  bottom: 0;
-  height: 260%;
-  background-image: var(--chat-wallpaper);
-  background-size: cover;
-  background-position: center bottom;
-  background-repeat: no-repeat;
-  filter: blur(22px) saturate(150%);
-  transform: scale(1.12);
-  transform-origin: center bottom;
-  opacity: 0.7;
+  content: none;
+  display: none;
 }
 
 .project-phone-header {
@@ -1731,8 +1719,20 @@ textarea.admin-input:focus {
   box-shadow:
     0 0.5px 0 rgba(255, 255, 255, 0.55) inset,
     0 1px 2px rgba(0, 0, 0, 0.06);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  backdrop-filter: blur(18px) saturate(150%);
+}
+
+.project-glass-pill.is-live.project-phone-attach,
+.project-glass-pill.is-live.project-phone-mic,
+.project-glass-pill.is-live.project-phone-input-pill {
+  isolation: auto;
+  background: rgba(255, 255, 255, 0.22);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  transform: translateZ(0);
+}
+
+.project-glass-pill.is-live .project-glass-tint {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 /* Clipped blurred wallpaper — real glass without relying on backdrop alone */
