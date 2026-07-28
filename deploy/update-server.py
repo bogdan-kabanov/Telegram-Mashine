@@ -16,7 +16,15 @@ PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
 REMOTE_DIR = "/opt/bot-ai"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-EXCLUDE_DIRS = {".git", ".next", "node_modules", ".cursor", "agent-transcripts", "terminals"}
+EXCLUDE_DIRS = {
+    ".git",
+    ".next",
+    "node_modules",
+    ".cursor",
+    "agent-transcripts",
+    "terminals",
+    ".tmp-test-photos",
+}
 EXCLUDE_PREFIXES = (
     "data/app.db",
     "data/logs/",
@@ -24,6 +32,8 @@ EXCLUDE_PREFIXES = (
     "data/reviews/",
     "data/renders/",
     "public/renders/",
+    "public/2026.",
+    ".tmp-",
 )
 
 
@@ -37,6 +47,11 @@ def should_skip(rel: str) -> bool:
     if any(norm.startswith(p) for p in EXCLUDE_PREFIXES):
         return True
     if "/renders/" in norm and norm.endswith((".png", ".html")):
+        return True
+    # junk sticker variants / local preview dumps
+    if "greeting.alpha" in norm:
+        return True
+    if norm.startswith("public/") and "/2026." in f"/{norm}":
         return True
     return False
 
@@ -63,12 +78,53 @@ def build_archive() -> Path:
 def connect() -> paramiko.SSHClient:
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    key = Path(os.environ.get("USERPROFILE", "")) / ".ssh" / "id_ed25519"
-    try:
-        client.connect(HOST, username=USER, key_filename=str(key), timeout=30)
-    except Exception:
-        client.connect(HOST, username=USER, password=PASSWORD, timeout=30)
-    return client
+    ssh_dir = Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or "") / ".ssh"
+    key_candidates = [
+        os.environ.get("DEPLOY_SSH_KEY_PATH", ""),
+        str(ssh_dir / "id_ed25519"),
+        str(ssh_dir / "max_desktop_deploy"),
+        str(ssh_dir / "id_rsa"),
+    ]
+    last_err: Exception | None = None
+    for key_path in key_candidates:
+        if not key_path or not Path(key_path).exists():
+            continue
+        try:
+            client.connect(HOST, username=USER, key_filename=key_path, timeout=30)
+            print(f"SSH: key auth OK ({Path(key_path).name})")
+            return client
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+    if PASSWORD:
+        try:
+            client.connect(HOST, username=USER, password=PASSWORD, timeout=30)
+            print("SSH: password auth OK")
+            return client
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+    raise RuntimeError(f"SSH auth failed for {USER}@{HOST}: {last_err}")
+
+
+def ensure_local_pubkey(client: paramiko.SSHClient) -> None:
+    """Install local id_ed25519.pub so later deploys / GitHub Actions key can work."""
+    pub = Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or "") / ".ssh" / "id_ed25519.pub"
+    if not pub.exists():
+        return
+    pubkey = pub.read_text(encoding="utf-8").strip()
+    if not pubkey:
+        return
+    # Avoid shell-injection via pubkey contents: only allow a single SSH public key line.
+    if "\n" in pubkey or "'" in pubkey:
+        print("SSH: skip pubkey install (unexpected format)")
+        return
+    cmd = (
+        "mkdir -p ~/.ssh && chmod 700 ~/.ssh && "
+        f"grep -qxF '{pubkey}' ~/.ssh/authorized_keys 2>/dev/null || "
+        f"echo '{pubkey}' >> ~/.ssh/authorized_keys && "
+        "chmod 600 ~/.ssh/authorized_keys"
+    )
+    run(client, cmd)
+    print("SSH: ensured local id_ed25519.pub on server")
 
 
 def run(client: paramiko.SSHClient, cmd: str, timeout: int = 7200) -> int:
@@ -87,6 +143,7 @@ def run(client: paramiko.SSHClient, cmd: str, timeout: int = 7200) -> int:
 def main() -> int:
     archive = build_archive()
     client = connect()
+    ensure_local_pubkey(client)
     sftp = client.open_sftp()
     remote_archive = "/tmp/bot-ai-update.tar.gz"
     print(f"Uploading to {remote_archive}...")
