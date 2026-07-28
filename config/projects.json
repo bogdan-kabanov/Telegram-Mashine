@@ -79,8 +79,7 @@
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#D4F0FD",
         "accentColor": "#007AFF",
-        "headerBg": "#F7FBFF",
-        "headerBgEnd": "#D6EBFF",
+        "headerBg": "#F7F7F7",
         "statusBarStyle": "light"
       },
       "depositMessageTemplate": "🥰 El depósito inicial se realiza a esta cuenta 👇🏻\n\n892029281899919001991\n\nUna vez que envíes el depósito inicial, envíanos el comprobante de pago 💛",
