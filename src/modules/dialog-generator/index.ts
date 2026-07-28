@@ -23,6 +23,7 @@ import { getFileStore } from "@/lib/storage/file-store";
 import {
   clientLegendSchema,
   dialogMessageSchema,
+  findAmountPackForBetPack,
   scenarioSchema,
   selectAmountPacksForProject,
   type ClientLegend,
@@ -594,6 +595,8 @@ export class DialogGenerator {
     projectId: string;
     scenarioId?: string;
     reviewType?: "small" | "big" | "unique_circle";
+    /** When set, force amount pack bound to this bet image pack (1:1). */
+    betPack?: number;
   }): Promise<GeneratedDialog> {
     const config = await loadAppConfig();
     const project = config.projects.projects.find((p) => p.id === params.projectId);
@@ -628,7 +631,10 @@ export class DialogGenerator {
         `No amount packs for project=${params.projectId} currency=${project.currency}`,
       );
     }
-    const amountPackIds = projectPacks.map((p) => p.id);
+
+    const forcedPack =
+      params.betPack != null ? findAmountPackForBetPack(projectPacks, params.betPack) : null;
+    const amountPackIds = forcedPack ? [forcedPack.id] : projectPacks.map((p) => p.id);
     const combination = await pickUnusedCombination({
       projectId: params.projectId,
       legendIds: availableLegends.map((l) => l.id),
@@ -639,7 +645,9 @@ export class DialogGenerator {
     const seedLegend =
       availableLegends.find((l) => l.id === combination.legendId) ?? availableLegends[0]!;
     const amountPack =
-      projectPacks.find((p) => p.id === combination.amountPackId) ?? projectPacks[0]!;
+      forcedPack ??
+      projectPacks.find((p) => p.id === combination.amountPackId) ??
+      projectPacks[0]!;
 
     const depositBank = pickRandom(depositBanks.length > 0 ? depositBanks : config.banks.depositBanks);
     const payoutBank = pickRandom(payoutBanks.length > 0 ? payoutBanks : config.banks.payoutBanks);

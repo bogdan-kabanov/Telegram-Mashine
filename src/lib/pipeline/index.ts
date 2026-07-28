@@ -7,7 +7,7 @@ import { formatMexicoDateTime } from "@/lib/timezone";
 import { createLogger, getRuntimeManager } from "@/lib/runtime/manager";
 import type { ReviewPackage } from "@/lib/schemas";
 import { pickUniqueWeeklyCircle } from "@/lib/weekly-circle";
-import { pickSequentialBets } from "@/lib/bet-cycle";
+import { pickNextBetPack } from "@/lib/bet-cycle";
 import { getChatRenderer } from "@/modules/chat-renderer";
 import { getDialogGenerator } from "@/modules/dialog-generator";
 import { getMediaHandler } from "@/modules/media-handler";
@@ -75,34 +75,34 @@ export class ReviewPipeline {
       const progress = params.onProgress;
 
       await report(progress, 1, "dialog", "Генерация диалога", "OpenAI пишет переписку клиент ↔ менеджер…");
+      const reviewId = randomUUID();
+      const betPackPick = await pickNextBetPack({
+        projectId: params.projectId,
+        reviewId,
+        reuseDays: config.schedule.betReuseDays,
+      });
       const dialog = await getDialogGenerator().generate({
         projectId: params.projectId,
         reviewType,
+        ...(betPackPick ? { betPack: betPackPick.packNumber } : {}),
       });
 
       const mediaHandler = getMediaHandler();
       const depositBank = config.banks.depositBanks.find((b) => b.id === dialog.depositBankId);
       const payoutBank = config.banks.payoutBanks.find((b) => b.id === dialog.payoutBankId);
       const mxNow = formatMexicoDateTime();
-      const reviewId = randomUUID();
 
       await report(progress, 2, "media", "Подбор медиа", "Библиотека или ИИ (ставки / условия / стикер)…");
       const videoNotePromise = pinVideoNote
         ? pickUniqueWeeklyCircle(params.projectId)
         : mediaHandler.pickRandomFromDb("video_note", params.projectId);
 
-      const [conditions, sequentialBets, videoNote, sticker] = await Promise.all([
+      const [conditions, videoNote, sticker] = await Promise.all([
         mediaHandler.resolveProjectImage("conditions", {
           projectId: params.projectId,
           projectName: project.name,
           locale: project.locale,
           currency: project.currency,
-        }),
-        pickSequentialBets({
-          projectId: params.projectId,
-          count: 3,
-          reviewId,
-          reuseDays: config.schedule.betReuseDays,
         }),
         videoNotePromise,
         mediaHandler.resolveProjectImage("sticker", {
@@ -111,6 +111,7 @@ export class ReviewPipeline {
         }),
       ]);
 
+      const sequentialBets = betPackPick?.assets ?? [];
       // Fill missing slots via AI / random when the ordered pool is thin
       const betSlots: Array<{ path?: string } | null> = [
         sequentialBets[0] ?? null,

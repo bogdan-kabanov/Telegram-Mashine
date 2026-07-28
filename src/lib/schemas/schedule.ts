@@ -23,7 +23,8 @@ export const scheduleConfigSchema = z
      * 0 = no cooldown (only sequential pack walk 1→N→1).
      * Default 5 ≈ Vlad’s pack cycle length.
      */
-    betReuseDays: z.number().int().min(0).max(90).default(5),
+    /** Real max is dynamic (unique bets ÷ daily usage); 365 is a sanity ceiling. */
+    betReuseDays: z.number().int().min(0).max(365).default(5),
     /** Length of the rotating schedule cycle (TZ: 3 weeks). */
     cycleWeeks: z.number().int().min(1).max(12).default(3),
     /** Mexico-local YYYY-MM-DD of any day in cycle week 0 (Monday of that week is used). */

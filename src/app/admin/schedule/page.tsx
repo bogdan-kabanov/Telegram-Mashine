@@ -1,4 +1,5 @@
 import { bootstrapApp } from "@/lib/bootstrap";
+import { getBetReuseCapacity } from "@/lib/bet-cycle";
 import { loadAppConfig } from "@/lib/config/loader";
 import { getActiveCycleWeekInfo, getActiveScheduleSlots } from "@/lib/schedule/cycle";
 import type { ScheduleSlot } from "@/lib/schemas";
@@ -84,6 +85,7 @@ function formatTime(hour: number, minute: number): string {
 export default async function SchedulePage() {
   await bootstrapApp();
   const config = await loadAppConfig();
+  const betReuseCapacity = await getBetReuseCapacity();
   const cycle = getActiveCycleWeekInfo(config.schedule);
   const { days, events, nowMinutes } = buildWeekEvents(config, 7);
 
@@ -145,7 +147,10 @@ export default async function SchedulePage() {
         tip="Настройка из schedule.json → betReuseDays."
         description="Паки идут по кругу 1→N→1. Кулдаун не даёт взять ту же картинку слишком рано."
       >
-        <BetReuseSettings initialDays={config.schedule.betReuseDays} />
+        <BetReuseSettings
+          initialDays={config.schedule.betReuseDays}
+          maxDays={betReuseCapacity.maxDays}
+        />
       </SectionCard>
 
       <SectionCard
