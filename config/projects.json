@@ -125,8 +125,7 @@
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#F5E6FF",
         "accentColor": "#AF52DE",
-        "headerBg": "#FBF7FF",
-        "headerBgEnd": "#EBD9FF",
+        "headerBg": "#F7F7F7",
         "statusBarStyle": "light"
       },
       "depositMessageTemplate": "💳 Banco: {{bankName}}\nAlias / CBU: {{clabe}}\nMandame una captura después del pago 💙",

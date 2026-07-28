@@ -12,6 +12,8 @@ export interface RenderChatParams {
   clientAvatarUrl?: string | null;
   managerAvatarUrl?: string | null;
   wallpaperUrl?: string | null;
+  /** Pre-blurred wallpaper for glass pills (Playwright-safe; no CSS filter). */
+  frostWallpaperUrl?: string | null;
   messages: RenderMessage[];
   statusText?: string;
   statusBarTime?: string;
@@ -55,12 +57,9 @@ const ICONS = {
     <rect x="9.6" y="3.2" width="3.2" height="8.8" rx="0.7" fill="currentColor"/>
     <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" fill="currentColor" fill-opacity="0.35"/>
   </svg>`,
-  /* iOS status-bar Wi‑Fi — SF Symbol–like filled arcs + tip (3 rings, not Android strokes) */
-  wifi: `<svg width="16" height="11.5" viewBox="0 0 16 11.5" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <circle cx="8" cy="10.35" r="1.15" fill="currentColor"/>
-    <path fill="currentColor" d="M4.55 7.55a4.9 4.9 0 0 1 6.9 0l-1.05 1.05a3.4 3.4 0 0 0-4.8 0L4.55 7.55z"/>
-    <path fill="currentColor" d="M2.05 5.05a8.4 8.4 0 0 1 11.9 0L12.9 6.1a6.9 6.9 0 0 0-9.8 0L2.05 5.05z"/>
-    <path fill="currentColor" d="M8 .45c3.35 0 6.4 1.36 8.6 3.56L15.55 5.1A10.7 10.7 0 0 0 8 1.85 10.7 10.7 0 0 0 .45 5.1L1.4 4.01A12.1 12.1 0 0 1 8 .45z"/>
+  /* Real iOS/SF-style Wi‑Fi (Framework7 SF glyph — Apple status-bar geometry) */
+  wifi: `<svg width="15.5" height="11" viewBox="2 9 52 38" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path fill="currentColor" d="M 5.4648 25.0352 C 5.9102 25.4805 6.5664 25.4571 6.9882 25.0118 C 12.5195 19.1289 19.8320 16.0352 28.0117 16.0352 C 36.2382 16.0352 43.5742 19.1523 49.0819 25.0352 C 49.4803 25.4336 50.1135 25.4336 50.5354 24.9883 L 53.6525 21.8711 C 54.0274 21.4727 54.0274 20.9571 53.7226 20.5820 C 48.4258 14.0664 38.4648 9.2617 28.0117 9.2617 C 17.5586 9.2617 7.5976 14.0664 2.3007 20.5820 C 1.9726 20.9571 1.9961 21.4727 2.3711 21.8711 Z M 14.8398 34.4336 C 15.3086 34.9258 15.9180 34.8789 16.3633 34.3633 C 19.0820 31.3398 23.4882 29.1602 28.0117 29.2071 C 32.5820 29.1602 36.9648 31.4102 39.7070 34.4336 C 40.1523 34.9023 40.7382 34.9023 41.1836 34.4102 L 44.6758 30.9649 C 45.0507 30.5898 45.0976 30.0977 44.7461 29.6992 C 41.3476 25.5039 35.0429 22.4102 28.0117 22.4102 C 20.9804 22.4102 14.6758 25.5274 11.2773 29.6992 C 10.9258 30.0977 10.9726 30.5664 11.3476 30.9649 Z M 28.0117 46.7383 C 28.5039 46.7383 28.9492 46.4805 29.8164 45.6367 L 35.3007 40.3633 C 35.6523 40.0352 35.7226 39.5196 35.4180 39.1211 C 33.9414 37.2227 31.1758 35.5820 28.0117 35.5820 C 24.7773 35.5820 21.9648 37.2930 20.5117 39.2617 C 20.3007 39.5898 20.3711 40.0352 20.7226 40.3633 L 26.2070 45.6367 C 27.0742 46.4805 27.5195 46.7383 28.0117 46.7383 Z"/>
   </svg>`,
   battery: `<svg width="27" height="13" viewBox="0 0 27 13" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="0.6" y="0.6" width="23" height="11.8" rx="2.6" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.4"/>
@@ -95,12 +94,15 @@ function avatarBlock(url: string | null | undefined, fallback: string): string {
 }
 
 /**
- * Real frosted glass for Playwright: backdrop-filter is flat/sharp in headless
- * Chromium, so each pill clips a blurred wallpaper copy aligned to the phone.
+ * Real frosted glass for Playwright: CSS filter / backdrop-filter are unreliable
+ * in headless Chromium, so each pill clips a *pre-blurred* wallpaper <img>
+ * aligned to the phone (not CSS url(data:) — Chromium drops huge data-URIs in CSS).
  */
-function glassFrostHtml(wallpaperSrc: string | null): string {
-  const frost = wallpaperSrc
-    ? `<span class="glass-frost" aria-hidden="true"><img class="glass-frost-img" src="${wallpaperSrc}" alt="" draggable="false" /></span>`
+function glassFrostHtml(frostSrc: string | null, sharpSrc: string | null): string {
+  const src = frostSrc ?? sharpSrc;
+  const preblurred = Boolean(frostSrc);
+  const frost = src
+    ? `<span class="glass-frost" aria-hidden="true"><img class="glass-frost-img${preblurred ? " is-preblurred" : ""}" src="${src}" alt="" draggable="false" /></span>`
     : `<span class="glass-frost glass-frost--fallback" aria-hidden="true"></span>`;
   return `${frost}<span class="glass-tint" aria-hidden="true"></span>`;
 }
@@ -237,6 +239,7 @@ export function buildChatHtml(params: RenderChatParams): string {
   const statusFg = statusLight ? "#fff" : "#000";
   /** Prefer <img src> over CSS url(data:) — Chromium drops huge data-URIs in stylesheets. */
   const wallpaperSrc = params.wallpaperUrl ?? null;
+  const frostWallpaperSrc = params.frostWallpaperUrl ?? null;
   const wallpaperFallbackCss = "linear-gradient(180deg, #6ba3be 0%, #4a8fa8 100%)";
 
   const messageHtml = renderMessageList(messages, theme, params.clientAvatarUrl);
@@ -244,7 +247,11 @@ export function buildChatHtml(params: RenderChatParams): string {
   const wallpaperImg = wallpaperSrc
     ? `<img class="wallpaper-img" src="${wallpaperSrc}" alt="" draggable="false" />`
     : "";
-  const frost = glassFrostHtml(wallpaperSrc);
+  const frostLayerSrc = frostWallpaperSrc ?? wallpaperSrc;
+  const frostImg = frostLayerSrc
+    ? `<img class="frost-img${frostWallpaperSrc ? " is-preblurred" : ""}" src="${frostLayerSrc}" alt="" draggable="false" />`
+    : "";
+  const frost = glassFrostHtml(frostWallpaperSrc, wallpaperSrc);
 
   return `<!DOCTYPE html>
 <html lang="${ui.lang}">
@@ -329,16 +336,62 @@ export function buildChatHtml(params: RenderChatParams): string {
       filter: blur(28px) saturate(150%);
       transform: scale(1.12);
       transform-origin: center top;
-      opacity: 0.22;
+      opacity: 0.55;
       pointer-events: none;
+    }
+    .header-frost .frost-img.is-preblurred {
+      filter: none;
+      opacity: 0.7;
     }
     .header-frost::after {
       content: none;
     }
 
-    /* No bottom frost */
+    /* Bottom input frost — mirror header so pills sit on blur, not flat paint */
     .input-frost {
-      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 110px;
+      z-index: 15;
+      pointer-events: none;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.06);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-mask-image: linear-gradient(
+        to top,
+        #000 0%,
+        #000 40%,
+        rgba(0, 0, 0, 0.55) 70%,
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to top,
+        #000 0%,
+        #000 40%,
+        rgba(0, 0, 0, 0.55) 70%,
+        transparent 100%
+      );
+    }
+    .input-frost .frost-img {
+      position: absolute;
+      left: -12%;
+      width: 124%;
+      bottom: 0;
+      height: 260%;
+      object-fit: cover;
+      object-position: center bottom;
+      filter: blur(28px) saturate(140%);
+      transform: scale(1.12);
+      transform-origin: center bottom;
+      opacity: 0.65;
+      pointer-events: none;
+    }
+    .input-frost .frost-img.is-preblurred {
+      filter: none;
+      opacity: 0.85;
     }
 
     .header-wrap {
@@ -426,7 +479,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       border: none;
       box-shadow: none;
     }
-    /* Glass pills — clipped blurred wallpaper (Playwright-safe), not backdrop-filter */
+    /* Glass pills — clipped pre-blurred wallpaper (Playwright-safe) */
     .nav-glass,
     .glass-circle,
     .input-pill,
@@ -455,11 +508,16 @@ export function buildChatHtml(params: RenderChatParams): string {
       max-width: none;
       object-fit: cover;
       object-position: center;
-      filter: blur(24px) saturate(120%) brightness(1.12);
-      transform: scale(1.14);
+      /* Fallback when sharp pre-blur missing — often flat in Playwright */
+      filter: blur(28px) saturate(130%) brightness(1.06);
+      transform: scale(1.2);
       transform-origin: center center;
       pointer-events: none;
       /* left/top aligned by syncGlassFrost() */
+    }
+    .glass-frost-img.is-preblurred {
+      filter: none;
+      transform: scale(1.04);
     }
     .glass-frost--fallback {
       inset: -30%;
@@ -472,8 +530,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       z-index: 1;
       border-radius: inherit;
       pointer-events: none;
-      /* White frosted glass — avoid blue cast from teal wallpapers */
-      background: rgba(255, 255, 255, 0.72);
+      /* Frosted glass — light so pre-blurred wallpaper color reads through */
+      background: rgba(255, 255, 255, 0.34);
     }
     .nav-glass > :not(.glass-frost):not(.glass-tint),
     .glass-circle > :not(.glass-frost):not(.glass-tint),
@@ -1022,14 +1080,17 @@ export function buildChatHtml(params: RenderChatParams): string {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
       z-index: 21;
       pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
     }
     .scroll-down.is-visible {
-      display: flex;
+      opacity: 1;
+      visibility: visible;
     }
     .scroll-down svg {
       display: block;
@@ -1067,7 +1128,8 @@ export function buildChatHtml(params: RenderChatParams): string {
         </div>
       </div>
       <!-- Inside stage so backdrop-filter samples wallpaper + messages -->
-      <div class="header-frost" aria-hidden="true">${wallpaperImg ? wallpaperImg.replace('class="wallpaper-img"', 'class="frost-img"') : ""}</div>
+      <div class="header-frost" aria-hidden="true">${frostImg}</div>
+      <div class="input-frost" aria-hidden="true">${frostImg}</div>
 
       <div class="scroll-down" aria-hidden="true">${frost}${ICONS.chevronDown}</div>
 
@@ -1133,10 +1195,21 @@ export function buildChatHtml(params: RenderChatParams): string {
       }
       window.syncGlassFrost = syncGlassFrost;
       window.addEventListener("resize", syncGlassFrost);
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", syncGlassFrost);
-      } else {
+      window.addEventListener("load", syncGlassFrost);
+      document.querySelectorAll(".glass-frost-img, .wallpaper-img, .frost-img").forEach(function (img) {
+        img.addEventListener("load", syncGlassFrost);
+      });
+      function boot() {
         syncGlassFrost();
+        requestAnimationFrame(function () {
+          syncGlassFrost();
+          requestAnimationFrame(syncGlassFrost);
+        });
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+      } else {
+        boot();
       }
     })();
   </script>

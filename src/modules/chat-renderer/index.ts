@@ -9,6 +9,7 @@ import {
   resolveImageForRender,
   resolveWallpaperForProject,
 } from "@/lib/media/resolve";
+import { blurWallpaperDataUri } from "@/lib/media/blur-wallpaper";
 import { createLogger } from "@/lib/runtime/manager";
 import type { GeneratedDialog } from "@/modules/dialog-generator";
 import {
@@ -225,6 +226,7 @@ export class ChatRenderer {
       resolveWallpaperForProject(projectId, project.wallpaperPath),
       pickRandomClientAvatar(projectId, project.clientAvatarPath),
     ]);
+    const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
 
     return this.render({
       project,
@@ -232,6 +234,7 @@ export class ChatRenderer {
       messages: getSampleMessages(project.locale),
       statusText: ui.statusRecently,
       wallpaperUrl,
+      frostWallpaperUrl,
       clientAvatarUrl: avatar.dataUri,
       statusBarTime: formatStatusBarTime(),
     });
@@ -259,6 +262,7 @@ export class ChatRenderer {
         resolveImageForRender(mediaAssets.receipt ?? null, { trimWhitespace: true }),
         resolveImageForRender(mediaAssets.captura ?? null, { trimWhitespace: true }),
       ]);
+    const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
 
     const enrichedMedia: DialogMediaAssets = {
       sticker: stickerUri,
@@ -286,6 +290,7 @@ export class ChatRenderer {
       messages: renderMessages,
       statusText: ui.statusRecently,
       wallpaperUrl,
+      frostWallpaperUrl,
       clientAvatarUrl: avatar.dataUri,
       statusBarTime: lastTime,
       // Vlad: Stories ring on peer avatar (Telegram iOS). Always on for review screenshots.

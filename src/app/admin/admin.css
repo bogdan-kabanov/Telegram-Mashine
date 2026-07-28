@@ -1543,7 +1543,7 @@ textarea.admin-input:focus {
   pointer-events: none;
 }
 
-/* Soft header frost only — weak but visible */
+/* Soft header frost — backdrop + wallpaper echo */
 .project-phone-header-frost {
   position: absolute;
   left: 0;
@@ -1554,8 +1554,8 @@ textarea.admin-input:focus {
   pointer-events: none;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.03);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
-  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
@@ -1586,7 +1586,7 @@ textarea.admin-input:focus {
   filter: blur(22px) saturate(150%);
   transform: scale(1.12);
   transform-origin: center top;
-  opacity: 0.2;
+  opacity: 0.55;
 }
 
 .project-phone-header-frost::after {
@@ -1594,15 +1594,50 @@ textarea.admin-input:focus {
   display: none;
 }
 
-.project-phone-header-frost::before,
-.project-phone-header-frost::after {
-  content: none;
-  display: none;
-}
-
-/* No bottom frost */
+/* Bottom input frost — same idea as header */
 .project-phone-input-frost {
-  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 88px;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-mask-image: linear-gradient(
+    to top,
+    #000 0%,
+    #000 40%,
+    rgba(0, 0, 0, 0.55) 70%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to top,
+    #000 0%,
+    #000 40%,
+    rgba(0, 0, 0, 0.55) 70%,
+    transparent 100%
+  );
+}
+
+.project-phone-input-frost::before {
+  content: "";
+  position: absolute;
+  left: -12%;
+  width: 124%;
+  bottom: 0;
+  height: 260%;
+  background-image: var(--chat-wallpaper);
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  filter: blur(22px) saturate(150%);
+  transform: scale(1.12);
+  transform-origin: center bottom;
+  opacity: 0.7;
 }
 
 .project-phone-header {
@@ -1696,9 +1731,11 @@ textarea.admin-input:focus {
   box-shadow:
     0 0.5px 0 rgba(255, 255, 255, 0.55) inset,
     0 1px 2px rgba(0, 0, 0, 0.06);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
 }
 
-/* Clipped blurred wallpaper — real glass without backdrop-filter */
+/* Clipped blurred wallpaper — real glass without relying on backdrop alone */
 .project-glass-frost {
   position: absolute;
   inset: 0;
@@ -1718,8 +1755,8 @@ textarea.admin-input:focus {
   background-image: var(--chat-wallpaper);
   background-size: cover;
   background-position: center;
-  filter: blur(18px) saturate(175%) brightness(1.06);
-  transform: scale(1.14);
+  filter: blur(20px) saturate(170%) brightness(1.05);
+  transform: scale(1.2);
   transform-origin: center center;
 }
 
@@ -1729,11 +1766,11 @@ textarea.admin-input:focus {
   z-index: 1;
   border-radius: inherit;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .project-phone-mic .project-glass-tint {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .project-phone-back.project-glass-pill,
