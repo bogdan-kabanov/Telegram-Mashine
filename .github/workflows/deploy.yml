@@ -19,24 +19,29 @@ jobs:
 
       - name: Pack release (keep server .env / DB / renders)
         run: |
-          tar -czf bot-ai-release.tar.gz \
-            --exclude='.git' \
-            --exclude='.next' \
-            --exclude='node_modules' \
-            --exclude='.cursor' \
-            --exclude='.env' \
-            --exclude='.env.local' \
-            --exclude='data/app.db' \
-            --exclude='data/app.db-shm' \
-            --exclude='data/app.db-wal' \
-            --exclude='data/logs' \
-            --exclude='data/runtime' \
-            --exclude='data/reviews' \
-            --exclude='data/renders' \
-            --exclude='public/renders' \
-            --exclude='.tmp-test-photos' \
-            --exclude='bot-ai-release.tar.gz' \
-            .
+          set -euo pipefail
+          # Archive outside the tree so tar does not see its own output change.
+          OUT="/tmp/bot-ai-release.tar.gz"
+          tar -czf "$OUT" \
+            --exclude='./.git' \
+            --exclude='./.next' \
+            --exclude='./node_modules' \
+            --exclude='./.cursor' \
+            --exclude='./.env' \
+            --exclude='./.env.local' \
+            --exclude='./data/app.db' \
+            --exclude='./data/app.db-shm' \
+            --exclude='./data/app.db-wal' \
+            --exclude='./data/logs' \
+            --exclude='./data/runtime' \
+            --exclude='./data/reviews' \
+            --exclude='./data/renders' \
+            --exclude='./public/renders' \
+            --exclude='./.tmp-test-photos' \
+            --exclude='./bot-ai-release.tar.gz' \
+            -C "$GITHUB_WORKSPACE" .
+          cp "$OUT" "$GITHUB_WORKSPACE/bot-ai-release.tar.gz"
+          ls -lh "$GITHUB_WORKSPACE/bot-ai-release.tar.gz"
 
       - name: Upload archive to server
         uses: appleboy/scp-action@v0.1.7
