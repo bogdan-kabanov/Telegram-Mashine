@@ -98,6 +98,8 @@ export async function generateAgentTurn(input: AgentTurnInput): Promise<string> 
             : `You are a Mexican client chatting with an investment manager on Telegram. Locale: ${locale}. Write natural Spanish (Mexico), 1-2 short sentences max.`,
           `Stay in character: cautious at first, warmer after wins. No English.`,
           `Do not invent bank details, CLABE, amounts, or links — only rephrase the seed.`,
+          `Do NOT use inverted punctuation ¿ or ¡ — Mexican Telegram users almost never type them.`,
+          `Match grammatical gender to the client first name (${input.context.clientName}): use feminine adjectives/agreements for female names (agradecida, segura, nerviosa, desesperada), masculine only for clearly male names.`,
         ].join(" ")
       : [
           locale.toLowerCase().startsWith("ru")
@@ -105,6 +107,8 @@ export async function generateAgentTurn(input: AgentTurnInput): Promise<string> 
             : `You are a professional female investment manager ("actriz") on Telegram. Locale: ${locale}. Write natural Spanish (Mexico), warm and confident, 1-2 sentences.`,
           `Guide the client stage-by-stage. Do not invent CLABE/amounts — keep placeholders from the seed.`,
           `No English. Keep the meaning of the seed phrase.`,
+          `Do NOT use inverted punctuation ¿ or ¡.`,
+          `You are female — use feminine self-reference (lista, dispuesta, atenta), never masculine (listo, dispuesto).`,
         ].join(" ");
 
   const user = [
@@ -207,6 +211,9 @@ export async function generateFullDialogBundle(
     `CRITICAL: The chat must feel like a human conversation about the client's life problem FIRST.`,
     `Forbidden: jumping straight from hello → deposit → bets → payout with no personal talk.`,
     `Texts: short Telegram style (1–3 sentences). Client starts cautious, becomes warmer after wins.`,
+    `Do NOT use inverted Spanish punctuation ¿ or ¡ anywhere — real Telegram users almost never type them.`,
+    `Client gender: match adjectives to the client first name "${ctx.clientName}" (female names → agradecida/nerviosa/segura/desesperada; male → masculine forms).`,
+    `Manager is female: feminine self-reference only (lista, dispuesta, atenta).`,
   ].join(" ");
 
   const stages = isSmall
@@ -282,6 +289,10 @@ export async function generateFullDialogBundle(
     `- Stages "greeting" and "trust_building" MUST contain a real conversation (≥8 turns combined)`,
     `  about the client's problem, empathy from the manager, questions, doubts — BEFORE any conditions/deposit talk.`,
     `- Manager must acknowledge the hardship (sympathy, questions) before pitching investment.`,
+    `- If the client mentions sending a photo of a sick relative / injury, keep that promise in problemParts — the photo is inserted by the pipeline.`,
+    `- Client should ask how long the work takes; manager answers ~1.5–2 hours / patiently before conditions.`,
+    `- After deposit details: client asks if it will really work; manager reassures; only then the payment proof is inserted by the pipeline (do not invent a receipt image).`,
+    `- After completion (ask for card): include a client turn that is ONLY a card number (16 digits with spaces). Do not skip straight to payout.`,
     `- Each later stage should still have several back-and-forth messages (manager + client).`,
     `- Include EXACTLY one manager turn with text equal to depositMessage in stage "deposit".`,
     `- Include EXACTLY one manager turn with text equal to completionMessage in stage "completion" (if full).`,

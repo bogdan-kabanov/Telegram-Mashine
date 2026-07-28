@@ -1,44 +1,45 @@
 {
   "stages": {
     "greeting": [
-      { "role": "manager", "type": "text", "content": "Hola 👋 Cuéntame, ¿qué te trae por aquí?", "delayMinutes": 1 },
-      { "role": "manager", "type": "text", "content": "Puedes hablarme con confianza, estoy para ayudarte", "delayMinutes": 2 }
+      { "role": "manager", "type": "text", "content": "Hola 👋 Cuéntame, qué te trae por aquí?", "delayMinutes": 2 },
+      { "role": "manager", "type": "text", "content": "Puedes hablarme con confianza, estoy para ayudarte", "delayMinutes": 4 }
     ],
     "trust_building": [
-      { "role": "manager", "type": "text", "content": "Entiendo tu situación, de verdad lo siento mucho 💙", "delayMinutes": 3 },
-      { "role": "manager", "type": "text", "content": "Te explico cómo funciona nuestro sistema de inversión paso a paso 📊", "delayMinutes": 4 },
-      { "role": "manager", "type": "text", "content": "Primero analizamos el mercado, luego hacemos las operaciones y al final repartimos las ganancias 💰", "delayMinutes": 5 },
-      { "role": "manager", "type": "text", "content": "Muchas personas en tu misma situación ya pudieron salir adelante con esto", "delayMinutes": 6 }
+      { "role": "manager", "type": "text", "content": "Entiendo tu situación, de verdad lo siento mucho 💙", "delayMinutes": 12 },
+      { "role": "manager", "type": "text", "content": "Normalmente el proceso completo toma alrededor de una hora y media o dos, con calma, sin apresurar el mercado", "delayMinutes": 14 },
+      { "role": "manager", "type": "text", "content": "Te explico cómo funciona nuestro sistema de inversión paso a paso 📊", "delayMinutes": 16 },
+      { "role": "manager", "type": "text", "content": "Primero analizamos el mercado, luego hacemos las operaciones y al final repartimos las ganancias 💰", "delayMinutes": 18 },
+      { "role": "manager", "type": "text", "content": "Muchas personas en tu misma situación ya pudieron salir adelante con esto", "delayMinutes": 20 }
     ],
     "conditions": [
-      { "role": "manager", "type": "conditions", "content": "conditions", "delayMinutes": 7 }
+      { "role": "manager", "type": "conditions", "content": "conditions", "delayMinutes": 22 }
     ],
     "deposit": [
-      { "role": "manager", "type": "text", "content": "{{depositMessage}}", "delayMinutes": 10 }
+      { "role": "manager", "type": "text", "content": "{{depositMessage}}", "delayMinutes": 32 }
     ],
     "bet_1": [
-      { "role": "manager", "type": "bet", "content": "bet_1", "delayMinutes": 15 }
+      { "role": "manager", "type": "bet", "content": "bet_1", "delayMinutes": 48 }
     ],
     "bet_2": [
-      { "role": "manager", "type": "bet", "content": "bet_2", "delayMinutes": 25 }
+      { "role": "manager", "type": "bet", "content": "bet_2", "delayMinutes": 75 }
     ],
     "bet_3": [
-      { "role": "manager", "type": "bet", "content": "bet_3", "delayMinutes": 35 }
+      { "role": "manager", "type": "bet", "content": "bet_3", "delayMinutes": 102 }
     ],
     "completion": [
-      { "role": "manager", "type": "text", "content": "{{completionMessage}}", "delayMinutes": 45 }
+      { "role": "manager", "type": "text", "content": "{{completionMessage}}", "delayMinutes": 112 }
     ],
     "payout": [
-      { "role": "manager", "type": "receipt", "content": "receipt", "delayMinutes": 55 },
-      { "role": "manager", "type": "text", "content": "{{payoutMessage}}", "delayMinutes": 56 }
+      { "role": "manager", "type": "receipt", "content": "receipt", "delayMinutes": 118 },
+      { "role": "manager", "type": "text", "content": "{{payoutMessage}}", "delayMinutes": 119 }
     ],
     "gratitude": []
   },
   "clientReplies": {
     "greeting": ["doubt"],
-    "trust_building": ["doubt"],
-    "deposit": ["Sí, ahora lo entiendo. ¿Seguro que saldrá bien?", "Me parece bien. Tienes muy buenas condiciones."],
-    "deposit_captura": [{ "type": "captura", "content": "payment_proof", "delayMinutes": 12 }],
+    "trust_building": ["Cuánto tiempo tarda más o menos? Ella no puede esperar mucho", "doubt"],
+    "deposit": ["Sí, ahora lo entiendo. Seguro que saldrá bien?", "Me parece bien. Tienes muy buenas condiciones."],
+    "deposit_captura": [{ "type": "captura", "content": "payment_proof", "delayMinutes": 40 }],
     "bet_1": ["Estos resultados son geniales", "No me lo puedo creer"],
     "bet_2": ["Sigue así por favor", "Wow… no esperaba ver eso"],
     "bet_3": ["Esto me va a cambiar la vida", "No sé cómo agradecerte"],

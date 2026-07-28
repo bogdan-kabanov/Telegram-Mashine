@@ -4,21 +4,21 @@
     "title": "Lesión en el trabajo",
     "locale": "es-MX",
     "openingPhrase": "Hola… necesito tu ayuda de verdad",
-    "problem": "Me lesioné fuerte en el trabajo hace poco. El doctor dice que necesito tratamiento urgente y no tengo cómo pagarlo. Estoy muy asustado porque si no opero pronto puede quedar peor.",
+    "problem": "Me lesioné fuerte en el trabajo hace poco. El doctor dice que necesito tratamiento urgente y no tengo cómo pagarlo. Estoy muy asustada porque si no opero pronto puede quedar peor.",
     "motivation": "Necesito reunir el dinero para el tratamiento cuanto antes. Por eso quiero empezar a trabajar con ustedes, aunque sea con poco al inicio.",
     "photoAfterProblemIndex": 0,
     "gratitudePhrases": [
       "Este dinero será suficiente para cubrir íntegramente los gastos del tratamiento y los medicamentos",
       "Me has ayudado mucho, no sabes lo que significa para mí",
-      "Les estoy muy agradecido de verdad",
-      "Estaré encantado de volver a trabajar con ustedes",
+      "Les estoy muy agradecida de verdad",
+      "Estaré encantada de volver a trabajar con ustedes",
       "Gracias de nuevo, me salvaste"
     ],
     "doubtPhrases": [
-      "No lo entiendo del todo… ¿puedes explicármelo más despacio?",
-      "¿Seguro que esto es real? Tengo miedo de perder lo poco que me queda",
-      "Sí, ahora lo entiendo un poco mejor. ¿De verdad puede salir bien?",
-      "Me parece bien, pero aún estoy nervioso. Tienes muy buenas condiciones."
+      "No lo entiendo del todo… puedes explicármelo más despacio?",
+      "Seguro que esto es real? Tengo miedo de perder lo poco que me queda",
+      "Sí, ahora lo entiendo un poco mejor. De verdad puede salir bien?",
+      "Me parece bien, pero aún estoy nerviosa. Tienes muy buenas condiciones."
     ]
   },
   {
@@ -37,16 +37,16 @@
     ],
     "doubtPhrases": [
       "No entiendo cómo lo haces, suena demasiado bueno",
-      "¿Y si no funciona? No puedo arriesgar lo último que tengo",
+      "Y si no funciona? No puedo arriesgar lo último que tengo",
       "Estos resultados son geniales, pero aún me cuesta creerlo",
-      "Tan pronto??? ¿Es normal?"
+      "Tan pronto??? Es normal?"
     ]
   },
   {
     "id": "sick_parent",
     "title": "Padre/madre enfermo",
     "locale": "es-MX",
-    "openingPhrase": "Hola… perdona, estoy un poco desesperado",
+    "openingPhrase": "Hola… perdona, estoy un poco desesperada",
     "problem": "Mi mamá está muy enferma en el hospital. Necesita un tratamiento caro y no alcanzamos. Te mando una foto para que veas cómo está.",
     "motivation": "Solo quiero juntar lo suficiente para su tratamiento. Si de verdad se puede ganar así, quiero intentarlo.",
     "photoAfterProblemIndex": 0,
@@ -57,10 +57,10 @@
       "Gracias, de verdad. Volveré a trabajar con ustedes"
     ],
     "doubtPhrases": [
-      "Tengo miedo… ¿esto es seguro?",
-      "Nunca he hecho algo así, ¿me puedes guiar paso a paso?",
-      "¿Cuánto tiempo tarda? Ella no puede esperar mucho",
-      "Está bien, confío… pero estoy muy nervioso"
+      "Tengo miedo… esto es seguro?",
+      "Nunca he hecho algo así, me puedes guiar paso a paso?",
+      "Cuánto tiempo tarda? Ella no puede esperar mucho",
+      "Está bien, confío… pero estoy muy nerviosa"
     ]
   }
 ]

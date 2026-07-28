@@ -53,9 +53,10 @@ const ICONS = {
   chevronBack: `<svg width="10" height="18" viewBox="0 0 12 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M9.2 1.6L1.7 10l7.5 8.4" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
-  checks: `<svg width="16" height="11" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M1.5 5.5L4.5 8.5L10.5 2.5" stroke="rgba(0,140,9,0.8)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M5.5 5.5L8.5 8.5L14.5 2.5" stroke="rgba(0,140,9,0.8)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  /* Telegram read: short dash (first tick peek) + full check — not two full overlapping ✓ */
+  checks: `<svg width="15" height="10" viewBox="0 0 15 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M1.15 5.55L3.55 7.95" stroke="rgba(0,140,9,0.85)" stroke-width="1.35" stroke-linecap="round"/>
+    <path d="M4.1 5.55L6.85 8.3L13.55 1.45" stroke="rgba(0,140,9,0.85)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   signal: `<svg width="19.5" height="12" viewBox="0 0 19.5 12" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="8.5" width="3.2" height="3.5" rx="0.7" fill="currentColor"/>
@@ -63,12 +64,12 @@ const ICONS = {
     <rect x="9.6" y="3.2" width="3.2" height="8.8" rx="0.7" fill="currentColor"/>
     <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" fill="currentColor" fill-opacity="0.35"/>
   </svg>`,
-  /* iOS status-bar Wi‑Fi — filled SF Symbol wedges (not stroked Android arcs) */
-  wifi: `<svg width="15.5" height="11" viewBox="0 0 15.5 11" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path fill="currentColor" d="M7.75 8.85c.72 0 1.3.58 1.3 1.3s-.58 1.3-1.3 1.3-1.3-.58-1.3-1.3.58-1.3 1.3-1.3z"/>
-    <path fill="currentColor" d="M7.75 5.9c1.35 0 2.58.48 3.55 1.28l-.95 1.02a3.9 3.9 0 0 0-5.2 0L3.2 7.18A5.55 5.55 0 0 1 7.75 5.9z"/>
-    <path fill="currentColor" d="M7.75 3.05c2.15 0 4.1.78 5.62 2.07l-.95 1.02A6.85 6.85 0 0 0 7.75 4.5c-1.7 0-3.25.62-4.47 1.64L2.33 5.12A8.3 8.3 0 0 1 7.75 3.05z"/>
-    <path fill="currentColor" d="M7.75.2c2.95 0 5.62 1.07 7.7 2.85l-.95 1.02A10.05 10.05 0 0 0 7.75 1.65 10.05 10.05 0 0 0 1 4.07L.05 3.05A12.5 12.5 0 0 1 7.75.2z"/>
+  /* iOS status-bar Wi‑Fi — SF Symbol–like filled arcs + tip (3 rings, not Android strokes) */
+  wifi: `<svg width="16" height="11.5" viewBox="0 0 16 11.5" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="8" cy="10.35" r="1.15" fill="currentColor"/>
+    <path fill="currentColor" d="M4.55 7.55a4.9 4.9 0 0 1 6.9 0l-1.05 1.05a3.4 3.4 0 0 0-4.8 0L4.55 7.55z"/>
+    <path fill="currentColor" d="M2.05 5.05a8.4 8.4 0 0 1 11.9 0L12.9 6.1a6.9 6.9 0 0 0-9.8 0L2.05 5.05z"/>
+    <path fill="currentColor" d="M8 .45c3.35 0 6.4 1.36 8.6 3.56L15.55 5.1A10.7 10.7 0 0 0 8 1.85 10.7 10.7 0 0 0 .45 5.1L1.4 4.01A12.1 12.1 0 0 1 8 .45z"/>
   </svg>`,
   battery: `<svg width="27" height="13" viewBox="0 0 27 13" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="0.6" y="0.6" width="23" height="11.8" rx="2.6" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.4"/>
@@ -131,6 +132,12 @@ function metaHtml(msg: RenderMessage, isOutgoing: boolean, variant: "inline" | "
   return `<span class="meta meta-${variant}"><span class="time">${msg.time}</span>${checks}</span>`;
 }
 
+function bubbleTailHtml(isOutgoing: boolean, lastInGroup: boolean, bubbleColor: string): string {
+  if (!lastInGroup) return "";
+  const side = isOutgoing ? "tail-out" : "tail-in";
+  return `<span class="bubble-tail ${side}" style="color:${bubbleColor}" aria-hidden="true"></span>`;
+}
+
 function renderBubble(
   msg: RenderMessage,
   theme: ProjectTheme,
@@ -158,6 +165,8 @@ function renderBubble(
       : `<div class="avatar avatar-spacer" aria-hidden="true"></div>`
     : "";
 
+  const tail = bubbleTailHtml(isOutgoing, opts.lastInGroup, bubbleColor);
+
   if (msg.type === "sticker" && msg.imageUrl) {
     return `
     <div class="${groupClass}">
@@ -182,9 +191,10 @@ function renderBubble(
     <div class="${groupClass}">
       ${avatarSlot}
       <div class="bubble-wrap">
-        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} bubble-media" style="background:${bubbleColor}">
+        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} bubble-media" style="background:${bubbleColor};--bubble-bg:${bubbleColor}">
           ${media}
           ${metaHtml(msg, isOutgoing, "overlay")}
+          ${tail}
         </div>
       </div>
     </div>
@@ -196,8 +206,9 @@ function renderBubble(
     <div class="${groupClass}">
       ${avatarSlot}
       <div class="bubble-wrap">
-        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"}" style="background:${bubbleColor}">
+        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"}" style="background:${bubbleColor};--bubble-bg:${bubbleColor}">
           <div class="text">${formatChatTextHtml(msg.content)}${metaHtml(msg, isOutgoing, "inline")}</div>
+          ${tail}
         </div>
       </div>
     </div>
@@ -453,7 +464,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       max-width: none;
       object-fit: cover;
       object-position: center;
-      filter: blur(24px) saturate(175%) brightness(1.06);
+      filter: blur(24px) saturate(120%) brightness(1.12);
       transform: scale(1.14);
       transform-origin: center center;
       pointer-events: none;
@@ -461,8 +472,8 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .glass-frost--fallback {
       inset: -30%;
-      background: linear-gradient(180deg, #7eb4c9 0%, #4a8fa8 100%);
-      filter: blur(22px) saturate(160%);
+      background: linear-gradient(180deg, #e8eef1 0%, #d5dee3 100%);
+      filter: blur(22px) saturate(110%);
     }
     .glass-tint {
       position: absolute;
@@ -470,7 +481,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       z-index: 1;
       border-radius: inherit;
       pointer-events: none;
-      background: rgba(255, 255, 255, 0.4);
+      /* White frosted glass — avoid blue cast from teal wallpapers */
+      background: rgba(255, 255, 255, 0.72);
     }
     .nav-glass > :not(.glass-frost):not(.glass-tint),
     .glass-circle > :not(.glass-frost):not(.glass-tint),
@@ -583,7 +595,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       justify-self: end;
       position: relative;
       /* Thick glass ring like Telegram avatar chrome */
-      border: 2.5px solid rgba(200, 230, 245, 0.92);
+      border: 2.5px solid rgba(255, 255, 255, 0.88);
       box-sizing: border-box;
       box-shadow:
         0 0 0 0.5px rgba(255, 255, 255, 0.35) inset,
@@ -725,14 +737,47 @@ export function buildChatHtml(params: RenderChatParams): string {
     .bubble-out {
       border-radius: 16px;
     }
-    /* Telegram corners: main 16, merge 8, tail 4
-       group-mid = not first → top merge; group-continued = not last → bottom merge */
-    .incoming.group-mid .bubble-in { border-top-left-radius: 8px; }
-    .incoming.group-continued .bubble-in { border-bottom-left-radius: 8px; }
-    .incoming.group-last .bubble-in { border-bottom-left-radius: 4px; }
-    .outgoing.group-mid .bubble-out { border-top-right-radius: 8px; }
-    .outgoing.group-continued .bubble-out { border-bottom-right-radius: 8px; }
-    .outgoing.group-last .bubble-out { border-bottom-right-radius: 4px; }
+    /* Telegram corners: main 16, merge 10, sharp only when no CSS tail on last */
+    .incoming.group-mid .bubble-in { border-top-left-radius: 10px; }
+    .incoming.group-continued .bubble-in { border-bottom-left-radius: 16px; }
+    .incoming.group-last .bubble-in { border-bottom-left-radius: 16px; }
+    .outgoing.group-mid .bubble-out { border-top-right-radius: 10px; }
+    .outgoing.group-continued .bubble-out { border-bottom-right-radius: 16px; }
+    .outgoing.group-last .bubble-out { border-bottom-right-radius: 16px; }
+    /* Real bubble tail — only on last message in a consecutive group */
+    .bubble-tail {
+      position: absolute;
+      bottom: 0;
+      width: 9px;
+      height: 17px;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .bubble-tail::before {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      width: 18px;
+      height: 18px;
+      background: var(--bubble-bg, currentColor);
+      border-radius: 0 0 0 14px;
+    }
+    .bubble-tail.tail-out {
+      right: -7px;
+    }
+    .bubble-tail.tail-out::before {
+      right: 2px;
+      transform: scaleX(-1);
+      border-radius: 0 0 0 14px;
+    }
+    .bubble-tail.tail-in {
+      left: -7px;
+    }
+    .bubble-tail.tail-in::before {
+      left: 2px;
+      border-radius: 0 0 14px 0;
+    }
     .text {
       font-size: 17px;
       font-weight: 400;
@@ -779,9 +824,10 @@ export function buildChatHtml(params: RenderChatParams): string {
       display: inline-flex;
       align-items: center;
       gap: 3px;
-      padding: 2px 6px 2px 7px;
-      border-radius: 10px;
-      background: rgba(0,0,0,0.28);
+      padding: 1px 4px 1px 5px;
+      border-radius: 8px;
+      /* Soft shadow instead of opaque plate */
+      background: rgba(0, 0, 0, 0.18);
       line-height: 1;
       z-index: 1;
     }
@@ -790,7 +836,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       font-weight: 400;
       color: rgba(255,255,255,0.95);
       letter-spacing: 0;
-      text-shadow: none;
+      text-shadow: 0 0.5px 1.5px rgba(0,0,0,0.55);
     }
     .checks {
       display: inline-flex;
@@ -799,6 +845,37 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .checks svg { display: block; }
     .meta-overlay .checks path { stroke: #fff; }
+    /* Telegram spoiler — animated secret blot over card / CLABE digits */
+    .tg-spoiler {
+      position: relative;
+      display: inline;
+      border-radius: 4px;
+      padding: 1px 3px;
+      color: transparent !important;
+      -webkit-text-fill-color: transparent;
+      background-color: rgba(118, 118, 128, 0.92);
+      background-image:
+        radial-gradient(circle at 15% 30%, rgba(255,255,255,0.45) 0 0.9px, transparent 1.2px),
+        radial-gradient(circle at 55% 70%, rgba(255,255,255,0.35) 0 0.8px, transparent 1.1px),
+        radial-gradient(circle at 80% 25%, rgba(0,0,0,0.35) 0 0.9px, transparent 1.2px),
+        radial-gradient(circle at 35% 85%, rgba(255,255,255,0.3) 0 0.7px, transparent 1px),
+        linear-gradient(
+          105deg,
+          rgba(90, 90, 100, 0.95) 0%,
+          rgba(160, 160, 170, 0.85) 40%,
+          rgba(100, 100, 110, 0.95) 70%,
+          rgba(140, 140, 150, 0.9) 100%
+        );
+      background-size: 12px 12px, 10px 10px, 14px 14px, 11px 11px, 240% 100%;
+      background-blend-mode: soft-light, soft-light, multiply, soft-light, normal;
+      animation: tg-spoiler-shimmer 2.2s linear infinite;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+    @keyframes tg-spoiler-shimmer {
+      0% { background-position: 0 0, 0 0, 0 0, 0 0, 100% 0; }
+      100% { background-position: 12px 8px, -8px 6px, 10px -6px, -6px 10px, -100% 0; }
+    }
     .image-placeholder {
       background: rgba(0,0,0,0.06);
       border-radius: 12px;
@@ -833,24 +910,33 @@ export function buildChatHtml(params: RenderChatParams): string {
       max-height: 340px;
     }
     .bubble-media {
-      padding: 2px 2px 22px 2px !important;
+      padding: 2px !important;
       background: transparent !important;
       box-shadow: 0 1px 0.5px rgba(0,0,0,0.13) !important;
-      overflow: hidden;
+      overflow: visible;
       border-radius: 16px;
       line-height: 0;
       position: relative;
     }
-    .incoming.group-mid .bubble-media { border-top-left-radius: 8px; }
-    .incoming.group-continued .bubble-media { border-bottom-left-radius: 8px; }
-    .incoming.group-last .bubble-media { border-bottom-left-radius: 4px; }
-    .outgoing.group-mid .bubble-media { border-top-right-radius: 8px; }
-    .outgoing.group-continued .bubble-media { border-bottom-right-radius: 8px; }
-    .outgoing.group-last .bubble-media { border-bottom-right-radius: 4px; }
-    .bubble-media .bubble-image { border-radius: inherit; margin: 0; }
+    .incoming.group-mid .bubble-media { border-top-left-radius: 10px; }
+    .incoming.group-continued .bubble-media { border-bottom-left-radius: 16px; }
+    .incoming.group-last .bubble-media { border-bottom-left-radius: 16px; }
+    .outgoing.group-mid .bubble-media { border-top-right-radius: 10px; }
+    .outgoing.group-continued .bubble-media { border-bottom-right-radius: 16px; }
+    .outgoing.group-last .bubble-media { border-bottom-right-radius: 16px; }
+    .bubble-media .bubble-image {
+      border-radius: inherit;
+      margin: 0;
+      display: block;
+    }
+    /* Clip media to bubble radius while letting the tail stick out */
+    .bubble-media > .bubble-image,
+    .bubble-media > .image-placeholder {
+      border-radius: inherit;
+    }
     .bubble-media .meta-overlay {
-      bottom: 4px;
-      right: 6px;
+      bottom: 8px;
+      right: 8px;
     }
     .sticker-wrap {
       position: relative;

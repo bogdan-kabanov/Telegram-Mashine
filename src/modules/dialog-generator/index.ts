@@ -10,6 +10,10 @@ import {
   generateClabe,
   injectTemplate,
 } from "@/lib/format";
+import {
+  generateClientCardNumber,
+  stripInvertedPunctuation,
+} from "@/lib/format/spanish-chat";
 import { resolveLocaleProfileFromConfig } from "@/lib/i18n/locale-profile";
 import {
   generateFullDialogBundle,
@@ -105,18 +109,22 @@ const STAGE_ORDER = [
   "gratitude",
 ] as const;
 
-const STAGE_DELAY: Record<string, number> = {
-  greeting: 1,
-  trust_building: 3,
-  conditions: 5,
-  deposit: 8,
-  bet_1: 15,
-  bet_2: 25,
-  bet_3: 35,
-  completion: 45,
-  payout: 55,
-  gratitude: 58,
-};
+const STAGE_DELAY = {
+  greeting: 2,
+  trust_building: 12,
+  conditions: 22,
+  deposit: 32,
+  bet_1: 48,
+  bet_2: 75,
+  bet_3: 102,
+  completion: 112,
+  payout: 118,
+  gratitude: 122,
+} as const satisfies Record<string, number>;
+
+function stageDelay(stage: string): number {
+  return STAGE_DELAY[stage as keyof typeof STAGE_DELAY] ?? 10;
+}
 
 function pickRandom<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
@@ -198,7 +206,7 @@ export class DialogGenerator {
       id: randomUUID(),
       role: stage.role,
       type: stage.type as MessageType,
-      content: finalContent,
+      content: stripInvertedPunctuation(finalContent),
       delayMinutes: stage.delayMinutes,
     });
   }
@@ -233,6 +241,9 @@ export class DialogGenerator {
       const fixed = this.resolveAiTurnText(content, legend);
       if (fixed == null) return;
       content = fixed;
+    }
+    if (msg.type === "text") {
+      content = stripInvertedPunctuation(content);
     }
     messages.push(
       dialogMessageSchema.parse({
@@ -375,7 +386,7 @@ export class DialogGenerator {
     for (const stageName of stagesToUse) {
       if (stageName === "greeting" || stageName === "trust_building") continue;
 
-      const baseDelay = STAGE_DELAY[stageName] ?? 10;
+      const baseDelay = stageDelay(stageName);
       const stageTurns = turnsByStage.get(stageName) ?? [];
 
       if (stageName === "conditions") {
@@ -406,37 +417,39 @@ export class DialogGenerator {
       }
 
       if (stageName === "deposit") {
-        let injectedDeposit = false;
+        push({
+          role: "manager",
+          type: "text",
+          content: params.depositMessage,
+          delayMinutes: baseDelay,
+        });
+        // Client reacts / asks if it will work (skip duplicate deposit template turns)
+        let clientSpoke = false;
         for (const turn of stageTurns) {
-          const isDepositTpl =
-            turn.role === "manager" &&
-            (turn.text.includes(params.depositMessage.slice(0, 20)) ||
-              turn.text === params.depositMessage);
-          if (isDepositTpl) {
-            push({
-              role: turn.role,
-              type: "text",
-              content: params.depositMessage,
-              delayMinutes: baseDelay,
-            });
-            injectedDeposit = true;
-          } else {
-            pushTurn(turn.role, turn.text, baseDelay);
-          }
+          if (turn.role !== "client") continue;
+          pushTurn(turn.role, turn.text, baseDelay + 2);
+          clientSpoke = true;
         }
-        if (!injectedDeposit) {
+        if (!clientSpoke) {
           push({
-            role: "manager",
+            role: "client",
             type: "text",
-            content: params.depositMessage,
-            delayMinutes: baseDelay,
+            content: pickRandom(bundle.legend.doubtPhrases),
+            delayMinutes: baseDelay + 2,
           });
         }
+        // Manager answers before the payment proof arrives
+        push({
+          role: "manager",
+          type: "text",
+          content: "Sí, confía. Si sigues los pasos, todo va a salir bien 💙",
+          delayMinutes: baseDelay + 4,
+        });
         push({
           role: "client",
           type: "captura",
           content: "payment_proof",
-          delayMinutes: baseDelay + 2,
+          delayMinutes: baseDelay + 8,
         });
         continue;
       }
@@ -483,6 +496,8 @@ export class DialogGenerator {
               delayMinutes: baseDelay,
             });
             injected = true;
+          } else if (turn.role === "client") {
+            pushTurn(turn.role, turn.text, baseDelay + 1);
           } else {
             pushTurn(turn.role, turn.text, baseDelay);
           }
@@ -495,6 +510,13 @@ export class DialogGenerator {
             delayMinutes: baseDelay,
           });
         }
+        // Client sends card before we pay out
+        push({
+          role: "client",
+          type: "text",
+          content: generateClientCardNumber(),
+          delayMinutes: baseDelay + 3,
+        });
         continue;
       }
 
@@ -597,6 +619,17 @@ export class DialogGenerator {
 
       if (stageName === "deposit") {
         const capturaSteps = managerScript.clientReplies.deposit_captura;
+        const lastDelay =
+          messages.at(-1)?.delayMinutes ??
+          stageMessages.at(-1)?.delayMinutes ??
+          STAGE_DELAY.deposit ??
+          32;
+        push({
+          role: "manager",
+          type: "text",
+          content: "Sí, confía. Si sigues los pasos, todo va a salir bien 💙",
+          delayMinutes: lastDelay + 2,
+        });
         if (Array.isArray(capturaSteps)) {
           for (const step of capturaSteps) {
             if (typeof step === "object" && "type" in step) {
@@ -609,6 +642,16 @@ export class DialogGenerator {
             }
           }
         }
+      }
+
+      if (stageName === "completion") {
+        const lastDelay = messages.at(-1)?.delayMinutes ?? STAGE_DELAY.completion ?? 112;
+        push({
+          role: "client",
+          type: "text",
+          content: generateClientCardNumber(),
+          delayMinutes: lastDelay + 2,
+        });
       }
     };
 
@@ -674,7 +717,7 @@ export class DialogGenerator {
         role: "client",
         type: "text",
         content: extraThanks,
-        delayMinutes: 58,
+        delayMinutes: 122,
       });
     }
 
@@ -808,7 +851,7 @@ export class DialogGenerator {
           payoutMessage,
           seedLegend: {
             title: seedLegend.title,
-            openingPhrase: seedLegend.openingPhrase,
+            openingPhrase: seedLegend.openingPhrase ?? "Hola… necesito tu ayuda",
             problem: seedLegend.problem,
             motivation: seedLegend.motivation,
             doubtPhrases: seedLegend.doubtPhrases,

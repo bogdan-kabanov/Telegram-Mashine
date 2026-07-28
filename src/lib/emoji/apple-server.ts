@@ -64,6 +64,27 @@ export function appleEmojiImgHtml(emoji: string): string {
   return `<img class="apple-emoji" src="${src}" alt="${alt}" draggable="false" />`;
 }
 
+/**
+ * Wrap long digit runs (CLABE / card / account) in Telegram spoiler markup.
+ * Also honors explicit ||spoiler|| markers from templates.
+ */
+function applyTelegramSpoilers(escapedHtml: string): string {
+  const parts = escapedHtml.split(/(\|\|[\s\S]+?\|\|)/g);
+  return parts
+    .map((part) => {
+      if (part.startsWith("||") && part.endsWith("||") && part.length >= 4) {
+        return `<span class="tg-spoiler" data-spoiler="1">${part.slice(2, -2)}</span>`;
+      }
+      // 10+ digit account/CLABE/card runs (spaces allowed between digits)
+      return part.replace(/\d(?:[\d\s]{8,}\d)/g, (match) => {
+        const digits = match.replace(/\s/g, "");
+        if (digits.length < 10) return match;
+        return `<span class="tg-spoiler" data-spoiler="1">${match}</span>`;
+      });
+    })
+    .join("");
+}
+
 /** Escape text for HTML, keep newlines as <br>, swap emoji for Apple PNGs. */
 export function formatChatTextHtml(text: string): string {
   const escaped = text
@@ -73,7 +94,8 @@ export function formatChatTextHtml(text: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-  const withEmoji = escaped.replace(EMOJI_RE, (match) => appleEmojiImgHtml(match));
+  const withSpoilers = applyTelegramSpoilers(escaped);
+  const withEmoji = withSpoilers.replace(EMOJI_RE, (match) => appleEmojiImgHtml(match));
   return withEmoji.replace(/\n/g, "<br>");
 }
 
