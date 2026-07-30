@@ -46,9 +46,10 @@ const ICONS = {
   chevronBack: `<svg width="10" height="18" viewBox="0 0 12 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M9.2 1.6L1.7 10l7.5 8.4" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
-  /* Official Telegram Web 2checks.svg — same geometry as Telegram iOS */
-  checks: `<svg width="15" height="11" viewBox="0 0 19 14" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path fill="#4FAE4E" fill-rule="nonzero" d="M4.96833846,10.0490996 L11.5108251,2.571972 C11.7472185,2.30180819 12.1578642,2.27443181 12.428028,2.51082515 C12.6711754,2.72357915 12.717665,3.07747757 12.5522007,3.34307913 L12.4891749,3.428028 L5.48917485,11.428028 C5.2663359,11.6827011 4.89144111,11.7199091 4.62486888,11.5309823 L4.54038059,11.4596194 L1.54038059,8.45961941 C1.2865398,8.20577862 1.2865398,7.79422138 1.54038059,7.54038059 C1.7688373,7.31192388 2.12504434,7.28907821 2.37905111,7.47184358 L2.45961941,7.54038059 L4.96833846,10.0490996 Z M9.96833846,10.0490996 L16.5108251,2.571972 C16.7472185,2.30180819 17.1578642,2.27443181 17.428028,2.51082515 C17.6711754,2.72357915 17.717665,3.07747757 17.5522007,3.34307913 L17.4891749,3.428028 L10.4891749,11.428028 C10.2663359,11.6827011 9.89144111,11.7199091 9.62486888,11.5309823 L9.54038059,11.4596194 L8.54038059,10.4596194 C8.2865398,10.2057786 8.2865398,9.79422138 8.54038059,9.54038059 C8.7688373,9.31192388 9.12504434,9.28907821 9.37905111,9.47184358 L9.45961941,9.54038059 L9.96833846,10.0490996 Z"/>
+  /* Telegram iOS read receipts — short peek + full check (not WhatsApp double-V) */
+  checks: `<svg width="16" height="10" viewBox="0 0 16 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M1.2 5.55L3.65 8.0" stroke="#4FAE4E" stroke-width="1.45" stroke-linecap="round"/>
+    <path d="M4.55 5.45L7.35 8.25L14.75 1.5" stroke="#4FAE4E" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   signal: `<svg width="19.5" height="12" viewBox="0 0 19.5 12" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="8.5" width="3.2" height="3.5" rx="0.7" fill="currentColor"/>
@@ -130,8 +131,12 @@ function metaHtml(msg: RenderMessage, isOutgoing: boolean, variant: "inline" | "
 
 function bubbleTailHtml(isOutgoing: boolean, lastInGroup: boolean, bubbleColor: string): string {
   if (!lastInGroup) return "";
+  /* Telegram iOS ear — organic curve to bottom tip, flush with bubble */
+  const path = isOutgoing
+    ? "M0 0v17h1c3.2-1.8 5.8-5.2 7.2-9.8C9.2 4.2 9.5 1.8 9.5 0H0z"
+    : "M11 0v17h-1c-3.2-1.8-5.8-5.2-7.2-9.8C1.8 4.2 1.5 1.8 1.5 0H11z";
   const side = isOutgoing ? "tail-out" : "tail-in";
-  return `<span class="bubble-tail ${side}" style="color:${bubbleColor}" aria-hidden="true"></span>`;
+  return `<span class="bubble-tail ${side}" style="color:${bubbleColor}" aria-hidden="true"><svg width="10" height="17" viewBox="0 0 11 17" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="${path}"/></svg></span>`;
 }
 
 function renderBubble(
@@ -792,46 +797,34 @@ export function buildChatHtml(params: RenderChatParams): string {
     .bubble-out {
       border-radius: 16px;
     }
-    /* Telegram corners: main 16, merge 10, sharp only when no CSS tail on last */
+    /* Telegram corners: main 16, merge 10; last bubble sharpens the ear corner */
     .incoming.group-mid .bubble-in { border-top-left-radius: 10px; }
     .incoming.group-continued .bubble-in { border-bottom-left-radius: 16px; }
-    .incoming.group-last .bubble-in { border-bottom-left-radius: 16px; }
+    .incoming.group-last .bubble-in { border-bottom-left-radius: 3px; }
     .outgoing.group-mid .bubble-out { border-top-right-radius: 10px; }
     .outgoing.group-continued .bubble-out { border-bottom-right-radius: 16px; }
-    .outgoing.group-last .bubble-out { border-bottom-right-radius: 16px; }
-    /* Real bubble tail — only on last message in a consecutive group */
+    .outgoing.group-last .bubble-out { border-bottom-right-radius: 3px; }
+    /* Real Telegram ear — SVG, only on last in group */
     .bubble-tail {
       position: absolute;
       bottom: 0;
-      width: 9px;
+      width: 10px;
       height: 17px;
       pointer-events: none;
       z-index: 0;
-      overflow: hidden;
+      line-height: 0;
+      overflow: visible;
     }
-    .bubble-tail::before {
-      content: "";
-      position: absolute;
-      bottom: 0;
-      width: 18px;
-      height: 18px;
-      background: var(--bubble-bg, currentColor);
-      border-radius: 0 0 0 14px;
+    .bubble-tail svg {
+      display: block;
+      width: 10px;
+      height: 17px;
     }
     .bubble-tail.tail-out {
-      right: -7px;
-    }
-    .bubble-tail.tail-out::before {
-      right: 2px;
-      transform: scaleX(-1);
-      border-radius: 0 0 0 14px;
+      right: -8px;
     }
     .bubble-tail.tail-in {
-      left: -7px;
-    }
-    .bubble-tail.tail-in::before {
-      left: 2px;
-      border-radius: 0 0 14px 0;
+      left: -8px;
     }
     .text {
       font-size: 17px;
@@ -899,7 +892,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       line-height: 0;
     }
     .checks svg { display: block; }
-    .meta-overlay .checks path { fill: #fff; }
+    .meta-overlay .checks path { stroke: #fff; }
     /* Telegram spoiler — animated secret blot over card / CLABE digits */
     .tg-spoiler {
       position: relative;
