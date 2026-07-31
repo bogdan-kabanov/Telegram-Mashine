@@ -2,10 +2,21 @@
 set -eu
 
 APP_DIR="/opt/bot-ai"
-DOMAIN="${DEPLOY_DOMAIN:-95-142-47-131.sslip.io}"
+DOMAIN="${DEPLOY_DOMAIN:-80-78-248-96.sslip.io}"
 APP_URL="https://${DOMAIN}"
 
 export DEBIAN_FRONTEND=noninteractive
+
+echo "==> Prefer IPv4 (Telegram AAAA often broken on VPS)"
+if ! grep -q 'precedence ::ffff:0:0/96  100' /etc/gai.conf 2>/dev/null; then
+  echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
+fi
+cat > /etc/sysctl.d/99-disable-ipv6.conf <<'EOF'
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+EOF
+sysctl --system >/dev/null 2>&1 || true
 
 echo "==> Installing packages"
 apt-get update -qq
@@ -45,7 +56,7 @@ echo "==> Nginx config"
 cat > /etc/nginx/sites-available/bot-ai <<NGINX
 server {
     listen 80;
-    server_name ${DOMAIN} 95.142.47.131;
+    server_name ${DOMAIN} 80.78.248.96;
 
     client_max_body_size 50m;
 

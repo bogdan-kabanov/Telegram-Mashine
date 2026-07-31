@@ -6,9 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 c = paramiko.SSHClient()
 c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 try:
-    c.connect("95.142.47.131", username="root", key_filename=str(KEY), timeout=30)
+    c.connect("80.78.248.96", username="root", key_filename=str(KEY), timeout=30)
 except Exception:
-    c.connect("95.142.47.131", username="root", password=os.environ.get("DEPLOY_SSH_PASSWORD", "") or None, timeout=30)
+    c.connect("80.78.248.96", username="root", password=os.environ.get("DEPLOY_SSH_PASSWORD", "") or None, timeout=30)
 
 sftp = c.open_sftp()
 sftp.put(str(ROOT / "docker-compose.yml"), "/opt/bot-ai/docker-compose.yml")
@@ -22,14 +22,14 @@ cmds = [
     """bash -lc 'cat > /etc/nginx/sites-available/bot-ai <<\"NGINX\"
 server {
     listen 80;
-    server_name 95-142-47-131.sslip.io 95.142.47.131;
+    server_name 80-78-248-96.sslip.io 80.78.248.96;
     return 301 https://\\$host\\$request_uri;
 }
 server {
     listen 443 ssl;
-    server_name 95-142-47-131.sslip.io 95.142.47.131;
-    ssl_certificate /etc/letsencrypt/live/95-142-47-131.sslip.io/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/95-142-47-131.sslip.io/privkey.pem;
+    server_name 80-78-248-96.sslip.io 80.78.248.96;
+    ssl_certificate /etc/letsencrypt/live/80-78-248-96.sslip.io/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/80-78-248-96.sslip.io/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
     client_max_body_size 50m;
@@ -47,8 +47,8 @@ NGINX
 ln -sf /etc/nginx/sites-available/bot-ai /etc/nginx/sites-enabled/bot-ai
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx'""",
-    "curl -s https://95-142-47-131.sslip.io/api/health",
-    "curl -s -X POST https://95-142-47-131.sslip.io/api/telegram/setup",
+    "curl -s https://80-78-248-96.sslip.io/api/health",
+    "curl -s -X POST https://80-78-248-96.sslip.io/api/telegram/setup",
     'curl -s -X POST http://127.0.0.1:3000/api/admin/control -H "Content-Type: application/json" -d \'{"action":"start"}\'',
     "cd /opt/bot-ai && docker compose ps",
 ]

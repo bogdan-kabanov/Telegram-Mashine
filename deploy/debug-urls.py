@@ -6,7 +6,7 @@ import paramiko
 c = paramiko.SSHClient()
 c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 c.connect(
-    "95.142.47.131",
+    "80.78.248.96",
     username="root",
     key_filename=str(Path(os.environ["USERPROFILE"]) / ".ssh" / "id_ed25519"),
 )

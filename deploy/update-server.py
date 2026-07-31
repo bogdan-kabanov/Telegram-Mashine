@@ -10,7 +10,7 @@ from pathlib import Path
 
 import paramiko
 
-HOST = "95.142.47.131"
+HOST = "80.78.248.96"
 USER = "root"
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
 REMOTE_DIR = "/opt/bot-ai"
@@ -156,9 +156,9 @@ def main() -> int:
         f"cd {REMOTE_DIR} && grep -q AUTO_SETUP_WEBHOOK .env || echo AUTO_SETUP_WEBHOOK=0 >> .env",
         f"chmod +x {REMOTE_DIR}/deploy/remote-update.sh",
         f"cd {REMOTE_DIR} && bash deploy/remote-update.sh",
-        "curl -s -o /dev/null -w 'admin:%{http_code}\\n' https://95-142-47-131.sslip.io/admin",
-        "curl -s -o /dev/null -w 'media:%{http_code}\\n' https://95-142-47-131.sslip.io/admin/media",
-        "curl -s -o /dev/null -w 'legends:%{http_code}\\n' https://95-142-47-131.sslip.io/admin/settings",
+        "curl -s -o /dev/null -w 'admin:%{http_code}\\n' https://80-78-248-96.sslip.io/admin",
+        "curl -s -o /dev/null -w 'media:%{http_code}\\n' https://80-78-248-96.sslip.io/admin/media",
+        "curl -s -o /dev/null -w 'legends:%{http_code}\\n' https://80-78-248-96.sslip.io/admin/settings",
     ]
 
     for cmd in cmds:
@@ -170,7 +170,7 @@ def main() -> int:
 
     client.close()
     archive.unlink(missing_ok=True)
-    print("\nDone: https://95-142-47-131.sslip.io/admin")
+    print("\nDone: https://80-78-248-96.sslip.io/admin")
     return 0
 
 

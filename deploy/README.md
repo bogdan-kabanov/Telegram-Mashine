@@ -1,6 +1,6 @@
 # Deploy & CI/CD
 
-Production: `https://95-142-47-131.sslip.io/admin`  
+Production: `https://80-78-248-96.sslip.io/admin`  
 Server path: `/opt/bot-ai` · Docker Compose + Nginx + Let’s Encrypt
 
 ## Local one-shot deploy
@@ -35,7 +35,7 @@ Settings → Secrets and variables → Actions:
 
 | Secret | Example |
 |--------|---------|
-| `DEPLOY_HOST` | `95.142.47.131` |
+| `DEPLOY_HOST` | `80.78.248.96` |
 | `DEPLOY_USER` | `root` |
 | `DEPLOY_SSH_KEY` | private key PEM (`-----BEGIN OPENSSH PRIVATE KEY-----` …) |
 | `DEPLOY_SSH_PORT` | `22` (optional) |
@@ -58,7 +58,7 @@ Or manually in GitHub → Settings → Secrets → Actions:
 
 | Secret | Value |
 |--------|--------|
-| `DEPLOY_HOST` | `95.142.47.131` |
+| `DEPLOY_HOST` | `80.78.248.96` |
 | `DEPLOY_USER` | `root` |
 | `DEPLOY_SSH_KEY` | contents of `~/.ssh/github_actions_bot_ai` (private key) |
 

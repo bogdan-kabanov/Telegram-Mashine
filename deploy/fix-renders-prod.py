@@ -9,7 +9,7 @@ from pathlib import Path
 
 import paramiko
 
-HOST = "95.142.47.131"
+HOST = "80.78.248.96"
 USER = "root"
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
 REMOTE = "/opt/bot-ai"
@@ -70,14 +70,14 @@ run(c, f"cd {REMOTE} && tar -xzf /tmp/renders-fix.tar.gz && rm -f /tmp/renders-f
 nginx = r'''bash -lc 'cat > /etc/nginx/sites-available/bot-ai <<'"'"'NGINX'"'"'
 server {
     listen 80;
-    server_name 95-142-47-131.sslip.io 95.142.47.131;
+    server_name 80-78-248-96.sslip.io 80.78.248.96;
     return 301 https://$host$request_uri;
 }
 server {
     listen 443 ssl;
-    server_name 95-142-47-131.sslip.io 95.142.47.131;
-    ssl_certificate /etc/letsencrypt/live/95-142-47-131.sslip.io/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/95-142-47-131.sslip.io/privkey.pem;
+    server_name 80-78-248-96.sslip.io 80.78.248.96;
+    ssl_certificate /etc/letsencrypt/live/80-78-248-96.sslip.io/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/80-78-248-96.sslip.io/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
     client_max_body_size 50m;
@@ -116,8 +116,8 @@ run(c, f"chown -R 1000:1000 {REMOTE}/public/renders {REMOTE}/data")
 run(c, f"cd {REMOTE} && docker compose build 2>&1 | tail -n 30")
 run(c, f"cd {REMOTE} && docker compose up -d")
 run(c, "sleep 18 && curl -sI http://127.0.0.1:3000/renders/c1919968-3ff1-4fa8-a593-4b0bbf1902ed_screen_1.png | head -12")
-run(c, "curl -sI https://95-142-47-131.sslip.io/renders/c1919968-3ff1-4fa8-a593-4b0bbf1902ed_screen_1.png | head -12")
-run(c, "curl -s -o /dev/null -w 'admin:%{http_code}\\n' https://95-142-47-131.sslip.io/admin/projects")
+run(c, "curl -sI https://80-78-248-96.sslip.io/renders/c1919968-3ff1-4fa8-a593-4b0bbf1902ed_screen_1.png | head -12")
+run(c, "curl -s -o /dev/null -w 'admin:%{http_code}\\n' https://80-78-248-96.sslip.io/admin/projects")
 run(c, f"cd {REMOTE} && docker compose ps")
 c.close()
 print("\nFixed renders serving")

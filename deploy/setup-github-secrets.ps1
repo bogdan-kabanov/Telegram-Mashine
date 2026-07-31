@@ -2,7 +2,7 @@
 # Sets Actions secrets for Deploy workflow from local deploy key.
 
 $ErrorActionPreference = "Stop"
-$hostName = "95.142.47.131"
+$hostName = "80.78.248.96"
 $user = "root"
 $keyPath = Join-Path $env:USERPROFILE ".ssh\github_actions_bot_ai"
 

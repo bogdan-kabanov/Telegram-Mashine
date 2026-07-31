@@ -12,7 +12,7 @@ from pathlib import Path
 
 import paramiko
 
-HOST = "95.142.47.131"
+HOST = "80.78.248.96"
 USER = "root"
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
 REMOTE_DIR = "/opt/bot-ai"
@@ -82,7 +82,7 @@ def load_local_env() -> dict[str, str]:
     values: dict[str, str] = {}
     if not env_path.exists():
         return values
-    for line in env_path.read_text(encoding="utf-8").splitlines():
+    for line in env_path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -92,22 +92,31 @@ def load_local_env() -> dict[str, str]:
 
 
 def ensure_ssh_key(client: paramiko.SSHClient) -> None:
-    pub = Path(os.environ.get("USERPROFILE", "")) / ".ssh" / "id_ed25519.pub"
-    if not pub.exists():
-        pub = Path(os.environ.get("USERPROFILE", "")) / ".ssh" / "id_rsa.pub"
-    if not pub.exists():
+    ssh_dir = Path(os.environ.get("USERPROFILE", "")) / ".ssh"
+    pubs = [
+        ssh_dir / "id_ed25519.pub",
+        ssh_dir / "id_rsa.pub",
+        ssh_dir / "github_actions_bot_ai.pub",
+    ]
+    installed = 0
+    for pub in pubs:
+        if not pub.exists():
+            continue
+        pubkey = pub.read_text(encoding="utf-8").strip()
+        if not pubkey or "\n" in pubkey or "'" in pubkey:
+            continue
+        cmd = (
+            "mkdir -p ~/.ssh && chmod 700 ~/.ssh && "
+            f"grep -qxF '{pubkey}' ~/.ssh/authorized_keys 2>/dev/null || "
+            f"echo '{pubkey}' >> ~/.ssh/authorized_keys && "
+            "chmod 600 ~/.ssh/authorized_keys"
+        )
+        stdin, stdout, stderr = client.exec_command(cmd)
+        stdout.channel.recv_exit_status()
+        installed += 1
+        print(f"SSH public key installed: {pub.name}")
+    if not installed:
         print("No local SSH public key found, skipping key install")
-        return
-    pubkey = pub.read_text(encoding="utf-8").strip()
-    cmd = (
-        "mkdir -p ~/.ssh && chmod 700 ~/.ssh && "
-        f"grep -qxF '{pubkey}' ~/.ssh/authorized_keys 2>/dev/null || "
-        f"echo '{pubkey}' >> ~/.ssh/authorized_keys && "
-        "chmod 600 ~/.ssh/authorized_keys"
-    )
-    stdin, stdout, stderr = client.exec_command(cmd)
-    stdout.channel.recv_exit_status()
-    print("SSH public key installed on server")
 
 
 def run(client: paramiko.SSHClient, cmd: str, timeout: int = 3600) -> int:
@@ -144,7 +153,7 @@ def main() -> int:
             f"cd {REMOTE_DIR} && tar -xzf {remote_archive} && rm -f {remote_archive}",
         )
 
-        domain = "95-142-47-131.sslip.io"
+        domain = "80-78-248-96.sslip.io"
         env_content = f"""NODE_ENV=production
 TELEGRAM_BOT_TOKEN={local_env.get('TELEGRAM_BOT_TOKEN', '')}
 TELEGRAM_WEBHOOK_SECRET={local_env.get('TELEGRAM_WEBHOOK_SECRET', '')}
@@ -154,6 +163,11 @@ APP_URL=https://{domain}
 PORT=3000
 OPENAI_API_KEY={local_env.get('OPENAI_API_KEY', '')}
 OPENAI_MODEL={local_env.get('OPENAI_MODEL', 'gpt-4o-mini')}
+AI_CLIENT_PHOTOS={local_env.get('AI_CLIENT_PHOTOS', 'fallback')}
+OPENAI_IMAGE_MODEL={local_env.get('OPENAI_IMAGE_MODEL', 'gpt-image-1')}
+AI_RECEIPTS={local_env.get('AI_RECEIPTS', 'fallback')}
+OPENAI_RECEIPT_IMAGE_MODEL={local_env.get('OPENAI_RECEIPT_IMAGE_MODEL', 'gpt-image-1')}
+AI_MEDIA={local_env.get('AI_MEDIA', 'fallback')}
 DATA_DIR=/app/data
 CONFIG_DIR=/app/config
 AUTO_SETUP_WEBHOOK=1
@@ -168,7 +182,7 @@ AUTO_SETUP_WEBHOOK=1
     run(client, f"chmod +x {setup_path}")
     code = run(
         client,
-        f"export DEPLOY_DOMAIN=95-142-47-131.sslip.io && bash {setup_path}",
+        f"export DEPLOY_DOMAIN=80-78-248-96.sslip.io && bash {setup_path}",
         timeout=7200,
     )
 
@@ -179,7 +193,7 @@ AUTO_SETUP_WEBHOOK=1
         print(f"Setup exited with code {code}", file=sys.stderr)
         return code
 
-    print("\nDeployment complete: https://95-142-47-131.sslip.io/admin")
+    print("\nDeployment complete: https://80-78-248-96.sslip.io/admin")
     return 0
 
 

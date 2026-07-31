@@ -131,12 +131,9 @@ function metaHtml(msg: RenderMessage, isOutgoing: boolean, variant: "inline" | "
 
 function bubbleTailHtml(isOutgoing: boolean, lastInGroup: boolean, bubbleColor: string): string {
   if (!lastInGroup) return "";
-  /* Telegram iOS ear — organic curve to bottom tip, flush with bubble */
-  const path = isOutgoing
-    ? "M0 0v17h1c3.2-1.8 5.8-5.2 7.2-9.8C9.2 4.2 9.5 1.8 9.5 0H0z"
-    : "M11 0v17h-1c-3.2-1.8-5.8-5.2-7.2-9.8C1.8 4.2 1.5 1.8 1.5 0H11z";
+  /* Official Telegram Desktop bubble_tail@3x mask (6×10 dp) — tip at bottom */
   const side = isOutgoing ? "tail-out" : "tail-in";
-  return `<span class="bubble-tail ${side}" style="color:${bubbleColor}" aria-hidden="true"><svg width="10" height="17" viewBox="0 0 11 17" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="${path}"/></svg></span>`;
+  return `<span class="bubble-tail ${side}" style="background:${bubbleColor}" aria-hidden="true"></span>`;
 }
 
 function renderBubble(
@@ -797,34 +794,36 @@ export function buildChatHtml(params: RenderChatParams): string {
     .bubble-out {
       border-radius: 16px;
     }
-    /* Telegram corners: main 16, merge 10; last bubble sharpens the ear corner */
+    /* Telegram corners: main 16, merge 10; tailed corner is square (tail draws the ear) */
     .incoming.group-mid .bubble-in { border-top-left-radius: 10px; }
     .incoming.group-continued .bubble-in { border-bottom-left-radius: 16px; }
-    .incoming.group-last .bubble-in { border-bottom-left-radius: 3px; }
+    .incoming.group-last .bubble-in { border-bottom-left-radius: 0; }
     .outgoing.group-mid .bubble-out { border-top-right-radius: 10px; }
     .outgoing.group-continued .bubble-out { border-bottom-right-radius: 16px; }
-    .outgoing.group-last .bubble-out { border-bottom-right-radius: 3px; }
-    /* Real Telegram ear — SVG, only on last in group */
+    .outgoing.group-last .bubble-out { border-bottom-right-radius: 0; }
+    /* Official tdesktop bubble_tail — CSS mask, tip at bottom; 1px overlap kills the seam */
     .bubble-tail {
       position: absolute;
       bottom: 0;
-      width: 10px;
-      height: 17px;
+      width: 6px;
+      height: 10px;
       pointer-events: none;
       z-index: 0;
       line-height: 0;
       overflow: visible;
-    }
-    .bubble-tail svg {
-      display: block;
-      width: 10px;
-      height: 17px;
+      -webkit-mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAeCAYAAAAhDE4sAAAA1klEQVR42u2UPQrCQBCF3/MCEiwFS/UA4lm8gkfwImJpaguxswliJZaCTUobqyDphDTPKhCWhOxf6VSzO/DtN8PuUpIQHktGAJUkk0EEmysAxABlsUAXAAid0ZvkOIbRqU5CQcc6CWmtJJnEMDo0FyGgfXPh21pOch7DKDU3fIy+ACYki1Cj1IT4GFUApiRfZsHVaNcGcTUqAMxIftqKLkbrLggAQHax7T3GApJZ+fZAnpKGoaC7pJH1BDsgZ+dragAqSRuv19eA3CQtvD8VSQ9JK/yjK34RPgHp8p8P/gAAAABJRU5ErkJggg==");
+      mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAeCAYAAAAhDE4sAAAA1klEQVR42u2UPQrCQBCF3/MCEiwFS/UA4lm8gkfwImJpaguxswliJZaCTUobqyDphDTPKhCWhOxf6VSzO/DtN8PuUpIQHktGAJUkk0EEmysAxABlsUAXAAid0ZvkOIbRqU5CQcc6CWmtJJnEMDo0FyGgfXPh21pOch7DKDU3fIy+ACYki1Cj1IT4GFUApiRfZsHVaNcGcTUqAMxIftqKLkbrLggAQHax7T3GApJZ+fZAnpKGoaC7pJH1BDsgZ+dragAqSRuv19eA3CQtvD8VSQ9JK/yjK34RPgHp8p8P/gAAAABJRU5ErkJggg==");
+      -webkit-mask-size: 100% 100%;
+      mask-size: 100% 100%;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
     }
     .bubble-tail.tail-out {
-      right: -8px;
+      right: -5px;
+      transform: scaleX(-1);
     }
     .bubble-tail.tail-in {
-      left: -8px;
+      left: -5px;
     }
     .text {
       font-size: 17px;
@@ -968,10 +967,10 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .incoming.group-mid .bubble-media { border-top-left-radius: 10px; }
     .incoming.group-continued .bubble-media { border-bottom-left-radius: 16px; }
-    .incoming.group-last .bubble-media { border-bottom-left-radius: 16px; }
+    .incoming.group-last .bubble-media { border-bottom-left-radius: 0; }
     .outgoing.group-mid .bubble-media { border-top-right-radius: 10px; }
     .outgoing.group-continued .bubble-media { border-bottom-right-radius: 16px; }
-    .outgoing.group-last .bubble-media { border-bottom-right-radius: 16px; }
+    .outgoing.group-last .bubble-media { border-bottom-right-radius: 0; }
     .bubble-media .bubble-image {
       border-radius: inherit;
       margin: 0;

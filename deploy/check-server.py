@@ -3,7 +3,7 @@ import os
 import paramiko
 import sys
 
-HOST = "95.142.47.131"
+HOST = "80.78.248.96"
 USER = "root"
 KEY = __import__("pathlib").Path(__import__("os").environ["USERPROFILE"]) / ".ssh" / "id_ed25519"
 

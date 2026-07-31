@@ -5,7 +5,7 @@ import tempfile
 import paramiko
 from pathlib import Path
 
-HOST = "95.142.47.131"
+HOST = "80.78.248.96"
 USER = "root"
 KEY = Path(os.environ["USERPROFILE"]) / ".ssh" / "id_ed25519"
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
@@ -55,14 +55,14 @@ sftp.close()
 nginx = """cat > /etc/nginx/sites-available/bot-ai <<'NGINX'
 server {
     listen 80;
-    server_name 95-142-47-131.sslip.io 95.142.47.131;
+    server_name 80-78-248-96.sslip.io 80.78.248.96;
     return 301 https://$host$request_uri;
 }
 server {
     listen 443 ssl;
-    server_name 95-142-47-131.sslip.io 95.142.47.131;
-    ssl_certificate /etc/letsencrypt/live/95-142-47-131.sslip.io/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/95-142-47-131.sslip.io/privkey.pem;
+    server_name 80-78-248-96.sslip.io 80.78.248.96;
+    ssl_certificate /etc/letsencrypt/live/80-78-248-96.sslip.io/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/80-78-248-96.sslip.io/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
     client_max_body_size 50m;
@@ -86,8 +86,8 @@ cmds = [
     "cd /opt/bot-ai && docker compose up -d",
     "sleep 25 && curl -s http://127.0.0.1:3000/api/health",
     nginx,
-    "curl -s https://95-142-47-131.sslip.io/api/health",
-    "curl -s -X POST https://95-142-47-131.sslip.io/api/telegram/setup",
+    "curl -s https://80-78-248-96.sslip.io/api/health",
+    "curl -s -X POST https://80-78-248-96.sslip.io/api/telegram/setup",
     "curl -s -X POST http://127.0.0.1:3000/api/admin/control -H 'Content-Type: application/json' -d '{\"action\":\"start\"}'",
     "cd /opt/bot-ai && docker compose ps",
 ]

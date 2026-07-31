@@ -3,7 +3,7 @@ import paramiko
 import os
 from pathlib import Path
 
-HOST = "95.142.47.131"
+HOST = "80.78.248.96"
 USER = "root"
 KEY = Path(os.environ["USERPROFILE"]) / ".ssh" / "id_ed25519"
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
@@ -37,10 +37,10 @@ cmds = [
     "cd /opt/bot-ai && docker compose up -d --build 2>&1 | tail -n 80",
     "cd /opt/bot-ai && docker compose ps",
     "curl -s http://127.0.0.1:3000/api/health | head -c 500 || true",
-    "certbot --nginx -d 95-142-47-131.sslip.io --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>&1 | tail -n 20 || true",
+    "certbot --nginx -d 80-78-248-96.sslip.io --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>&1 | tail -n 20 || true",
     "curl -s -X POST http://127.0.0.1:3000/api/telegram/setup | head -c 400 || true",
     "curl -s -X POST http://127.0.0.1:3000/api/admin/control -H 'Content-Type: application/json' -d '{\"action\":\"start\"}' | head -c 200 || true",
-    "curl -s -o /dev/null -w 'https:%{http_code}' https://95-142-47-131.sslip.io/api/health || true",
+    "curl -s -o /dev/null -w 'https:%{http_code}' https://80-78-248-96.sslip.io/api/health || true",
 ]
 
 for cmd in cmds:

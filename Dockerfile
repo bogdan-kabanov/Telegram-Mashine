@@ -31,6 +31,7 @@ ENV PORT=3000
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p data/history data/scripts data/scenarios data/media
 
 RUN npm run build \
   && npm prune --omit=dev
