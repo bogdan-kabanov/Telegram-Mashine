@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 ARG PLAYWRIGHT_VERSION=1.61.1
 
 # ---- deps ----
