@@ -12,7 +12,7 @@ import {
   resolveImageForRender,
   resolveWallpaperForProject,
 } from "@/lib/media/resolve";
-import { blurWallpaperDataUri } from "@/lib/media/blur-wallpaper";
+import { blurWallpaperDataUri, averageWallpaperColor, wallpaperCutoutDataUri } from "@/lib/media/blur-wallpaper";
 import { createLogger } from "@/lib/runtime/manager";
 import type { GeneratedDialog } from "@/modules/dialog-generator";
 import {
@@ -191,8 +191,12 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
         chat.scrollTop = Math.max(0, chat.scrollTop - overflow);
       }
       window.dispatchEvent(new Event("resize"));
-      const sync = (window as unknown as { syncGlassFrost?: () => void }).syncGlassFrost;
-      sync?.();
+      const w = window as unknown as {
+        syncGlassFrost?: () => void;
+        alignTailCutouts?: () => void;
+      };
+      w.syncGlassFrost?.();
+      w.alignTailCutouts?.();
     });
     await page.waitForTimeout(100);
     await bakeInputGlass(page, DEVICE_SCALE_FACTOR);
@@ -288,8 +292,12 @@ async function screenshotChatByScrolling(params: {
             scrollDown.classList.toggle("is-visible", maxScroll > 24 && !nearBottom);
           }
           window.dispatchEvent(new Event("resize"));
-          const sync = (window as unknown as { syncGlassFrost?: () => void }).syncGlassFrost;
-          sync?.();
+          const w = window as unknown as {
+            syncGlassFrost?: () => void;
+            alignTailCutouts?: () => void;
+          };
+          w.syncGlassFrost?.();
+          w.alignTailCutouts?.();
         },
         { top: scrollTop, maxScroll: metrics.maxScroll },
       );
@@ -346,6 +354,9 @@ export class ChatRenderer {
       pickRandomClientAvatar(projectId, project.clientAvatarPath),
     ]);
     const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
+    const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperUrl
+      ? await Promise.all([wallpaperCutoutDataUri(wallpaperUrl), averageWallpaperColor(wallpaperUrl)])
+      : [null, null];
 
     return this.render({
       project,
@@ -354,6 +365,8 @@ export class ChatRenderer {
       statusText: ui.statusRecently,
       wallpaperUrl,
       frostWallpaperUrl,
+      wallpaperCutoutUrl,
+      wallpaperCutoutColor,
       clientAvatarUrl: avatar.dataUri,
       statusBarTime: formatStatusBarTime(),
     });
@@ -382,6 +395,9 @@ export class ChatRenderer {
         resolveImageForRender(mediaAssets.captura ?? null, { trimWhitespace: true }),
       ]);
     const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
+    const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperUrl
+      ? await Promise.all([wallpaperCutoutDataUri(wallpaperUrl), averageWallpaperColor(wallpaperUrl)])
+      : [null, null];
 
     const enrichedMedia: DialogMediaAssets = {
       sticker: stickerUri,
@@ -410,6 +426,8 @@ export class ChatRenderer {
       statusText: ui.statusRecently,
       wallpaperUrl,
       frostWallpaperUrl,
+      wallpaperCutoutUrl,
+      wallpaperCutoutColor,
       clientAvatarUrl: avatar.dataUri,
       statusBarTime: lastTime,
       // Vlad: Stories ring on peer avatar (Telegram iOS). Always on for review screenshots.

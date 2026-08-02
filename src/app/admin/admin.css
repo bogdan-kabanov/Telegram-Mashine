@@ -1972,6 +1972,7 @@ textarea.admin-input:focus {
   word-break: break-word;
   position: relative;
   border-radius: 12px;
+  overflow: visible;
 }
 
 .project-phone-bubble .apple-emoji,
@@ -1986,15 +1987,59 @@ img.apple-emoji {
 
 .project-phone-bubble.is-in {
   align-self: flex-start;
-  border-radius: 12px 12px 12px 3px;
+  border-radius: 12px;
   color: #000;
+  overflow: visible;
+  --tail-cutout: #3d7a84;
+}
+.project-phone-bubble.is-in::before,
+.project-phone-bubble.is-in::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  height: 14px;
+  pointer-events: none;
+}
+.project-phone-bubble.is-in::before {
+  left: -5px;
+  width: 14px;
+  background: inherit;
+  border-bottom-right-radius: 12px 10px;
+}
+.project-phone-bubble.is-in::after {
+  left: -18px;
+  width: 18px;
+  background: var(--tail-cutout);
+  border-bottom-right-radius: 8px;
 }
 
 .project-phone-bubble.is-out {
   align-self: flex-end;
-  border-radius: 12px 12px 3px 12px;
+  border-radius: 12px;
   color: #000;
   padding-right: 1.2rem;
+  overflow: visible;
+  --tail-cutout: #3d7a84;
+}
+.project-phone-bubble.is-out::before,
+.project-phone-bubble.is-out::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  height: 14px;
+  pointer-events: none;
+}
+.project-phone-bubble.is-out::before {
+  right: -5px;
+  width: 14px;
+  background: inherit;
+  border-bottom-left-radius: 12px 10px;
+}
+.project-phone-bubble.is-out::after {
+  right: -18px;
+  width: 18px;
+  background: var(--tail-cutout);
+  border-bottom-left-radius: 8px;
 }
 
 .project-phone-checks {

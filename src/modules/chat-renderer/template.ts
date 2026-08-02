@@ -14,6 +14,10 @@ export interface RenderChatParams {
   wallpaperUrl?: string | null;
   /** Pre-blurred wallpaper for glass pills (Playwright-safe; no CSS filter). */
   frostWallpaperUrl?: string | null;
+  /** Compact phone-sized wallpaper JPEG for ear ::after knockout (aligned via script). */
+  wallpaperCutoutUrl?: string | null;
+  /** Fallback solid when cutout image is missing. */
+  wallpaperCutoutColor?: string | null;
   messages: RenderMessage[];
   statusText?: string;
   statusBarTime?: string;
@@ -129,11 +133,8 @@ function metaHtml(msg: RenderMessage, isOutgoing: boolean, variant: "inline" | "
   return `<span class="meta meta-${variant}"><span class="time">${msg.time}</span>${checks}</span>`;
 }
 
-function bubbleTailHtml(isOutgoing: boolean, lastInGroup: boolean, bubbleColor: string): string {
-  if (!lastInGroup) return "";
-  /* Official Telegram Desktop bubble_tail@3x mask (6×10 dp) — tip at bottom */
-  const side = isOutgoing ? "tail-out" : "tail-in";
-  return `<span class="bubble-tail ${side}" style="background:${bubbleColor}" aria-hidden="true"></span>`;
+function bubbleStyle(color: string): string {
+  return `background:${color};--bubble-bg:${color}`;
 }
 
 function renderBubble(
@@ -163,7 +164,8 @@ function renderBubble(
       : `<div class="avatar avatar-spacer" aria-hidden="true"></div>`
     : "";
 
-  const tail = bubbleTailHtml(isOutgoing, opts.lastInGroup, bubbleColor);
+  const tailClass = opts.lastInGroup ? (isOutgoing ? "has-tail-out" : "has-tail-in") : "";
+  const style = bubbleStyle(bubbleColor);
 
   if (msg.type === "sticker" && msg.imageUrl) {
     return `
@@ -185,14 +187,14 @@ function renderBubble(
       msg.imageUrl != null
         ? `<img class="bubble-image${kindClass}" src="${msg.imageUrl}" alt="" />`
         : `<div class="image-placeholder">📷 ${escapeHtml(msg.content)}</div>`;
+    /* Media: CSS radii only (photo mosaic masking is separate). */
     return `
     <div class="${groupClass}">
       ${avatarSlot}
       <div class="bubble-wrap">
-        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} bubble-media" style="background:${bubbleColor};--bubble-bg:${bubbleColor}">
+        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} bubble-media" style="${style}">
           ${media}
           ${metaHtml(msg, isOutgoing, "overlay")}
-          ${tail}
         </div>
       </div>
     </div>
@@ -204,9 +206,8 @@ function renderBubble(
     <div class="${groupClass}">
       ${avatarSlot}
       <div class="bubble-wrap">
-        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"}" style="background:${bubbleColor};--bubble-bg:${bubbleColor}">
+        <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} ${tailClass}" style="${style}">
           <div class="text">${formatChatTextHtml(msg.content)}${metaHtml(msg, isOutgoing, "inline")}</div>
-          ${tail}
         </div>
       </div>
     </div>
@@ -246,6 +247,9 @@ export function buildChatHtml(params: RenderChatParams): string {
   const wallpaperSrc = params.wallpaperUrl ?? null;
   const frostWallpaperSrc = params.frostWallpaperUrl ?? null;
   const wallpaperFallbackCss = "linear-gradient(180deg, #6ba3be 0%, #4a8fa8 100%)";
+  const cutoutUrl = params.wallpaperCutoutUrl?.trim() || null;
+  const cutoutFallback = params.wallpaperCutoutColor?.trim() || "#4a8fa8";
+  const cutoutImageCss = cutoutUrl ? `url("${cutoutUrl}")` : "none";
 
   const messageHtml = renderMessageList(messages, theme, params.clientAvatarUrl);
 
@@ -278,6 +282,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       height: 844px;
       position: relative;
       overflow: hidden;
+      --tail-cutout-fallback: ${cutoutFallback};
+      --tail-cutout-image: ${cutoutImageCss};
     }
     /* Wallpaper + messages + frost live here so backdrop-filter can sample them */
     .phone-stage {
@@ -742,9 +748,10 @@ export function buildChatHtml(params: RenderChatParams): string {
       gap: 6px;
       margin-bottom: 2px;
       width: 100%;
+      position: relative;
     }
-    .message.group-last { margin-bottom: 4px; }
-    .message.group-first.group-last { margin-bottom: 4px; }
+    .message.group-last { margin-bottom: 6px; }
+    .message.group-first.group-last { margin-bottom: 6px; }
     .message.incoming { padding-right: 52px; }
     .message.outgoing {
       justify-content: flex-end;
@@ -757,6 +764,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       object-fit: cover;
       flex-shrink: 0;
       margin-bottom: 1px;
+      position: relative;
+      z-index: 2;
     }
     .avatar-spacer {
       visibility: hidden;
@@ -794,36 +803,62 @@ export function buildChatHtml(params: RenderChatParams): string {
     .bubble-out {
       border-radius: 16px;
     }
-    /* Telegram corners: main 16, merge 10; tailed corner is square (tail draws the ear) */
+    /* Telegram corners: main 16, merge 10 — tailed corner KEEPS full radius (iOS). */
     .incoming.group-mid .bubble-in { border-top-left-radius: 10px; }
     .incoming.group-continued .bubble-in { border-bottom-left-radius: 16px; }
-    .incoming.group-last .bubble-in { border-bottom-left-radius: 0; }
     .outgoing.group-mid .bubble-out { border-top-right-radius: 10px; }
     .outgoing.group-continued .bubble-out { border-bottom-right-radius: 16px; }
-    .outgoing.group-last .bubble-out { border-bottom-right-radius: 0; }
-    /* Official tdesktop bubble_tail — CSS mask, tip at bottom; 1px overlap kills the seam */
-    .bubble-tail {
+    /*
+     * Telegram/iOS ear (Samuel Kraft): ::before blob + ::after wallpaper knockout.
+     * ::after samples a compact wallpaper tile aligned to .phone (see alignTailCutouts).
+     */
+    .bubble.has-tail-out,
+    .bubble.has-tail-in {
+      overflow: visible;
+      position: relative;
+      z-index: 1;
+    }
+    .bubble.has-tail-out::before,
+    .bubble.has-tail-out::after,
+    .bubble.has-tail-in::before,
+    .bubble.has-tail-in::after {
+      content: "";
       position: absolute;
       bottom: 0;
-      width: 6px;
-      height: 10px;
+      height: 20px;
       pointer-events: none;
-      z-index: 0;
-      line-height: 0;
-      overflow: visible;
-      -webkit-mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAeCAYAAAAhDE4sAAAA1klEQVR42u2UPQrCQBCF3/MCEiwFS/UA4lm8gkfwImJpaguxswliJZaCTUobqyDphDTPKhCWhOxf6VSzO/DtN8PuUpIQHktGAJUkk0EEmysAxABlsUAXAAid0ZvkOIbRqU5CQcc6CWmtJJnEMDo0FyGgfXPh21pOch7DKDU3fIy+ACYki1Cj1IT4GFUApiRfZsHVaNcGcTUqAMxIftqKLkbrLggAQHax7T3GApJZ+fZAnpKGoaC7pJH1BDsgZ+dragAqSRuv19eA3CQtvD8VSQ9JK/yjK34RPgHp8p8P/gAAAABJRU5ErkJggg==");
-      mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAeCAYAAAAhDE4sAAAA1klEQVR42u2UPQrCQBCF3/MCEiwFS/UA4lm8gkfwImJpaguxswliJZaCTUobqyDphDTPKhCWhOxf6VSzO/DtN8PuUpIQHktGAJUkk0EEmysAxABlsUAXAAid0ZvkOIbRqU5CQcc6CWmtJJnEMDo0FyGgfXPh21pOch7DKDU3fIy+ACYki1Cj1IT4GFUApiRfZsHVaNcGcTUqAMxIftqKLkbrLggAQHax7T3GApJZ+fZAnpKGoaC7pJH1BDsgZ+dragAqSRuv19eA3CQtvD8VSQ9JK/yjK34RPgHp8p8P/gAAAABJRU5ErkJggg==");
-      -webkit-mask-size: 100% 100%;
-      mask-size: 100% 100%;
-      -webkit-mask-repeat: no-repeat;
-      mask-repeat: no-repeat;
     }
-    .bubble-tail.tail-out {
-      right: -5px;
-      transform: scaleX(-1);
+    .bubble.has-tail-out::before {
+      right: -7px;
+      width: 20px;
+      background: var(--bubble-bg);
+      border-bottom-left-radius: 16px 14px;
     }
-    .bubble-tail.tail-in {
-      left: -5px;
+    .bubble.has-tail-out::after {
+      right: -26px;
+      width: 26px;
+      background-color: var(--tail-cutout-fallback);
+      background-image: var(--tail-cutout-image);
+      background-size: 390px 844px;
+      background-repeat: no-repeat;
+      background-position: var(--cut-x, 0) var(--cut-y, 0);
+      border-bottom-left-radius: 10px;
+    }
+    .bubble.has-tail-in::before {
+      left: -7px;
+      width: 20px;
+      background: var(--bubble-bg);
+      border-bottom-right-radius: 16px 14px;
+    }
+    .bubble.has-tail-in::after {
+      left: -26px;
+      width: 26px;
+      background-color: var(--tail-cutout-fallback);
+      background-image: var(--tail-cutout-image);
+      background-size: 390px 844px;
+      background-repeat: no-repeat;
+      background-position: var(--cut-x, 0) var(--cut-y, 0);
+      border-bottom-right-radius: 10px;
     }
     .text {
       font-size: 17px;
@@ -967,10 +1002,8 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .incoming.group-mid .bubble-media { border-top-left-radius: 10px; }
     .incoming.group-continued .bubble-media { border-bottom-left-radius: 16px; }
-    .incoming.group-last .bubble-media { border-bottom-left-radius: 0; }
     .outgoing.group-mid .bubble-media { border-top-right-radius: 10px; }
     .outgoing.group-continued .bubble-media { border-bottom-right-radius: 16px; }
-    .outgoing.group-last .bubble-media { border-bottom-right-radius: 0; }
     .bubble-media .bubble-image {
       border-radius: inherit;
       margin: 0;
@@ -1191,17 +1224,48 @@ export function buildChatHtml(params: RenderChatParams): string {
           img.style.top = (pr.top - r.top) + "px";
         });
       }
+      function alignTailCutouts() {
+        var phone = document.querySelector(".phone");
+        if (!(phone instanceof HTMLElement)) return;
+        var pr = phone.getBoundingClientRect();
+        phone.querySelectorAll(".bubble.has-tail-in, .bubble.has-tail-out").forEach(function (el) {
+          if (!(el instanceof HTMLElement)) return;
+          var br = el.getBoundingClientRect();
+          var aw = 26;
+          var ah = 20;
+          var isIn = el.classList.contains("has-tail-in");
+          var ax = isIn ? br.left - aw : br.right;
+          var ay = br.bottom - ah;
+          el.style.setProperty("--cut-x", (pr.left - ax) + "px");
+          el.style.setProperty("--cut-y", (pr.top - ay) + "px");
+        });
+      }
       window.syncGlassFrost = syncGlassFrost;
-      window.addEventListener("resize", syncGlassFrost);
-      window.addEventListener("load", syncGlassFrost);
+      window.alignTailCutouts = alignTailCutouts;
+      window.addEventListener("resize", function () {
+        syncGlassFrost();
+        alignTailCutouts();
+      });
+      window.addEventListener("load", function () {
+        syncGlassFrost();
+        alignTailCutouts();
+      });
       document.querySelectorAll(".glass-frost-img, .wallpaper-img, .frost-img").forEach(function (img) {
-        img.addEventListener("load", syncGlassFrost);
+        img.addEventListener("load", function () {
+          syncGlassFrost();
+          alignTailCutouts();
+        });
       });
       function boot() {
         syncGlassFrost();
+        alignTailCutouts();
         requestAnimationFrame(function () {
           syncGlassFrost();
-          requestAnimationFrame(syncGlassFrost);
+          alignTailCutouts();
+          requestAnimationFrame(function () {
+            syncGlassFrost();
+            alignTailCutouts();
+          });
         });
       }
       if (document.readyState === "loading") {
