@@ -31,6 +31,9 @@ services:
       - ./public/renders:/app/public/renders
     # Chromium needs shared memory
     shm_size: "256mb"
+    # This VPS blocks some Telegram DC IPs (e.g. 149.154.166.110); pin a reachable one
+    extra_hosts:
+      - "api.telegram.org:149.154.167.220"
     healthcheck:
       test:
         [

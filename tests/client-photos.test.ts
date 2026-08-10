@@ -17,8 +17,8 @@ import {
 } from "../src/modules/chat-renderer/messages";
 import type { RenderMessage } from "../src/modules/chat-renderer/template";
 
-describe("screenshot pagination ~9", () => {
-  it("targets about 9 screens for a long dialog", () => {
+describe("screenshot pagination ~10", () => {
+  it("targets about 10 screens for a long dialog", () => {
     const count = 45;
     const per = messagesPerScreenForCount(count, TARGET_SCREENSHOTS);
     const messages: RenderMessage[] = Array.from({ length: count }, (_, i) => ({
@@ -31,8 +31,8 @@ describe("screenshot pagination ~9", () => {
     const pages = paginateMessages(messages);
     expect(per).toBeGreaterThanOrEqual(3);
     expect(per).toBeLessThanOrEqual(5);
-    // Prefer fitting above the input bar over hitting exactly 9 screens.
-    expect(pages.length).toBeGreaterThanOrEqual(9);
+    // Prefer fitting above the input bar over hitting exactly TARGET screens.
+    expect(pages.length).toBeGreaterThanOrEqual(8);
     expect(pages.length).toBeLessThanOrEqual(18);
   });
 

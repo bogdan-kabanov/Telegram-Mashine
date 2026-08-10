@@ -12,13 +12,13 @@ export function planScrollPositions(
     minOverlapPx?: number;
   },
 ): number[] {
-  const targetScreens = options?.targetScreens ?? options?.defaultTargetScreens ?? 11;
+  const targetScreens = options?.targetScreens ?? options?.defaultTargetScreens ?? 10;
   const minOverlap = options?.minOverlapPx ?? 160;
   const overlapPx = options?.overlapPx ?? Math.max(minOverlap, Math.round(clientHeight * 0.55));
 
   if (maxScroll <= 8) return [0];
 
-  const minFrames = Math.max(targetScreens, 9);
+  const minFrames = Math.max(1, targetScreens);
   const stepFromTarget = Math.max(90, Math.floor(maxScroll / Math.max(1, minFrames - 1)));
   const stepFromOverlap = Math.max(90, clientHeight - overlapPx);
   const step = Math.min(stepFromTarget, stepFromOverlap);

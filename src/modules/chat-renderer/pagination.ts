@@ -1,7 +1,7 @@
 import type { RenderMessage } from "./render-types";
 
-/** Target screenshots per full review (Vlad: more than ~6; aim ~9–12). */
-export const TARGET_SCREENSHOTS = 11;
+/** Target screenshots per full review — Telegram album max is 10. */
+export const TARGET_SCREENSHOTS = 10;
 /** Carry last N messages onto the next screen so clipped tails never vanish. */
 const PAGE_OVERLAP = 2;
 /** Soft floor so short dialogs don't become 1-msg pages. */

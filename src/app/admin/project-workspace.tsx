@@ -15,6 +15,7 @@ import {
 import { chatUiForLocale } from "@/lib/i18n/chat-ui";
 
 import { AppleEmojiText } from "./ui/AppleEmojiText";
+import { DialogReviewPanel } from "./dialog-review-panel";
 import { ScreenshotGallery } from "./screenshot-gallery";
 import { colors, inputStyle } from "./styles";
 import { HelpTip, LabelWithHelp } from "./ui/HelpTip";
@@ -56,7 +57,7 @@ function wallpaperPreviewUrl(path: string | null | undefined): string | null {
   return `/api/admin/media/file?path=${encodeURIComponent(path)}`;
 }
 
-type Tab = "preview" | "settings";
+type Tab = "preview" | "dialog" | "settings";
 
 /**
  * Frosted glass via clipped blurred wallpaper (not backdrop-filter — flat in many
@@ -186,18 +187,17 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
   }, [tab, loadMediaAssets]);
 
   const wallpaperLibraryAssets = useMemo((): PickerMediaAsset[] => {
+    const pid = project.id.toLowerCase();
     return mediaAssets.filter((a) => {
       if (!a.isImage) return false;
-      // Prefer wallpapers; also allow other photos from media storage.
-      return (
-        a.type === "wallpaper" ||
-        a.type === "story_photo" ||
-        a.type === "sticker" ||
-        a.type === "avatar" ||
-        a.path.includes("wallpapers")
-      );
+      const isWallpaper =
+        a.type === "wallpaper" || a.path.replace(/\\/g, "/").includes("/wallpapers/");
+      if (!isWallpaper) return false;
+      // Only this project's wallpaper — avoids Melissa↔Francesca mix-ups.
+      const base = a.path.replace(/\\/g, "/").split("/").pop()?.replace(/\.[^.]+$/, "") ?? "";
+      return base.toLowerCase() === pid || a.projectId === project.id;
     });
-  }, [mediaAssets]);
+  }, [mediaAssets, project.id]);
 
   async function handleGenerate() {
     setLoading(true);
@@ -220,7 +220,7 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
       if (!res.ok) throw new Error(data.error ?? "Ошибка генерации");
       setReviewId(data.reviewId ?? "");
       setScreenshots(data.screenshots ?? []);
-      setTab("preview");
+      setTab("dialog");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
@@ -403,6 +403,9 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
         <TabBtn active={tab === "preview"} onClick={() => setTab("preview")}>
           Скриншоты
         </TabBtn>
+        <TabBtn active={tab === "dialog"} onClick={() => setTab("dialog")}>
+          Диалог
+        </TabBtn>
         <TabBtn active={tab === "settings"} onClick={() => setTab("settings")}>
           Настройки
         </TabBtn>
@@ -422,6 +425,14 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
         </div>
       )}
 
+      {tab === "dialog" && (
+        <DialogReviewPanel
+          reviewId={reviewId}
+          onScreenshotsChange={setScreenshots}
+          onError={setError}
+        />
+      )}
+
       {tab === "settings" && (
         <form onSubmit={handleSaveSettings} className="project-settings-layout">
           <div className="project-settings-fields">
@@ -429,7 +440,7 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
               label={
                 <LabelWithHelp
                   label="Язык / регион"
-                  tip="Меняет рынок проекта: валюту, пул имён клиентов, банки и формат сумм. Тексты отзывов не переводятся автоматически — их правьте отдельно."
+                  tip="Меняет рынок проекта: валюту, пул имён клиентов, банки и формат сумм. Готовый диалог можно перевести на RU во вкладке «Диалог» (перевод только для оператора)."
                 />
               }
             >
@@ -792,7 +803,7 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
       <MediaPicker
         open={pickerOpen}
         title="Фон чата из медиатеки"
-        emptyHint="В медиатеке пока нет картинок. Загрузите фото в разделе «Медиатека» или файл ниже."
+        emptyHint="Нет фона для этого проекта. Загрузите файл в Проекты или положите data/media/wallpapers/{id}.jpg"
         footNote="Выбор сразу ставит фон для этого проекта. Новые файлы можно добавить в Медиатеке."
         assets={wallpaperLibraryAssets}
         selectedPath={wallpaperPath}

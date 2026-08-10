@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { generatedDialogSchema, reviewRenderMediaSchema } from "./dialog";
+
 export const botStatusSchema = z.enum(["running", "paused", "stopped", "error"]);
 
 export const runtimeStateSchema = z.object({
@@ -40,6 +42,12 @@ export const reviewPackageSchema = z.object({
     }),
   ),
   publishedAt: z.string().datetime().nullable(),
+  /** Full dialog for preview / edit / re-render (optional on older packages). */
+  dialog: generatedDialogSchema.optional(),
+  /** Media paths for ChatRenderer re-render. */
+  renderMedia: reviewRenderMediaSchema.optional(),
+  /** Operator RU translations keyed by message id (does not affect screenshots). */
+  dialogTranslations: z.record(z.string()).optional(),
 });
 
 export type BotStatus = z.infer<typeof botStatusSchema>;

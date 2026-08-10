@@ -26,11 +26,16 @@
         "client": [
           "01_banorte.jpg",
           "02_mercado.jpg",
-          "03_spin.jpg"
+          "02_oxxo_spin.jpg",
+          "03_spin.jpg",
+          "04_spin_detail.jpg",
+          "05_oxxo_spin.jpg"
         ],
         "manager": [
           "01_banorte.jpg",
-          "02_mercado.jpg"
+          "02_mercado.jpg",
+          "03_spin.jpg",
+          "04_spin_detail.jpg"
         ]
       },
       "theme": {
@@ -69,10 +74,12 @@
       "receiptTemplates": {
         "client": [
           "01_mercado.jpg",
-          "02_compartamos.jpg"
+          "02_compartamos.jpg",
+          "03_oxxo_spin.jpg"
         ],
         "manager": [
-          "02_compartamos.jpg"
+          "02_compartamos.jpg",
+          "04_azteca.jpg"
         ]
       },
       "theme": {
@@ -112,12 +119,18 @@
         "client": [
           "01_mercado_ar.jpg",
           "02_belo.jpg",
-          "03_retiro_ar.jpg"
+          "03_retiro_ar.jpg",
+          "04_naranja.jpg",
+          "05_mercado_ar.jpg",
+          "06_coolsia.jpg"
         ],
         "manager": [
           "01_mercado_ar.jpg",
           "02_belo.jpg",
-          "03_retiro_ar.jpg"
+          "03_retiro_ar.jpg",
+          "04_naranja.jpg",
+          "05_mercado_ar.jpg",
+          "06_coolsia.jpg"
         ]
       },
       "theme": {
@@ -155,13 +168,17 @@
       "receiptTemplates": {
         "client": [
           "01_mercado.jpg",
+          "01_bbva.jpg",
           "02_spin.jpg",
-          "03_nu.jpg"
+          "03_nu.jpg",
+          "04_bbva.jpg",
+          "05_oxxo_spin.jpg"
         ],
         "manager": [
-          "01_mercado.jpg",
+          "01_bbva.jpg",
           "02_spin.jpg",
-          "03_nu.jpg"
+          "03_nu.jpg",
+          "04_bbva.jpg"
         ]
       },
       "theme": {
@@ -200,10 +217,14 @@
       "capturaStyle": "generic",
       "receiptTemplates": {
         "client": [
-          "01.jpg"
+          "01.jpg",
+          "02_dark.jpg",
+          "03_light.jpg"
         ],
         "manager": [
-          "01.jpg"
+          "01.jpg",
+          "02_dark.jpg",
+          "03_light.jpg"
         ]
       },
       "theme": {
@@ -228,7 +249,6 @@
       "managerName": "Анна Тестова",
       "managerHandle": "@Demo_RU",
       "clientAvatarPath": "data/media/story_photos/pool/ai_1784812803851_e86a5bf0.png",
-      "wallpaperPath": "data/media/wallpapers/nancy.jpg",
       "conditionsImagePath": "data/media/conditions/demo-ru/1785065110808_ChatGPT_Image_25_июл._2026_г._15_26_13.png",
       "conditionsTexts": [
         "😊 Условия работы со мной (тестовый проект):\n\n1️⃣ Депозит: 5 000 ₽\n2️⃣ Доход: от 80 000 ₽\n3️⃣ Время работы: 2–4 часа\n4️⃣ Моя комиссия: 10% от прибыли\n5️⃣ Выплата: на карту или криптокошелёк 💳\n\n🔹 Это демо-проект на русском, чтобы было понятно, как выглядит отзыв."

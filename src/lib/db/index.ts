@@ -65,6 +65,9 @@ function initTables(sqlite: Database.Database): void {
       pin_video_note INTEGER NOT NULL DEFAULT 0,
       screenshots TEXT NOT NULL,
       media TEXT NOT NULL,
+      dialog TEXT,
+      render_media TEXT,
+      dialog_translations TEXT,
       published_at TEXT,
       created_at TEXT NOT NULL
     );
@@ -158,6 +161,15 @@ function initTables(sqlite: Database.Database): void {
   }
   if (!reviewColNames.has("pin_video_note")) {
     sqlite.exec(`ALTER TABLE review_packages ADD COLUMN pin_video_note INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!reviewColNames.has("dialog")) {
+    sqlite.exec(`ALTER TABLE review_packages ADD COLUMN dialog TEXT`);
+  }
+  if (!reviewColNames.has("render_media")) {
+    sqlite.exec(`ALTER TABLE review_packages ADD COLUMN render_media TEXT`);
+  }
+  if (!reviewColNames.has("dialog_translations")) {
+    sqlite.exec(`ALTER TABLE review_packages ADD COLUMN dialog_translations TEXT`);
   }
 }
 

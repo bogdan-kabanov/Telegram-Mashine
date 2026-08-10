@@ -391,8 +391,8 @@ export class ChatRenderer {
         resolveImageForRender(mediaAssets.bet1 ?? null),
         resolveImageForRender(mediaAssets.bet2 ?? null),
         resolveImageForRender(mediaAssets.bet3 ?? null),
-        resolveImageForRender(mediaAssets.receipt ?? null, { trimWhitespace: true }),
-        resolveImageForRender(mediaAssets.captura ?? null, { trimWhitespace: true }),
+        resolveImageForRender(mediaAssets.receipt ?? null),
+        resolveImageForRender(mediaAssets.captura ?? null),
       ]);
     const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
     const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperUrl

@@ -104,12 +104,18 @@ export async function pickRandomClientAvatar(
   return { dataUri: fileToDataUri(fallback), filePath: fallback };
 }
 
+function wallpaperBasenameMatchesProject(filePath: string, projectId: string): boolean {
+  const base = path.parse(filePath.replace(/\\/g, "/")).name.toLowerCase();
+  return base === projectId.toLowerCase();
+}
+
 export async function resolveWallpaperForProject(
   projectId: string,
   configPath?: string,
 ): Promise<string | null> {
-  // Prefer the project's selected wallpaper (admin preview / settings).
-  if (configPath) {
+  // Prefer the project's selected wallpaper only when it belongs to this project
+  // (prevents Melissa↔Francesca swaps from a shared media picker).
+  if (configPath && wallpaperBasenameMatchesProject(configPath, projectId)) {
     const preferred = fileToDataUri(configPath);
     if (preferred) return preferred;
   }
@@ -122,7 +128,7 @@ export async function resolveWallpaperForProject(
     .orderBy(desc(mediaAssets.createdAt))
     .limit(1);
 
-  if (assets[0]) {
+  if (assets[0] && wallpaperBasenameMatchesProject(assets[0].path, projectId)) {
     const dataUri = fileToDataUri(assets[0].path);
     if (dataUri) return dataUri;
   }

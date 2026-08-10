@@ -39,7 +39,7 @@
       "id": "demo_ru_story",
       "projectId": "demo-ru",
       "name": "Тестовый отзыв (RU)",
-      "legendIds": ["injury_work", "medical_debt", "sick_parent"],
+      "legendIds": ["injury_work_ru", "medical_debt_ru", "sick_parent_ru"],
       "enabled": true
     }
   ]

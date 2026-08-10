@@ -43,7 +43,7 @@ function spinTemplate(p: CapturaParams, amount: string): string {
     <div class="header"><div class="logo">Spin</div><div class="sub">by OXXO · Comprobante</div></div>
     <div class="body">
       <div class="ok">✓ Pago enviado</div>
-      <div class="amount">$${amount} MXN</div>
+      <div class="amount">${amount}</div>
       <div class="row"><span class="label">De</span><span class="value">${escapeHtml(p.senderName)}</span></div>
       <div class="row"><span class="label">Para</span><span class="value">${escapeHtml(p.recipientLabel)}</span></div>
       <div class="row"><span class="label">CLABE</span><span class="value">${escapeHtml(p.clabe)}</span></div>
@@ -69,7 +69,7 @@ function mercadoPagoTemplate(p: CapturaParams, amount: string): string {
     <div class="header"><div class="logo">Mercado Pago</div></div>
     <div class="card">
       <div class="ok">¡Listo! Enviaste</div>
-      <div class="amount">$${amount}</div>
+      <div class="amount">${amount}</div>
       <div class="row"><span class="label">Destino</span><span class="value">${escapeHtml(p.recipientLabel)}</span></div>
       <div class="row"><span class="label">CLABE</span><span class="value">${escapeHtml(p.clabe)}</span></div>
       <div class="row"><span class="label">Fecha</span><span class="value">${escapeHtml(p.date)} ${escapeHtml(p.time)}</span></div>
@@ -93,7 +93,7 @@ function okxTemplate(p: CapturaParams, amount: string): string {
     <div class="header"><div class="logo">OKX</div></div>
     <div class="body">
       <div class="ok">Withdrawal Successful</div>
-      <div class="amount">${amount} MXN</div>
+      <div class="amount">${amount}</div>
       <div class="row"><span>From</span><span class="value">${escapeHtml(p.senderName)}</span></div>
       <div class="row"><span>To</span><span class="value">${escapeHtml(p.recipientLabel)}</span></div>
       <div class="row"><span>CLABE</span><span class="value">${escapeHtml(p.clabe)}</span></div>
@@ -103,6 +103,12 @@ function okxTemplate(p: CapturaParams, amount: string): string {
 }
 
 function genericTemplate(p: CapturaParams, amount: string): string {
+  const ru = p.currency === "RUB";
+  const ok = ru ? "Перевод отправлен ✓" : "Transferencia enviada ✓";
+  const from = ru ? "От" : "De";
+  const account = ru ? "Счёт" : "CLABE";
+  const date = ru ? "Дата" : "Fecha";
+  const time = ru ? "Время" : "Hora";
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{width:360px;height:640px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f2f2f7;padding:20px 12px}
@@ -114,17 +120,21 @@ function genericTemplate(p: CapturaParams, amount: string): string {
     .label{color:#8E8E93}.value{text-align:right;max-width:60%;word-break:break-all}
   </style></head><body><div class="card">
     <div class="bank">${escapeHtml(p.bankName)}</div>
-    <div class="ok">Transferencia enviada ✓</div>
-    <div class="amount">$${amount} MXN</div>
-    <div class="row"><span class="label">De</span><span class="value">${escapeHtml(p.senderName)}</span></div>
-    <div class="row"><span class="label">CLABE</span><span class="value">${escapeHtml(p.clabe)}</span></div>
-    <div class="row"><span class="label">Fecha</span><span class="value">${escapeHtml(p.date)}</span></div>
-    <div class="row"><span class="label">Hora</span><span class="value">${escapeHtml(p.time)}</span></div>
+    <div class="ok">${ok}</div>
+    <div class="amount">${amount}</div>
+    <div class="row"><span class="label">${from}</span><span class="value">${escapeHtml(p.senderName)}</span></div>
+    <div class="row"><span class="label">${account}</span><span class="value">${escapeHtml(p.clabe)}</span></div>
+    <div class="row"><span class="label">${date}</span><span class="value">${escapeHtml(p.date)}</span></div>
+    <div class="row"><span class="label">${time}</span><span class="value">${escapeHtml(p.time)}</span></div>
   </div></body></html>`;
 }
 
 export function buildCapturaHtml(params: CapturaParams): string {
-  const amount = formatAmount(params.amount, params.currency);
+  // MXN chat copy historically used bare numbers; bank screens need $ + MXN.
+  const amount =
+    params.currency === "MXN"
+      ? `$${formatAmount(params.amount, params.currency)} MXN`
+      : formatAmount(params.amount, params.currency);
   switch (params.bankStyle) {
     case "spin":
       return spinTemplate(params, amount);

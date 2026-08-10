@@ -120,6 +120,11 @@ export async function saveReviewToDb(review: ReviewPackage, clientAvatarPath?: s
       pinVideoNote: review.pinVideoNote ? 1 : 0,
       screenshots: JSON.stringify(review.screenshots),
       media: JSON.stringify(review.media),
+      dialog: review.dialog ? JSON.stringify(review.dialog) : null,
+      renderMedia: review.renderMedia ? JSON.stringify(review.renderMedia) : null,
+      dialogTranslations: review.dialogTranslations
+        ? JSON.stringify(review.dialogTranslations)
+        : null,
       publishedAt: review.publishedAt,
       createdAt: review.createdAt,
     })
@@ -131,9 +136,23 @@ export async function saveReviewToDb(review: ReviewPackage, clientAvatarPath?: s
         pinVideoNote: review.pinVideoNote ? 1 : 0,
         screenshots: JSON.stringify(review.screenshots),
         media: JSON.stringify(review.media),
+        dialog: review.dialog ? JSON.stringify(review.dialog) : null,
+        renderMedia: review.renderMedia ? JSON.stringify(review.renderMedia) : null,
+        dialogTranslations: review.dialogTranslations
+          ? JSON.stringify(review.dialogTranslations)
+          : null,
         publishedAt: review.publishedAt,
       },
     });
+}
+
+function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 function mapReviewRow(row: {
@@ -148,8 +167,18 @@ function mapReviewRow(row: {
   pinVideoNote?: number | null;
   screenshots: string;
   media: string;
+  dialog?: string | null;
+  renderMedia?: string | null;
+  dialogTranslations?: string | null;
   publishedAt: string | null;
 }): ReviewPackage {
+  const dialog = safeJsonParse<ReviewPackage["dialog"]>(row.dialog, undefined);
+  const renderMedia = safeJsonParse<ReviewPackage["renderMedia"]>(row.renderMedia, undefined);
+  const dialogTranslations = safeJsonParse<ReviewPackage["dialogTranslations"]>(
+    row.dialogTranslations,
+    undefined,
+  );
+
   return reviewPackageSchema.parse({
     id: row.id,
     projectId: row.projectId,
@@ -163,6 +192,9 @@ function mapReviewRow(row: {
     screenshots: JSON.parse(row.screenshots),
     media: JSON.parse(row.media),
     publishedAt: row.publishedAt,
+    ...(dialog ? { dialog } : {}),
+    ...(renderMedia ? { renderMedia } : {}),
+    ...(dialogTranslations ? { dialogTranslations } : {}),
   });
 }
 

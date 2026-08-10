@@ -781,20 +781,21 @@ export function buildChatHtml(params: RenderChatParams): string {
       font-weight: 600;
     }
     .bubble-wrap {
-      max-width: calc(100% - 34px);
+      max-width: min(75%, 280px);
       display: flex;
       flex-direction: column;
       min-width: 0;
     }
     .message.outgoing .bubble-wrap {
       align-items: flex-end;
-      max-width: 100%;
+      max-width: min(75%, 280px);
     }
-    .message.incoming .bubble-wrap { max-width: calc(100% - 34px); }
+    .message.incoming .bubble-wrap { max-width: min(75%, calc(100% - 34px)); }
     .bubble {
-      padding: 6px 12px;
+      padding: 5px 11px 6px 11px;
       position: relative;
       display: inline-block;
+      width: fit-content;
       max-width: 100%;
       box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
       vertical-align: top;
@@ -878,15 +879,17 @@ export function buildChatHtml(params: RenderChatParams): string {
       display: inline-block;
       object-fit: contain;
     }
-    /* Time (+ ticks) sit on the last line — no fake padding-right strip */
+    /* Time (+ ticks) sit on the last text line like Telegram iOS */
     .meta-inline {
-      float: right;
       display: inline-flex;
       align-items: flex-end;
       gap: 3px;
-      margin: 5px 0 -1px 10px;
+      margin: 0 0 -2px 7px;
       position: relative;
-      top: 3px;
+      top: 0;
+      vertical-align: -2px;
+      float: right;
+      clear: none;
       line-height: 1;
       white-space: nowrap;
     }

@@ -31,6 +31,19 @@ function guessGender(clientName?: string): "woman" | "man" {
   return FEMALE_NAME_HINTS.test(first) ? "woman" : "man";
 }
 
+function regionLabel(locale?: string): string {
+  const loc = (locale ?? "es-MX").toLowerCase();
+  if (loc.startsWith("ru")) return "Russian";
+  if (loc.startsWith("es-ar") || loc.includes("ar")) return "Argentine";
+  return "Mexican";
+}
+
+function uiLanguage(locale?: string): string {
+  const loc = (locale ?? "es-MX").toLowerCase();
+  if (loc.startsWith("ru")) return "Russian";
+  return "Spanish";
+}
+
 function buildPrompt(kind: SceneMediaKind, params: {
   projectName?: string;
   clientName?: string;
@@ -41,13 +54,15 @@ function buildPrompt(kind: SceneMediaKind, params: {
   const locale = params.locale ?? "es-MX";
   const currency = params.currency ?? "MXN";
   const project = params.projectName ?? "proyecto";
+  const language = uiLanguage(locale);
+  const region = regionLabel(locale);
 
   if (kind === "bet") {
     const odds = (1.4 + Math.random() * 2.4).toFixed(2);
     const stake = params.amountHint ?? `${500 + Math.floor(Math.random() * 2500)} ${currency}`;
     return [
       "Photorealistic smartphone screenshot of a sports betting / trading mobile app.",
-      `Locale UI in Spanish (${locale}), currency ${currency}.`,
+      `Locale UI in ${language} (${locale}), currency ${currency}.`,
       `Visible stake around ${stake}, odds ~${odds}, green profit accent.`,
       "Clean modern fintech UI, status bar, no watermarks, no logos of real banned brands,",
       "looks like a real phone screenshot sent in Telegram chat, portrait 9:16 framing.",
@@ -56,8 +71,8 @@ function buildPrompt(kind: SceneMediaKind, params: {
 
   if (kind === "conditions") {
     return [
-      `Photorealistic image of work conditions / terms card for a Latin American money project «${project}».`,
-      `Text language Spanish (${locale}), readable short bullet rules on a clean flyer or phone note.`,
+      `Photorealistic image of work conditions / terms card for a ${region} money project «${project}».`,
+      `Text language ${language} (${locale}), readable short bullet rules on a clean flyer or phone note.`,
       "Include deposit mention, payout mention, simple steps 1-2-3, soft professional design.",
       "Looks like a real JPEG/PNG sent in Telegram (not a UI mock with browser chrome).",
       "No watermarks, no QR spam, portrait orientation.",
@@ -85,7 +100,7 @@ function buildPrompt(kind: SceneMediaKind, params: {
   const gender = guessGender(params.clientName);
   const age = 22 + Math.floor(Math.random() * 16);
   return [
-    `Photorealistic close-up portrait selfie of a Mexican ${gender}, about ${age} years old,`,
+    `Photorealistic close-up portrait selfie of a ${region} ${gender}, about ${age} years old,`,
     "neutral background, natural lighting, looking at camera, bust crop for chat avatar,",
     "casual clothes, no text, no watermark, square framing.",
   ].join(" ");

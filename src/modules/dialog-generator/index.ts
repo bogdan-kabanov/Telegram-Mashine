@@ -141,6 +141,28 @@ function splitProblem(problem: string): string[] {
   return [problem];
 }
 
+function isRussianLocale(locale?: string): boolean {
+  return Boolean(locale?.toLowerCase().startsWith("ru"));
+}
+
+function fallbackManagerGreeting(locale?: string): string {
+  return isRussianLocale(locale)
+    ? "Здравствуйте, расскажите что случилось. Я здесь, чтобы помочь 💙"
+    : "Hola, cuéntame qué te pasa. Estoy aquí para ayudarte 💙";
+}
+
+function fallbackManagerEmpathy(locale?: string): string {
+  return isRussianLocale(locale)
+    ? "Мне очень жаль, что вам приходится через это проходить. Давайте посмотрим, чем я могу помочь 🙏"
+    : "Lo siento mucho por lo que estás pasando. Vamos a ver cómo podemos ayudarte con esto 🙏";
+}
+
+function fallbackDepositEncourage(locale?: string): string {
+  return isRussianLocale(locale)
+    ? "Да, доверяйте. Если идёте по шагам — всё получится 💙"
+    : "Sí, confía. Si sigues los pasos, todo va a salir bien 💙";
+}
+
 export class DialogGenerator {
   private readonly store = getFileStore();
 
@@ -152,7 +174,17 @@ export class DialogGenerator {
     return this.store.readJson("scripts/legends.json", clientLegendSchema.array());
   }
 
-  async loadManagerScript() {
+  async loadManagerScript(locale?: string) {
+    if (locale) {
+      const localized = `scripts/manager.${locale}.json`;
+      try {
+        if (await this.store.exists(localized)) {
+          return this.store.readJson(localized, managerScriptSchema);
+        }
+      } catch {
+        // fall through to default Spanish script
+      }
+    }
     return this.store.readJson("scripts/manager.json", managerScriptSchema);
   }
 
@@ -268,8 +300,9 @@ export class DialogGenerator {
     includeConditionsImage?: boolean;
     /** Script fallbacks when AI under-delivers greeting/trust conversation. */
     managerScript?: z.infer<typeof managerScriptSchema>;
+    locale?: string;
   }): DialogMessage[] {
-    const { bundle, legendId, stagesToUse } = params;
+    const { bundle, legendId, stagesToUse, locale } = params;
     const messages: DialogMessage[] = [];
     const push = (msg: Omit<DialogMessage, "id">) =>
       this.pushMessage(messages, msg, bundle.legend);
@@ -305,7 +338,7 @@ export class DialogGenerator {
       push({
         role: "manager",
         type: "text",
-        content: "Hola, cuéntame qué te pasa. Estoy aquí para ayudarte 💙",
+        content: fallbackManagerGreeting(locale),
         delayMinutes: STAGE_DELAY.greeting,
       });
     }
@@ -340,8 +373,7 @@ export class DialogGenerator {
       push({
         role: "manager",
         type: "text",
-        content:
-          "Lo siento mucho por lo que estás pasando. Vamos a ver cómo podemos ayudarte con esto 🙏",
+        content: fallbackManagerEmpathy(locale),
         delayMinutes: STAGE_DELAY.trust_building,
       });
       push({
@@ -442,7 +474,7 @@ export class DialogGenerator {
         push({
           role: "manager",
           type: "text",
-          content: "Sí, confía. Si sigues los pasos, todo va a salir bien 💙",
+          content: fallbackDepositEncourage(locale),
           delayMinutes: baseDelay + 4,
         });
         push({
@@ -576,8 +608,9 @@ export class DialogGenerator {
     };
     stagesToUse: readonly string[];
     isUniqueCircle: boolean;
+    locale?: string;
   }): Promise<DialogMessage[]> {
-    const { legend, managerScript, vars, agentContext, stagesToUse, isUniqueCircle } = params;
+    const { legend, managerScript, vars, agentContext, stagesToUse, isUniqueCircle, locale } = params;
     const messages: DialogMessage[] = [];
     const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg, legend);
 
@@ -627,7 +660,7 @@ export class DialogGenerator {
         push({
           role: "manager",
           type: "text",
-          content: "Sí, confía. Si sigues los pasos, todo va a salir bien 💙",
+          content: fallbackDepositEncourage(locale),
           delayMinutes: lastDelay + 2,
         });
         if (Array.isArray(capturaSteps)) {
@@ -738,7 +771,7 @@ export class DialogGenerator {
     const [scenarios, legends, managerScript] = await Promise.all([
       this.loadScenarios(),
       this.loadLegends(),
-      this.loadManagerScript(),
+      this.loadManagerScript(project.locale),
     ]);
 
     const scenario =
@@ -746,8 +779,16 @@ export class DialogGenerator {
       scenarios.find((s) => s.projectId === params.projectId && s.enabled);
     if (!scenario) throw new Error(`No scenario for project: ${params.projectId}`);
 
-    const availableLegends = legends.filter((l) => scenario.legendIds.includes(l.id));
-    if (availableLegends.length === 0) throw new Error("No legends for scenario");
+    const availableLegends = legends.filter(
+      (l) =>
+        scenario.legendIds.includes(l.id) &&
+        (l.locale === project.locale || l.locale.startsWith(project.locale.split("-")[0]!)),
+    );
+    if (availableLegends.length === 0) {
+      throw new Error(
+        `No legends for scenario=${scenario.id} locale=${project.locale} (ids: ${scenario.legendIds.join(", ")})`,
+      );
+    }
 
     const namePool = config.geo.clientNamePools[project.locale] ?? ["Cliente"];
     const localeProfile = resolveLocaleProfileFromConfig(config.geo, project.locale);
@@ -851,7 +892,11 @@ export class DialogGenerator {
           payoutMessage,
           seedLegend: {
             title: seedLegend.title,
-            openingPhrase: seedLegend.openingPhrase ?? "Hola… necesito tu ayuda",
+            openingPhrase: seedLegend.openingPhrase ?? (
+              project.locale.toLowerCase().startsWith("ru")
+                ? "Здравствуйте… мне нужна ваша помощь"
+                : "Hola… necesito tu ayuda"
+            ),
             problem: seedLegend.problem,
             motivation: seedLegend.motivation,
             doubtPhrases: seedLegend.doubtPhrases,
@@ -892,6 +937,7 @@ export class DialogGenerator {
         payoutMessage,
         includeConditionsImage: Boolean(project.conditionsImagePath),
         managerScript,
+        locale: project.locale,
         ...(project.conditionsTexts?.length ? { conditionsTexts: project.conditionsTexts } : {}),
         ...(betCaptions ? { betCaptions } : {}),
       });
@@ -904,6 +950,7 @@ export class DialogGenerator {
         agentContext,
         stagesToUse,
         isUniqueCircle,
+        locale: project.locale,
       });
     }
 

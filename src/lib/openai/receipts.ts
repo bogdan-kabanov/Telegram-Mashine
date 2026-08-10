@@ -185,7 +185,8 @@ export async function generateAiReceipt(
 
     try {
       const { trimWhitespaceInPlace } = await import("@/lib/media/trim-image");
-      await trimWhitespaceInPlace(params.outputPath, { threshold: 22, padding: 6 });
+      // Only trim near-pure white letterbox (threshold 4) — higher values eat light bank UIs.
+      await trimWhitespaceInPlace(params.outputPath, { threshold: 4, padding: 8 });
     } catch {
       // trim is best-effort; keep original if sharp fails
     }

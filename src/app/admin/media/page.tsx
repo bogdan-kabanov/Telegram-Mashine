@@ -1,4 +1,5 @@
 import { bootstrapApp } from "@/lib/bootstrap";
+import { countUnusedClientPhotos } from "@/lib/client-photos";
 import { loadAppConfig } from "@/lib/config/loader";
 import { loadLegendsFromDisk } from "@/lib/config/writer";
 
@@ -9,7 +10,11 @@ export const dynamic = "force-dynamic";
 
 export default async function MediaPage() {
   await bootstrapApp();
-  const [config, legends] = await Promise.all([loadAppConfig(), loadLegendsFromDisk()]);
+  const [config, legends, photoPool] = await Promise.all([
+    loadAppConfig(),
+    loadLegendsFromDisk(),
+    countUnusedClientPhotos(),
+  ]);
 
   return (
     <AdminShell
@@ -41,8 +46,15 @@ export default async function MediaPage() {
             <div>
               <h3>Фото для историй</h3>
               <p>
-                Загрузите сами или сгенерируйте ИИ ниже. Каждое фото — один раз. Если пул пуст и в .env стоит{" "}
-                <code>AI_CLIENT_PHOTOS=fallback</code>, бот сам дорисует фото при отзыве.
+                Загрузите сами или сгенерируйте ИИ ниже. Каждое фото — один раз. Сейчас в пуле{" "}
+                <strong>
+                  {photoPool.unused} свободных из {photoPool.total}
+                </strong>
+                {photoPool.unused === 0
+                  ? " — без новых загрузок или AI_CLIENT_PHOTOS=fallback фото в отзыве не появится."
+                  : "."}{" "}
+                Если пул пуст и в .env стоит <code>AI_CLIENT_PHOTOS=fallback</code>, бот сам дорисует
+                фото при отзыве.
               </p>
             </div>
           </div>

@@ -37,6 +37,19 @@ export function dialogToRenderMessages(
         msg.type === "image";
 
       if (needsMedia && !imageUrl) {
+        // Never silently drop the client's story photo — leave a visible gap warning
+        // only for other media; story images stay as a text stub so pagination still
+        // includes the turn (operator sees something went wrong in-chat).
+        if (msg.type === "image") {
+          return {
+            id: msg.id,
+            role: msg.role,
+            type: "text" as const,
+            content: "📷",
+            delayMinutes: msg.delayMinutes,
+            read: msg.role === "manager",
+          };
+        }
         return null;
       }
 
@@ -103,7 +116,8 @@ function resolveImageUrl(
   if (msg.type === "bet") {
     if (msg.content === "bet_1") return mediaAssets.bet1 ?? undefined;
     if (msg.content === "bet_2") return mediaAssets.bet2 ?? undefined;
-    return mediaAssets.bet3 ?? undefined;
+    if (msg.content === "bet_3") return mediaAssets.bet3 ?? undefined;
+    return undefined;
   }
   if (msg.type === "receipt") return mediaAssets.receipt ?? undefined;
   return undefined;

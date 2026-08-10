@@ -48,6 +48,9 @@ export const reviewPackages = sqliteTable("review_packages", {
   pinVideoNote: integer("pin_video_note").notNull().default(0),
   screenshots: text("screenshots").notNull(),
   media: text("media").notNull(),
+  dialog: text("dialog"),
+  renderMedia: text("render_media"),
+  dialogTranslations: text("dialog_translations"),
   publishedAt: text("published_at"),
   createdAt: text("created_at").notNull(),
 });

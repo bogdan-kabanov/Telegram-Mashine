@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { existsSync, statSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import path from "path";
 import { and, desc, eq, gte } from "drizzle-orm";
 
@@ -131,7 +131,7 @@ async function listProjectBets(projectId: string): Promise<MediaAsset[]> {
     .from(mediaAssets)
     .where(and(eq(mediaAssets.type, "bet"), eq(mediaAssets.projectId, projectId)));
 
-  return sortBetsStable(
+  const fromDb = sortBetsStable(
     rows
       .filter((r) => isUsableBetFile(r.filename, r.path))
       .map((r) => ({
@@ -142,6 +142,26 @@ async function listProjectBets(projectId: string): Promise<MediaAsset[]> {
         projectId: r.projectId,
       })),
   );
+  if (fromDb.length > 0) return fromDb;
+
+  // Disk fallback when media_assets is empty (fresh DB / Docker volume).
+  const dataDir = process.env.DATA_DIR ?? "./data";
+  const dir = path.resolve(dataDir, "media/bets", projectId);
+  if (!existsSync(dir)) return [];
+  try {
+    const files = readdirSync(dir).filter((f) => isUsableBetFile(f, path.join(dir, f)));
+    return sortBetsStable(
+      files.map((filename) => ({
+        id: randomUUID(),
+        type: "bet" as const,
+        filename,
+        path: `data/media/bets/${projectId}/${filename}`,
+        projectId,
+      })),
+    );
+  } catch {
+    return [];
+  }
 }
 
 async function recentBetPaths(projectId: string, days: number): Promise<Set<string>> {

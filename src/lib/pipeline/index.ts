@@ -112,23 +112,19 @@ export class ReviewPipeline {
       ]);
 
       const sequentialBets = betPackPick?.assets ?? [];
-      // Fill missing slots via AI / random when the ordered pool is thin
-      const betSlots: Array<{ path?: string } | null> = [
-        sequentialBets[0] ?? null,
-        sequentialBets[1] ?? null,
-        sequentialBets[2] ?? null,
-      ];
-      for (let i = 0; i < 3; i++) {
-        if (betSlots[i]?.path) continue;
-        betSlots[i] = await mediaHandler.resolveProjectImage("bet", {
+      // Use one complete pack only — never fill slots from random other packs
+      // (that produced mixed/out-of-order bets in QA).
+      const bet1 = sequentialBets[0] ?? null;
+      const bet2 = sequentialBets[1] ?? null;
+      const bet3 = sequentialBets[2] ?? null;
+      if (!bet1?.path || !bet2?.path || !bet3?.path) {
+        await logger.warn("Incomplete bet pack — slots left empty rather than mixing packs", {
           projectId: params.projectId,
-          projectName: project.name,
-          locale: project.locale,
-          currency: project.currency,
           reviewId,
+          pack: betPackPick?.packNumber ?? null,
+          have: sequentialBets.map((a) => a.filename),
         });
       }
-      const [bet1, bet2, bet3] = betSlots;
 
       await report(progress, 3, "photo", "Фото клиента", "Пул медиатеки или генерация ИИ…");
       // Bias AI photo by early client problem texts (hospital / illness proof).
@@ -138,23 +134,58 @@ export class ReviewPipeline {
         .map((m) => m.content)
         .join(" ")
         .slice(0, 400);
-      const uniquePhoto = await resolveClientPhoto({
-        projectId: params.projectId,
-        reviewId,
-        clientName: dialog.clientName,
-        ...(storyHint ? { hint: storyHint } : {}),
-        locale: project.locale,
-      });
+      const imageMsg = dialog.messages.find((m) => m.type === "image");
+      const legendIdForPhoto =
+        (typeof imageMsg?.metadata?.legendId === "string" && imageMsg.metadata.legendId) ||
+        (typeof dialog.legendId === "string" ? dialog.legendId : null);
+
+      let uniquePhoto: { path: string; filename: string; source: "pool" | "ai" | "legend" } | null =
+        null;
+
+      // Prefer legend-tagged story photos when the dialog asks for one.
+      if (legendIdForPhoto && !legendIdForPhoto.startsWith("ai_")) {
+        const legendPick = await mediaHandler.pickStoryPhoto(legendIdForPhoto);
+        if (legendPick?.path && mediaHandler.isValidFile(legendPick.path)) {
+          const { markClientPhotoUsed } = await import("@/lib/client-photos");
+          await markClientPhotoUsed({
+            mediaPath: legendPick.path,
+            projectId: params.projectId,
+            reviewId,
+          });
+          uniquePhoto = {
+            path: legendPick.path,
+            filename: legendPick.filename,
+            source: "legend",
+          };
+        }
+      }
+
+      if (!uniquePhoto) {
+        uniquePhoto = await resolveClientPhoto({
+          projectId: params.projectId,
+          reviewId,
+          clientName: dialog.clientName,
+          ...(storyHint ? { hint: storyHint } : {}),
+          locale: project.locale,
+        });
+      }
 
       if (!uniquePhoto) {
         await logger.warn(
           "No client photo — upload story_photo assets or set AI_CLIENT_PHOTOS=fallback/always with OPENAI_API_KEY",
-          { projectId: params.projectId },
+          { projectId: params.projectId, legendId: legendIdForPhoto },
         );
       } else if (uniquePhoto.source === "ai") {
         await logger.info("Using AI-generated client photo", {
           projectId: params.projectId,
           reviewId,
+          path: uniquePhoto.path,
+        });
+      } else if (uniquePhoto.source === "legend") {
+        await logger.info("Using legend story photo", {
+          projectId: params.projectId,
+          reviewId,
+          legendId: legendIdForPhoto,
           path: uniquePhoto.path,
         });
       }
@@ -216,26 +247,30 @@ export class ReviewPipeline {
       review = { ...review, id: reviewId };
 
       await report(progress, 5, "render", "Рендер скриншотов", "Playwright снимает экраны чата…");
+      const renderMedia = {
+        sticker: sticker?.path ?? null,
+        storyPhoto: uniquePhoto?.path ?? null,
+        conditions: conditions?.path ?? project.conditionsImagePath ?? null,
+        bet1: bet1?.path ?? null,
+        bet2: bet2?.path ?? null,
+        bet3: bet3?.path ?? null,
+        receipt: receipt.path,
+        captura: captura.path,
+      };
+
       const renderResult = await getChatRenderer().renderDialog({
         dialog,
         project,
         reviewId,
-        mediaAssets: {
-          sticker: sticker?.path ?? null,
-          storyPhoto: uniquePhoto?.path ?? null,
-          conditions: conditions?.path ?? project.conditionsImagePath ?? null,
-          bet1: bet1?.path ?? null,
-          bet2: bet2?.path ?? null,
-          bet3: bet3?.path ?? null,
-          receipt: receipt.path,
-          captura: captura.path,
-        },
+        mediaAssets: renderMedia,
       });
 
       const media: ReviewPackage["media"] = [];
       if (captura.path) media.push({ type: "receipt", path: captura.path });
       if (receipt.path) media.push({ type: "receipt", path: receipt.path });
       if (bet1?.path) media.push({ type: "bet", path: bet1.path });
+      if (bet2?.path) media.push({ type: "bet", path: bet2.path });
+      if (bet3?.path) media.push({ type: "bet", path: bet3.path });
       if (conditions?.path) media.push({ type: "conditions", path: conditions.path });
       if (uniquePhoto?.path && mediaHandler.isValidFile(uniquePhoto.path)) {
         media.push({ type: "photo", path: uniquePhoto.path });
@@ -254,6 +289,8 @@ export class ReviewPipeline {
         ...review,
         screenshots: renderResult.screenshots,
         media,
+        dialog,
+        renderMedia,
         phase: "partial",
       };
 

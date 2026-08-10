@@ -12,7 +12,7 @@ export async function trimWhitespaceImage(
   inputPath: string,
   options?: { threshold?: number; padding?: number },
 ): Promise<{ path: string; trimmed: boolean }> {
-  const threshold = options?.threshold ?? 22;
+  const threshold = options?.threshold ?? 4;
   const padding = options?.padding ?? 6;
 
   if (!existsSync(inputPath)) {
@@ -71,7 +71,7 @@ export async function trimWhitespaceInPlace(
   filePath: string,
   options?: { threshold?: number; padding?: number },
 ): Promise<boolean> {
-  const threshold = options?.threshold ?? 22;
+  const threshold = options?.threshold ?? 4;
   const padding = options?.padding ?? 6;
   if (!existsSync(filePath)) return false;
 
