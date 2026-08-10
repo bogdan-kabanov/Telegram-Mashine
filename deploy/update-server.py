@@ -24,6 +24,8 @@ EXCLUDE_DIRS = {
     "agent-transcripts",
     "terminals",
     ".tmp-test-photos",
+    ".tmp-tails",
+    "фит",
 }
 EXCLUDE_PREFIXES = (
     "data/app.db",
@@ -33,6 +35,9 @@ EXCLUDE_PREFIXES = (
     "data/renders/",
     "public/renders/",
     "public/2026.",
+    "public/ставки/",
+    "data/media/receipt_templates/_backup_",
+    "data/media/receipt_templates/_vlad_fit_refs/",
     ".tmp-",
 )
 
@@ -81,6 +86,7 @@ def connect() -> paramiko.SSHClient:
     ssh_dir = Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or "") / ".ssh"
     key_candidates = [
         os.environ.get("DEPLOY_SSH_KEY_PATH", ""),
+        str(ssh_dir / "github_actions_bot_ai"),
         str(ssh_dir / "id_ed25519"),
         str(ssh_dir / "max_desktop_deploy"),
         str(ssh_dir / "id_rsa"),
@@ -135,7 +141,12 @@ def run(client: paramiko.SSHClient, cmd: str, timeout: int = 7200) -> int:
     code = stdout.channel.recv_exit_status()
     text = (out + err).strip()
     if text:
-        print(text[-12000:])
+        # Windows consoles (cp1251) choke on some Docker/build glyphs.
+        safe = text[-12000:].encode(sys.stdout.encoding or "utf-8", errors="replace").decode(
+            sys.stdout.encoding or "utf-8",
+            errors="replace",
+        )
+        print(safe)
     print(f"exit={code}")
     return code
 
