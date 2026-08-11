@@ -175,15 +175,32 @@ export class DialogGenerator {
   }
 
   async loadManagerScript(locale?: string) {
+    const candidates: string[] = [];
     if (locale) {
-      const localized = `scripts/manager.${locale}.json`;
-      try {
-        if (await this.store.exists(localized)) {
-          return this.store.readJson(localized, managerScriptSchema);
-        }
-      } catch {
-        // fall through to default Spanish script
+      candidates.push(`scripts/manager.${locale}.json`);
+      const lang = locale.split("-")[0];
+      if (lang && lang !== locale) {
+        candidates.push(`scripts/manager.${lang}.json`);
       }
+    }
+
+    for (const path of candidates) {
+      try {
+        if (!(await this.store.exists(path))) continue;
+        return await this.store.readJson(path, managerScriptSchema);
+      } catch (error) {
+        await logger.warn("Manager script unreadable — trying next", {
+          path,
+          error: error instanceof Error ? error.message : "unknown",
+        });
+      }
+    }
+
+    if (locale && !locale.toLowerCase().startsWith("es")) {
+      await logger.warn("No localized manager script — falling back to Spanish default", {
+        locale,
+        tried: candidates,
+      });
     }
     return this.store.readJson("scripts/manager.json", managerScriptSchema);
   }
@@ -869,6 +886,7 @@ export class DialogGenerator {
       managerName: project.managerName,
       deposit: amountPack.deposit,
       profitFinal: amountPack.profitFinal,
+      locale: project.locale,
     };
 
     const isSmallReview = params.reviewType === "small";

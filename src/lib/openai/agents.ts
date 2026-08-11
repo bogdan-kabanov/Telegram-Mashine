@@ -204,7 +204,8 @@ export async function generateFullDialogBundle(
   const system = [
     locale.toLowerCase().startsWith("ru")
       ? `You write realistic Telegram chats in Russian (${locale}) between a Russian client and a female investment manager.`
-      : `You write realistic Telegram chats in Spanish (${locale}) between a Mexican client and a female investment manager.`,
+      : `You write realistic Telegram chats in Spanish (${locale}) between a Latin-American client and a female investment manager.`,
+    `ALL chat texts (client AND manager) must be in the same language for locale ${locale}. Never mix Russian and Spanish in one dialog.`,
     `Return ONLY valid JSON. No markdown, no English in chat texts.`,
     `Do NOT invent CLABE numbers, bank account digits, payment links, or amounts other than those given.`,
     `When a turn must include deposit/completion/payout details, copy the provided template text VERBATIM.`,

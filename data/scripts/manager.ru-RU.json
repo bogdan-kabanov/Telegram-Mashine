@@ -1,0 +1,50 @@
+{
+  "stages": {
+    "greeting": [
+      { "role": "manager", "type": "text", "content": "Здравствуйте 👋 Расскажите, что случилось?", "delayMinutes": 2 },
+      { "role": "manager", "type": "text", "content": "Можете говорить спокойно, я здесь чтобы помочь", "delayMinutes": 4 }
+    ],
+    "trust_building": [
+      { "role": "manager", "type": "text", "content": "Понимаю вашу ситуацию, мне очень жаль 💙", "delayMinutes": 12 },
+      { "role": "manager", "type": "text", "content": "Обычно весь процесс занимает около полутора–двух часов, без спешки", "delayMinutes": 14 },
+      { "role": "manager", "type": "text", "content": "Объясню, как работает наша схема инвестирования по шагам 📊", "delayMinutes": 16 },
+      { "role": "manager", "type": "text", "content": "Сначала смотрим рынок, потом делаем сделки и в конце делим прибыль 💰", "delayMinutes": 18 },
+      { "role": "manager", "type": "text", "content": "Многие в похожей ситуации уже смогли выбраться с нашей помощью", "delayMinutes": 20 }
+    ],
+    "conditions": [
+      { "role": "manager", "type": "conditions", "content": "conditions", "delayMinutes": 22 }
+    ],
+    "deposit": [
+      { "role": "manager", "type": "text", "content": "{{depositMessage}}", "delayMinutes": 32 }
+    ],
+    "bet_1": [
+      { "role": "manager", "type": "bet", "content": "bet_1", "delayMinutes": 48 }
+    ],
+    "bet_2": [
+      { "role": "manager", "type": "bet", "content": "bet_2", "delayMinutes": 75 }
+    ],
+    "bet_3": [
+      { "role": "manager", "type": "bet", "content": "bet_3", "delayMinutes": 102 }
+    ],
+    "completion": [
+      { "role": "manager", "type": "text", "content": "{{completionMessage}}", "delayMinutes": 112 }
+    ],
+    "payout": [
+      { "role": "manager", "type": "receipt", "content": "receipt", "delayMinutes": 118 },
+      { "role": "manager", "type": "text", "content": "{{payoutMessage}}", "delayMinutes": 119 }
+    ],
+    "gratitude": []
+  },
+  "clientReplies": {
+    "greeting": ["doubt"],
+    "trust_building": ["Сколько примерно по времени? Мне нельзя долго ждать", "doubt"],
+    "deposit": ["Да, теперь понятнее. Точно всё получится?", "Хорошо. У вас очень нормальные условия."],
+    "deposit_captura": [{ "type": "captura", "content": "payment_proof", "delayMinutes": 40 }],
+    "bet_1": ["Результаты просто огонь", "Не могу поверить"],
+    "bet_2": ["Так и продолжайте, пожалуйста", "Вау… не ожидал такое увидеть"],
+    "bet_3": ["Это меняет мне жизнь", "Не знаю, как вас благодарить"],
+    "completion": ["Так быстро???", "Не думал, что будет такая сумма"],
+    "payout": ["gratitude"],
+    "gratitude": ["gratitude"]
+  }
+}
