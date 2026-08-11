@@ -26,40 +26,31 @@ python deploy/deploy.py
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `CI` | push/PR → `main` | `npm ci`, typecheck, vitest |
-| `Deploy` | push → `main` or manual | SCP archive → SSH → `deploy/remote-update.sh` |
+| `CI` | push/PR → `main` | `npm ci`, typecheck, vitest (GitHub-hosted) |
+| `Deploy` | push → `main` or manual | self-hosted runner on VPS → rsync → `deploy/remote-update.sh` |
 
-### Required repository secrets
+Deploy runs on the VPS (`runs-on: [self-hosted, linux, bot-ai]`). No inbound SSH from GitHub is required.
 
-Settings → Secrets and variables → Actions:
+### One-time: install self-hosted runner on the VPS
 
-| Secret | Example |
-|--------|---------|
-| `DEPLOY_HOST` | `80.78.248.96` |
-| `DEPLOY_USER` | `root` |
-| `DEPLOY_SSH_KEY` | private key PEM (`-----BEGIN OPENSSH PRIVATE KEY-----` …) |
-| `DEPLOY_SSH_PORT` | `22` (optional) |
-| `DEPLOY_APP_DIR` | `/opt/bot-ai` (optional) |
+1. Open https://github.com/bogdan-kabanov/ai-telegram-panel/settings/actions/runners/new  
+2. Copy the short-lived **registration token**
+3. On the server (as root):
 
-Also create a GitHub **Environment** named `production` (Actions → Environments), or remove `environment: production` from `.github/workflows/deploy.yml`.
-
-### Install deploy key on the server (once)
-
-A dedicated key already lives at `~/.ssh/github_actions_bot_ai` on the author machine
-(public half is on the VPS). To register secrets:
-
-```powershell
-gh auth login
-pwsh deploy/setup-github-secrets.ps1
-gh workflow run Deploy.yml
+```bash
+# from a machine with SSH access:
+scp deploy/install-github-runner.sh root@80.78.248.96:/tmp/
+ssh root@80.78.248.96 'RUNNER_TOKEN=XXXX bash /tmp/install-github-runner.sh'
 ```
 
-Or manually in GitHub → Settings → Secrets → Actions:
+Runner installs under `/opt/actions-runner` as a systemd service (`bot-ai-vps`).
 
-| Secret | Value |
-|--------|--------|
-| `DEPLOY_HOST` | `80.78.248.96` |
-| `DEPLOY_USER` | `root` |
-| `DEPLOY_SSH_KEY` | contents of `~/.ssh/github_actions_bot_ai` (private key) |
+SSH deploy secrets (`DEPLOY_HOST` / `DEPLOY_SSH_KEY`) are optional leftovers from the old SCP flow — not used by current Deploy.
+
+### Local one-shot (still works)
+
+```powershell
+python deploy/update-server.py
+```
 
 Server `.env` is **not** managed by CI — edit it on the VPS only.

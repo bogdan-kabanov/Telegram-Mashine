@@ -12,105 +12,48 @@ concurrency:
 jobs:
   deploy:
     name: Build on server
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bot-ai]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Pack release (keep server .env / DB / renders)
+      - name: Sync release into /opt/bot-ai
         run: |
           set -euo pipefail
-          # Archive outside the tree so tar does not see its own output change.
-          OUT="/tmp/bot-ai-release.tar.gz"
-          tar -czf "$OUT" \
-            --exclude='./.git' \
-            --exclude='./.next' \
-            --exclude='./node_modules' \
-            --exclude='./.cursor' \
-            --exclude='./.env' \
-            --exclude='./.env.local' \
-            --exclude='./data/app.db' \
-            --exclude='./data/app.db-shm' \
-            --exclude='./data/app.db-wal' \
-            --exclude='./data/logs' \
-            --exclude='./data/runtime' \
-            --exclude='./data/reviews' \
-            --exclude='./data/renders' \
-            --exclude='./public/renders' \
-            --exclude='./public/ставки' \
-            --exclude='./public/2026.07.22' \
-            --exclude='./public/2026.07.23' \
-            --exclude='./фит' \
-            --exclude='./.tmp-test-photos' \
-            --exclude='./.tmp-tails' \
-            --exclude='./data/media/receipt_templates/_backup_before_fit_20260811_011109' \
-            --exclude='./data/media/receipt_templates/_vlad_fit_refs' \
-            --exclude='./bot-ai-release.tar.gz' \
-            -C "$GITHUB_WORKSPACE" .
-          cp "$OUT" "$GITHUB_WORKSPACE/bot-ai-release.tar.gz"
-          ls -lh "$GITHUB_WORKSPACE/bot-ai-release.tar.gz"
-
-      - name: Prepare SSH key
-        run: |
-          set -euo pipefail
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          # Force IPv4 — avoids flaky dual-stack paths to the VPS.
-          {
-            echo "Host deploy-target"
-            echo "  HostName ${{ secrets.DEPLOY_HOST }}"
-            echo "  User ${{ secrets.DEPLOY_USER }}"
-            echo "  Port ${{ secrets.DEPLOY_SSH_PORT || 22 }}"
-            echo "  IdentityFile ~/.ssh/deploy_key"
-            echo "  IdentitiesOnly yes"
-            echo "  AddressFamily inet"
-            echo "  StrictHostKeyChecking accept-new"
-            echo "  ConnectTimeout 20"
-            echo "  ConnectionAttempts 3"
-            echo "  ServerAliveInterval 15"
-          } > ~/.ssh/config
-          chmod 600 ~/.ssh/config
-
-      - name: Upload archive to server (retry)
-        run: |
-          set -euo pipefail
-          for i in 1 2 3 4 5 6 7 8; do
-            echo "SCP attempt $i..."
-            if scp -F ~/.ssh/config bot-ai-release.tar.gz deploy-target:/tmp/bot-ai-release.tar.gz; then
-              echo "SCP ok"
-              exit 0
-            fi
-            echo "SCP failed; sleeping before retry..."
-            sleep $((i * 15))
-          done
-          echo "SCP failed after retries"
-          exit 1
-
-      - name: Extract, rebuild, healthcheck (retry SSH)
-        run: |
-          set -euo pipefail
-          SCRIPT=$(cat <<'EOF'
-          set -eu
-          APP_DIR="/opt/bot-ai"
+          APP_DIR="${DEPLOY_APP_DIR:-/opt/bot-ai}"
           mkdir -p "$APP_DIR"
-          cd "$APP_DIR"
-          tar -xzf /tmp/bot-ai-release.tar.gz
-          rm -f /tmp/bot-ai-release.tar.gz
-          test -f .env || { echo "ERROR: $APP_DIR/.env missing on server"; exit 1; }
-          chmod 600 .env
-          chmod +x deploy/remote-update.sh
-          bash deploy/remote-update.sh
-          EOF
-          )
-          for i in 1 2 3 4 5; do
-            echo "SSH attempt $i..."
-            if ssh -F ~/.ssh/config deploy-target "$SCRIPT"; then
-              echo "Deploy ok"
-              exit 0
-            fi
-            echo "SSH failed; sleeping before retry..."
-            sleep $((i * 15))
-          done
-          echo "SSH deploy failed after retries"
-          exit 1
+          # Sync code onto the live tree. Never touch secrets / DB / runtime media.
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.next/' \
+            --exclude='node_modules/' \
+            --exclude='.cursor/' \
+            --exclude='.env' \
+            --exclude='.env.local' \
+            --exclude='data/app.db' \
+            --exclude='data/app.db-shm' \
+            --exclude='data/app.db-wal' \
+            --exclude='data/logs/' \
+            --exclude='data/runtime/' \
+            --exclude='data/reviews/' \
+            --exclude='data/renders/' \
+            --exclude='public/renders/' \
+            --exclude='public/ставки/' \
+            --exclude='public/2026.07.22/' \
+            --exclude='public/2026.07.23/' \
+            --exclude='фит/' \
+            --exclude='.tmp-test-photos/' \
+            --exclude='.tmp-tails/' \
+            --exclude='data/media/receipt_templates/_backup_before_fit_20260811_011109/' \
+            --exclude='data/media/receipt_templates/_vlad_fit_refs/' \
+            --exclude='bot-ai-release.tar.gz' \
+            "$GITHUB_WORKSPACE"/ "$APP_DIR"/
+          test -f "$APP_DIR/.env" || { echo "ERROR: $APP_DIR/.env missing on server"; exit 1; }
+          chmod 600 "$APP_DIR/.env"
+          chmod +x "$APP_DIR/deploy/remote-update.sh"
+
+      - name: Rebuild container + healthcheck
+        run: |
+          set -euo pipefail
+          export APP_DIR="${DEPLOY_APP_DIR:-/opt/bot-ai}"
+          bash "$APP_DIR/deploy/remote-update.sh"
