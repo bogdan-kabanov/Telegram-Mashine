@@ -1,7 +1,8 @@
-import { createReadStream, existsSync, mkdirSync, writeFileSync } from "fs";
+import { createReadStream, copyFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { toFile } from "openai";
+import sharp from "sharp";
 
 import { formatAmount } from "@/lib/format";
 import { createLogger } from "@/lib/runtime/manager";
@@ -49,6 +50,41 @@ export function pickReceiptTemplate(params: {
   }
 
   return existing[Math.floor(Math.random() * existing.length)]!;
+}
+
+/**
+ * Use a project receipt template as-is (PNG). Prefer this over HTML stubs when
+ * OpenAI image edit is unavailable (e.g. region 403 on the VPS).
+ */
+export async function materializeReceiptTemplate(params: {
+  project: ProjectConfig;
+  role: ReceiptRole;
+  outputPath: string;
+  dataDir?: string;
+}): Promise<{ path: string; template: string } | null> {
+  const template = pickReceiptTemplate({
+    project: params.project,
+    role: params.role,
+    ...(params.dataDir ? { dataDir: params.dataDir } : {}),
+  });
+  if (!template) return null;
+
+  mkdirSync(path.dirname(params.outputPath), { recursive: true });
+  const ext = path.extname(template.absPath).toLowerCase();
+  if (ext === ".png") {
+    copyFileSync(template.absPath, params.outputPath);
+  } else {
+    await sharp(template.absPath).png().toFile(params.outputPath);
+  }
+
+  await logger.warn("Using receipt template as-is (AI edit unavailable)", {
+    projectId: params.project.id,
+    role: params.role,
+    template: template.filename,
+    path: params.outputPath,
+  });
+
+  return { path: params.outputPath, template: template.filename };
 }
 
 function formatReceiptAmount(amount: number, currency: string, locale: string): string {

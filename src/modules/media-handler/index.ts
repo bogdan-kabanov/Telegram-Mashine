@@ -5,7 +5,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
-import { generateAiReceipt, getAiReceiptsMode } from "@/lib/openai/receipts";
+import { generateAiReceipt, getAiReceiptsMode, materializeReceiptTemplate } from "@/lib/openai/receipts";
 import { createLogger } from "@/lib/runtime/manager";
 import type { ProjectConfig } from "@/lib/schemas/projects";
 import { getFileStore } from "@/lib/storage/file-store";
@@ -285,7 +285,7 @@ export class MediaHandler {
     /** Project-level style overrides bank mapping when set. */
     style?: ReceiptBankStyle;
     project?: ProjectConfig;
-  }): Promise<{ id: string; path: string; source: "ai" | "html" }> {
+  }): Promise<{ id: string; path: string; source: "ai" | "template" | "html" }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/receipts");
     const outputPath = path.join(outputDir, `${id}.png`);
@@ -310,9 +310,28 @@ export class MediaHandler {
         return { id, path: outputPath, source: "ai" };
       }
       if (mode === "always") {
-        await logger.warn("AI receipt required but failed — falling back to HTML", {
+        await logger.warn("AI receipt required but failed — trying template/HTML", {
           projectId: params.project.id,
         });
+      }
+    }
+
+    // Prefer real bank screenshots from фит over HTML stubs when AI is geo-blocked.
+    if (params.project) {
+      const fromTemplate = await materializeReceiptTemplate({
+        project: params.project,
+        role: "manager",
+        outputPath,
+      });
+      if (fromTemplate) {
+        await logger.info("Receipt generated", {
+          id,
+          path: outputPath,
+          bankId: params.bankId,
+          source: "template",
+          template: fromTemplate.template,
+        });
+        return { id, path: outputPath, source: "template" };
       }
     }
 
@@ -349,7 +368,7 @@ export class MediaHandler {
     style?: CapturaBankStyle;
     project?: ProjectConfig;
     accountLastDigits?: string;
-  }): Promise<{ id: string; path: string; source: "ai" | "html" }> {
+  }): Promise<{ id: string; path: string; source: "ai" | "template" | "html" }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/capturas");
     const outputPath = path.join(outputDir, `${id}.png`);
@@ -378,9 +397,27 @@ export class MediaHandler {
         return { id, path: outputPath, source: "ai" };
       }
       if (mode === "always") {
-        await logger.warn("AI captura required but failed — falling back to HTML", {
+        await logger.warn("AI captura required but failed — trying template/HTML", {
           projectId: params.project.id,
         });
+      }
+    }
+
+    if (params.project) {
+      const fromTemplate = await materializeReceiptTemplate({
+        project: params.project,
+        role: "client",
+        outputPath,
+      });
+      if (fromTemplate) {
+        await logger.info("Captura generated", {
+          id,
+          path: outputPath,
+          bankId: params.bankId,
+          source: "template",
+          template: fromTemplate.template,
+        });
+        return { id, path: outputPath, source: "template" };
       }
     }
 
