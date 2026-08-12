@@ -970,10 +970,10 @@ export function buildChatHtml(params: RenderChatParams): string {
       color: #666;
       min-width: 180px;
     }
-    /* Telegram iOS photo message: portrait-friendly, no floating white pad */
+    /* Telegram iOS photo: shrink-wrap to visible pixels (no letterbox beside tall receipts). */
     .bubble-image {
       display: block;
-      width: 240px;
+      width: auto;
       max-width: min(240px, 100%);
       height: auto;
       max-height: 360px;
@@ -983,14 +983,12 @@ export function buildChatHtml(params: RenderChatParams): string {
       background: transparent;
     }
     .bubble-image-conditions {
-      width: 278px;
       max-width: min(278px, 100%);
       max-height: 400px;
     }
     .bubble-image-bet,
     .bubble-image-receipt,
     .bubble-image-captura {
-      width: 250px;
       max-width: min(250px, 100%);
       max-height: 340px;
     }
@@ -998,7 +996,9 @@ export function buildChatHtml(params: RenderChatParams): string {
       padding: 2px !important;
       background: transparent !important;
       box-shadow: 0 1px 0.5px rgba(0,0,0,0.13) !important;
-      overflow: visible;
+      overflow: hidden;
+      width: fit-content;
+      max-width: 100%;
       border-radius: 16px;
       line-height: 0;
       position: relative;
