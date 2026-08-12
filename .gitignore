@@ -19,6 +19,7 @@
 !.env.example
 !.env.docker.example
 /config/ai-settings.json
+/config/proxy-settings.json
 
 # debug / IDE
 npm-debug.log*

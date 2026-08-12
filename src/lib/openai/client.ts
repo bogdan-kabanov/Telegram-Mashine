@@ -1,18 +1,36 @@
 import OpenAI from "openai";
 
+import { getOutboundFetch } from "@/lib/http/outbound-fetch";
 import { createLogger } from "@/lib/runtime/manager";
 import { getEnv } from "@/lib/schemas/env";
+import { getProxyUrl } from "@/lib/config/proxy-settings";
 
 const logger = createLogger("openai");
 
 let clientInstance: OpenAI | null = null;
+let clientFingerprint: string | null = null;
+
+function fingerprint(apiKey: string, proxyUrl: string): string {
+  return `${apiKey}::${proxyUrl}`;
+}
+
+export function resetOpenAIClient(): void {
+  clientInstance = null;
+  clientFingerprint = null;
+}
 
 export function getOpenAIClient(): OpenAI | null {
   const env = getEnv();
   if (!env.OPENAI_API_KEY) return null;
 
-  if (!clientInstance) {
-    clientInstance = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+  const proxyUrl = getProxyUrl();
+  const nextFp = fingerprint(env.OPENAI_API_KEY, proxyUrl);
+  if (!clientInstance || clientFingerprint !== nextFp) {
+    clientInstance = new OpenAI({
+      apiKey: env.OPENAI_API_KEY,
+      fetch: getOutboundFetch(),
+    });
+    clientFingerprint = nextFp;
   }
   return clientInstance;
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import path from "path";
 
+import { getOutboundFetch } from "@/lib/http/outbound-fetch";
 import { getEnv } from "@/lib/schemas/env";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
@@ -77,7 +78,7 @@ export class TelegramClient {
       init.body = JSON.stringify(body);
     }
 
-    const response = await fetch(url, init);
+    const response = await getOutboundFetch()(url, init);
     return this.parseResponse<T>(response, method);
   }
 
@@ -101,7 +102,7 @@ export class TelegramClient {
       form.append(key, new Blob([buffer], { type: mime }), path.basename(filePath));
     }
 
-    const response = await fetch(url, { method: "POST", body: form });
+    const response = await getOutboundFetch()(url, { method: "POST", body: form });
     return this.parseResponse<T>(response, method);
   }
 

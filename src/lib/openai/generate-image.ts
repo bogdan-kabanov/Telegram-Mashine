@@ -1,3 +1,4 @@
+import { getOutboundFetch } from "@/lib/http/outbound-fetch";
 import { getEnv, resetEnvCache } from "@/lib/schemas/env";
 import { getOpenAIClient } from "./client";
 
@@ -34,7 +35,7 @@ export async function generateImagePngBase64(prompt: string): Promise<GeneratedI
       const first = response.data?.[0];
       let b64 = first?.b64_json ?? null;
       if (!b64 && first?.url) {
-        const imgRes = await fetch(first.url);
+        const imgRes = await getOutboundFetch()(first.url);
         if (!imgRes.ok) {
           throw new Error(`Не удалось скачать картинку по URL (${imgRes.status})`);
         }
