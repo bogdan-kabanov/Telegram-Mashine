@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
 import { generateAiReceipt, getAiReceiptsMode, materializeReceiptTemplate } from "@/lib/openai/receipts";
 import { createLogger } from "@/lib/runtime/manager";
+import { isStandaloneLegend } from "@/lib/legends/standalone";
 import type { ProjectConfig } from "@/lib/schemas/projects";
 import { getFileStore } from "@/lib/storage/file-store";
 import { bankIdToCapturaStyle, renderCapturaPng, type CapturaBankStyle } from "./captura";
@@ -198,7 +199,7 @@ export class MediaHandler {
 
   /**
    * Pick a video circle for a review.
-   * Prefer legend-tagged file; then standalone / untagged for the project.
+   * Only the same legend or standalone/untagged — never another legend's circle.
    */
   async pickVideoNote(
     projectId: string,
@@ -210,17 +211,17 @@ export class MediaHandler {
       return this.pickRandomFromDb("video_note", projectId);
     }
 
-    const tagged =
-      legendId && !options?.preferStandalone
-        ? assets.filter((a) => a.legendId === legendId)
-        : [];
     const standalone = assets.filter(
       (a) => a.legendId === "standalone" || a.legendId == null || a.legendId === "",
     );
+    const tagged =
+      legendId && !options?.preferStandalone && !isStandaloneLegend(legendId)
+        ? assets.filter((a) => a.legendId === legendId)
+        : [];
 
-    const pool = options?.preferStandalone
-      ? [...standalone, ...assets.filter((a) => a.legendId && a.legendId !== "standalone")]
-      : [...tagged, ...standalone, ...assets.filter((a) => a.legendId && a.legendId !== legendId)];
+    const pool = options?.preferStandalone || isStandaloneLegend(legendId ?? "")
+      ? standalone
+      : [...tagged, ...standalone];
 
     const unique: MediaAsset[] = [];
     const seen = new Set<string>();
@@ -230,8 +231,22 @@ export class MediaHandler {
       unique.push(a);
     }
 
-    if (unique.length === 0) return null;
-    return shuffleInPlace(unique)[0] ?? null;
+    if (unique.length === 0) {
+      await logger.warn("No video circle for legend — upload one in media library", {
+        projectId,
+        legendId,
+      });
+      return null;
+    }
+
+    const pick = shuffleInPlace(unique)[0] ?? null;
+    if (pick && legendId && pick.legendId && pick.legendId !== legendId && pick.legendId !== "standalone") {
+      await logger.warn("Video circle legend mismatch skipped", {
+        wanted: legendId,
+        got: pick.legendId,
+      });
+    }
+    return pick;
   }
 
   async pickStoryPhoto(legendId: string): Promise<MediaAsset | null> {

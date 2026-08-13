@@ -4,6 +4,7 @@ import { loadAppConfig } from "@/lib/config/loader";
 import { resolveClientPhoto } from "@/lib/client-photos";
 import { getReviewFromDb, saveReviewToDb } from "@/lib/db/reviews";
 import { formatMexicoDateTime } from "@/lib/timezone";
+import { isStandaloneLegend, legendIdFromCircleTag } from "@/lib/legends/standalone";
 import { createLogger, getRuntimeManager } from "@/lib/runtime/manager";
 import type { ReviewPackage } from "@/lib/schemas";
 import { pickUniqueWeeklyCircle } from "@/lib/weekly-circle";
@@ -73,42 +74,65 @@ export class ReviewPipeline {
       const reviewType = params.reviewType ?? "big";
       const pinVideoNote = params.pinVideoNote === true || reviewType === "unique_circle";
       const progress = params.onProgress;
-
-      await report(progress, 1, "dialog", "Генерация диалога", "OpenAI пишет переписку клиент ↔ менеджер…");
+      const mediaHandler = getMediaHandler();
       const reviewId = randomUUID();
       const betPackPick = await pickNextBetPack({
         projectId: params.projectId,
         reviewId,
         reuseDays: config.schedule.betReuseDays,
       });
+
+      // Weekly unique_circle: pick circle first → dialog uses the same legend (or neutral standalone).
+      let preselectedVideoNote: Awaited<ReturnType<typeof pickUniqueWeeklyCircle>> = null;
+      let forcedLegendId: string | undefined;
+      if (reviewType === "unique_circle") {
+        await report(progress, 1, "media", "Подбор кружка", "Недельный уникальный кружок…");
+        preselectedVideoNote = await pickUniqueWeeklyCircle(params.projectId);
+        forcedLegendId = legendIdFromCircleTag(preselectedVideoNote?.legendId, project.locale);
+        await report(
+          progress,
+          2,
+          "dialog",
+          "Генерация диалога",
+          preselectedVideoNote?.legendId && preselectedVideoNote.legendId !== "standalone"
+            ? `История «${preselectedVideoNote.legendId}» под кружок`
+            : "Общая благодарность (standalone)",
+        );
+      } else {
+        await report(progress, 1, "dialog", "Генерация диалога", "OpenAI пишет переписку клиент ↔ менеджер…");
+      }
+
       const dialog = await getDialogGenerator().generate({
         projectId: params.projectId,
         reviewType,
         ...(betPackPick ? { betPack: betPackPick.packNumber } : {}),
+        ...(forcedLegendId ? { forcedLegendId } : {}),
       });
 
-      const mediaHandler = getMediaHandler();
       const depositBank = config.banks.depositBanks.find((b) => b.id === dialog.depositBankId);
       const payoutBank = config.banks.payoutBanks.find((b) => b.id === dialog.payoutBankId);
       const mxNow = formatMexicoDateTime();
 
-      await report(progress, 2, "media", "Подбор медиа", "Библиотека или ИИ (ставки / условия / стикер)…");
-      const legendIdForMedia =
-        typeof dialog.legendId === "string" && dialog.legendId && !dialog.legendId.startsWith("ai_")
-          ? dialog.legendId
-          : null;
-      const videoNotePromise = pinVideoNote
-        ? pickUniqueWeeklyCircle(params.projectId)
-        : mediaHandler.pickVideoNote(params.projectId, legendIdForMedia);
+      await report(
+        progress,
+        reviewType === "unique_circle" ? 3 : 2,
+        "media",
+        "Подбор медиа",
+        "Библиотека или ИИ (ставки / условия / стикер)…",
+      );
+      const legendIdForMedia = dialog.legendId;
 
-      const [conditions, videoNote, sticker] = await Promise.all([
+      let videoNote = preselectedVideoNote;
+      if (!videoNote) {
+        videoNote = await mediaHandler.pickVideoNote(params.projectId, legendIdForMedia);
+      }
+      const [conditions, sticker] = await Promise.all([
         mediaHandler.resolveProjectImage("conditions", {
           projectId: params.projectId,
           projectName: project.name,
           locale: project.locale,
           currency: project.currency,
         }),
-        videoNotePromise,
         mediaHandler.resolveProjectImage("sticker", {
           projectId: params.projectId,
           projectName: project.name,
@@ -146,8 +170,12 @@ export class ReviewPipeline {
       let uniquePhoto: { path: string; filename: string; source: "pool" | "ai" | "legend" } | null =
         null;
 
-      // Prefer legend-tagged story photos when the dialog asks for one.
-      if (legendIdForPhoto && !legendIdForPhoto.startsWith("ai_")) {
+      // Prefer legend-tagged story photos when the dialog asks for one (skip for standalone gratitude).
+      if (
+        legendIdForPhoto &&
+        !legendIdForPhoto.startsWith("ai_") &&
+        !isStandaloneLegend(legendIdForPhoto)
+      ) {
         const legendPick = await mediaHandler.pickStoryPhoto(legendIdForPhoto);
         if (legendPick?.path && mediaHandler.isValidFile(legendPick.path)) {
           const { markClientPhotoUsed } = await import("@/lib/client-photos");

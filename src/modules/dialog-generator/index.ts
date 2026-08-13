@@ -23,6 +23,7 @@ import {
 } from "@/lib/openai/agents";
 import { createLogger } from "@/lib/runtime/manager";
 import { getEnv } from "@/lib/schemas/env";
+import { isStandaloneLegend } from "@/lib/legends/standalone";
 import { getFileStore } from "@/lib/storage/file-store";
 import {
   clientLegendSchema,
@@ -373,7 +374,7 @@ export class DialogGenerator {
         content: part,
         delayMinutes: STAGE_DELAY.greeting + i + 1,
       });
-      if (i === 0) {
+      if (i === 0 && !isStandaloneLegend(legendId)) {
         push({
           role: "client",
           type: "image",
@@ -742,7 +743,7 @@ export class DialogGenerator {
         delayMinutes: i + 2,
       });
 
-      if (i === photoAfterIndex) {
+      if (i === photoAfterIndex && photoAfterIndex >= 0 && !isStandaloneLegend(legend.id)) {
         push({
           role: "client",
           type: "image",
@@ -788,6 +789,8 @@ export class DialogGenerator {
     projectId: string;
     scenarioId?: string;
     reviewType?: "small" | "big" | "unique_circle";
+    /** When set, force this legend (e.g. weekly circle already picked). */
+    forcedLegendId?: string;
     /** When set, force amount pack bound to this bet image pack (1:1). */
     betPack?: number;
   }): Promise<GeneratedDialog> {
@@ -811,7 +814,10 @@ export class DialogGenerator {
         scenario.legendIds.includes(l.id) &&
         (l.locale === project.locale || l.locale.startsWith(project.locale.split("-")[0]!)),
     );
-    if (availableLegends.length === 0) {
+    const localeLegends = legends.filter(
+      (l) => l.locale === project.locale || l.locale.startsWith(project.locale.split("-")[0]!),
+    );
+    if (availableLegends.length === 0 && !params.forcedLegendId) {
       throw new Error(
         `No legends for scenario=${scenario.id} locale=${project.locale} (ids: ${scenario.legendIds.join(", ")})`,
       );
@@ -833,18 +839,27 @@ export class DialogGenerator {
       );
     }
 
+    const forcedLegend = params.forcedLegendId
+      ? localeLegends.find((l) => l.id === params.forcedLegendId) ??
+        legends.find((l) => l.id === params.forcedLegendId)
+      : null;
+
     const forcedPack =
       params.betPack != null ? findAmountPackForBetPack(projectPacks, params.betPack) : null;
     const amountPackIds = forcedPack ? [forcedPack.id] : projectPacks.map((p) => p.id);
     const combination = await pickUnusedCombination({
       projectId: params.projectId,
-      legendIds: availableLegends.map((l) => l.id),
+      legendIds: forcedLegend
+        ? [forcedLegend.id]
+        : availableLegends.map((l) => l.id),
       amountPackIds,
       clientNames: namePool,
     });
 
     const seedLegend =
-      availableLegends.find((l) => l.id === combination.legendId) ?? availableLegends[0]!;
+      forcedLegend ??
+      availableLegends.find((l) => l.id === combination.legendId) ??
+      availableLegends[0]!;
     const amountPack =
       forcedPack ??
       projectPacks.find((p) => p.id === combination.amountPackId) ??
@@ -933,7 +948,7 @@ export class DialogGenerator {
         })
       : null;
 
-    const legendId = aiBundle ? `ai_${randomUUID().slice(0, 8)}` : seedLegend.id;
+    const legendId = seedLegend.id;
     let messages: DialogMessage[];
     let aiAuthored = false;
 

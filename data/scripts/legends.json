@@ -126,5 +126,49 @@
       "Сколько по времени? Ей нельзя долго ждать",
       "Ладно, доверяю… но очень волнуюсь"
     ]
+  },
+  {
+    "id": "standalone_gratitude",
+    "title": "Gratitud general (sin historia dura)",
+    "locale": "es-MX",
+    "openingPhrase": "Hola, quería contarte cómo me fue contigo",
+    "problem": "Llevaba tiempo buscando una forma honesta de mejorar mi situación. No era fácil decidirme, pero quería intentarlo.",
+    "motivation": "Confié en el proceso y valió la pena. Ahora quiero agradecerte de corazón.",
+    "photoAfterProblemIndex": -1,
+    "gratitudePhrases": [
+      "Muchas gracias por todo, de verdad",
+      "Me encantaría volver a trabajar con ustedes",
+      "Gracias de nuevo, fue un placer",
+      "No tengo palabras, gracias por la confianza",
+      "Excelente trabajo, les recomendaré"
+    ],
+    "doubtPhrases": [
+      "Suena bien, pero quería estar seguro",
+      "Lo comprobaré con calma",
+      "Realmente tienes un trabajo honesto",
+      "Creo en tu trabajo"
+    ]
+  },
+  {
+    "id": "standalone_gratitude_ru",
+    "title": "Общая благодарность (без истории)",
+    "locale": "ru-RU",
+    "openingPhrase": "Здравствуйте, хотел рассказать, как всё прошло",
+    "problem": "Долго искал честный способ улучшить своё положение. Было непросто решиться, но я решил попробовать.",
+    "motivation": "Доверился процессу — и не зря. Хочу от всей души поблагодарить.",
+    "photoAfterProblemIndex": -1,
+    "gratitudePhrases": [
+      "Большое спасибо за всё, правда",
+      "С удовольствием ещё поработаю с вами",
+      "Ещё раз спасибо, было приятно",
+      "Нет слов, спасибо за доверие",
+      "Отличная работа, буду рекомендовать"
+    ],
+    "doubtPhrases": [
+      "Звучит хорошо, но хотел убедиться",
+      "Спокойно всё проверю",
+      "У вас правда честная работа",
+      "Верю вашей работе"
+    ]
   }
 ]
