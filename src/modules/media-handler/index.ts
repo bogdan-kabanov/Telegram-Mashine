@@ -71,6 +71,23 @@ function isValidMediaFile(filename: string, filePath: string): boolean {
   }
 }
 
+/** legendId from path: story_photos/{id}/… or video_notes/{project}/{id}/… */
+function legendIdFromPath(filePath: string): string | null {
+  const norm = filePath.replace(/\\/g, "/");
+  const story = norm.match(/story_photos\/([^/]+)\//);
+  if (story) return story[1] === "pool" ? null : story[1]!;
+  const circle = norm.match(/video_notes\/[^/]+\/([^/]+)\//);
+  return circle?.[1] ?? null;
+}
+
+function shuffleInPlace<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j]!, items[i]!];
+  }
+  return items;
+}
+
 export class MediaHandler {
   private readonly store = getFileStore();
 
@@ -102,6 +119,7 @@ export class MediaHandler {
         filename: a.filename,
         path: a.path,
         projectId: a.projectId,
+        legendId: legendIdFromPath(a.path),
       }));
 
     if (fromDb.length > 0) return fromDb;
@@ -171,10 +189,49 @@ export class MediaHandler {
         filename: pick.filename,
         path: pick.path,
         projectId: pick.projectId,
+        legendId: legendIdFromPath(pick.path),
       };
     }
 
     return this.pickRandom(type as MediaType, projectId);
+  }
+
+  /**
+   * Pick a video circle for a review.
+   * Prefer legend-tagged file; then standalone / untagged for the project.
+   */
+  async pickVideoNote(
+    projectId: string,
+    legendId?: string | null,
+    options?: { preferStandalone?: boolean },
+  ): Promise<MediaAsset | null> {
+    const assets = await this.listMedia("video_note", projectId);
+    if (assets.length === 0) {
+      return this.pickRandomFromDb("video_note", projectId);
+    }
+
+    const tagged =
+      legendId && !options?.preferStandalone
+        ? assets.filter((a) => a.legendId === legendId)
+        : [];
+    const standalone = assets.filter(
+      (a) => a.legendId === "standalone" || a.legendId == null || a.legendId === "",
+    );
+
+    const pool = options?.preferStandalone
+      ? [...standalone, ...assets.filter((a) => a.legendId && a.legendId !== "standalone")]
+      : [...tagged, ...standalone, ...assets.filter((a) => a.legendId && a.legendId !== legendId)];
+
+    const unique: MediaAsset[] = [];
+    const seen = new Set<string>();
+    for (const a of pool) {
+      if (seen.has(a.path)) continue;
+      seen.add(a.path);
+      unique.push(a);
+    }
+
+    if (unique.length === 0) return null;
+    return shuffleInPlace(unique)[0] ?? null;
   }
 
   async pickStoryPhoto(legendId: string): Promise<MediaAsset | null> {

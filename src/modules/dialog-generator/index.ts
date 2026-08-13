@@ -115,15 +115,21 @@ const STAGE_DELAY = {
   conditions: 22,
   deposit: 32,
   bet_1: 48,
-  bet_2: 75,
-  bet_3: 102,
-  completion: 112,
-  payout: 118,
-  gratitude: 122,
+  bet_2: 78,
+  bet_3: 110,
+  /** After bets the lead is offline — leave room for 15–35 min replies. */
+  completion: 150,
+  payout: 158,
+  gratitude: 165,
 } as const satisfies Record<string, number>;
 
 function stageDelay(stage: string): number {
   return STAGE_DELAY[stage as keyof typeof STAGE_DELAY] ?? 10;
+}
+
+/** Lead is not glued to chat — reply after a bet takes minutes, not ~1 min. */
+function delayAfterBetMinutes(baseDelay: number): number {
+  return baseDelay + 15 + Math.floor(Math.random() * 21); // +15…35 min
 }
 
 function pickRandom<T>(items: T[]): T {
@@ -520,11 +526,15 @@ export class DialogGenerator {
             delayMinutes: baseDelay + 1,
           });
           for (const turn of stageTurns) {
-            if (turn.role === "client") pushTurn(turn.role, turn.text, baseDelay + 2);
+            if (turn.role === "client") pushTurn(turn.role, turn.text, delayAfterBetMinutes(baseDelay));
           }
         } else {
           for (const turn of stageTurns) {
-            pushTurn(turn.role, turn.text, baseDelay + 1);
+            if (turn.role === "client") {
+              pushTurn(turn.role, turn.text, delayAfterBetMinutes(baseDelay));
+            } else {
+              pushTurn(turn.role, turn.text, baseDelay + 1);
+            }
           }
         }
         continue;
@@ -656,13 +666,13 @@ export class DialogGenerator {
             clientReply as string | string[],
             agentContext,
           );
+          const lastDelay = stageMessages.at(-1)?.delayMinutes ?? stageDelay(stageName);
+          const isBetStage = stageName === "bet_1" || stageName === "bet_2" || stageName === "bet_3";
           push({
             role: "client",
             type: "text",
             content,
-            delayMinutes: stageMessages.at(-1)?.delayMinutes
-              ? stageMessages.at(-1)!.delayMinutes + 1
-              : 2,
+            delayMinutes: isBetStage ? delayAfterBetMinutes(lastDelay) : lastDelay + 1,
           });
         }
       }
@@ -767,7 +777,7 @@ export class DialogGenerator {
         role: "client",
         type: "text",
         content: extraThanks,
-        delayMinutes: 122,
+        delayMinutes: STAGE_DELAY.gratitude,
       });
     }
 

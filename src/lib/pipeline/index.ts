@@ -93,9 +93,13 @@ export class ReviewPipeline {
       const mxNow = formatMexicoDateTime();
 
       await report(progress, 2, "media", "Подбор медиа", "Библиотека или ИИ (ставки / условия / стикер)…");
+      const legendIdForMedia =
+        typeof dialog.legendId === "string" && dialog.legendId && !dialog.legendId.startsWith("ai_")
+          ? dialog.legendId
+          : null;
       const videoNotePromise = pinVideoNote
         ? pickUniqueWeeklyCircle(params.projectId)
-        : mediaHandler.pickRandomFromDb("video_note", params.projectId);
+        : mediaHandler.pickVideoNote(params.projectId, legendIdForMedia);
 
       const [conditions, videoNote, sticker] = await Promise.all([
         mediaHandler.resolveProjectImage("conditions", {

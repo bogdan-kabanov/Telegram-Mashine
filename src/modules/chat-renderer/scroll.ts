@@ -12,15 +12,18 @@ export function planScrollPositions(
     minOverlapPx?: number;
   },
 ): number[] {
-  const targetScreens = options?.targetScreens ?? options?.defaultTargetScreens ?? 10;
+  const targetScreens = Math.max(1, options?.targetScreens ?? options?.defaultTargetScreens ?? 10);
   const minOverlap = options?.minOverlapPx ?? 160;
   const overlapPx = options?.overlapPx ?? Math.max(minOverlap, Math.round(clientHeight * 0.55));
 
   if (maxScroll <= 8) return [0];
 
-  const minFrames = Math.max(1, targetScreens);
-  const stepFromTarget = Math.max(90, Math.floor(maxScroll / Math.max(1, minFrames - 1)));
+  // Prefer evenly spaced frames covering [0, maxScroll], hard-capped at targetScreens
+  // (Telegram album limit = 10 photos — never emit an 11th screen).
+  if (targetScreens === 1) return [0];
+
   const stepFromOverlap = Math.max(90, clientHeight - overlapPx);
+  const stepFromTarget = Math.max(90, Math.floor(maxScroll / Math.max(1, targetScreens - 1)));
   const step = Math.min(stepFromTarget, stepFromOverlap);
 
   const positions: number[] = [];
@@ -28,21 +31,22 @@ export function planScrollPositions(
     positions.push(Math.min(y, maxScroll));
   }
   const last = positions[positions.length - 1] ?? 0;
-  if (maxScroll - last > 24) positions.push(maxScroll);
+  if (last !== maxScroll) positions.push(maxScroll);
 
-  const hardCap = targetScreens + 6;
-  if (positions.length > hardCap) {
-    const out = [positions[0]!];
-    const inner = positions.slice(1, -1);
-    const keep = Math.max(1, hardCap - 2);
-    for (let i = 0; i < keep; i++) {
-      const idx = Math.round((i / Math.max(1, keep - 1)) * (inner.length - 1));
-      const v = inner[idx]!;
-      if (out[out.length - 1] !== v) out.push(v);
-    }
-    if (out[out.length - 1] !== maxScroll) out.push(maxScroll);
+  if (positions.length <= targetScreens) return positions;
+
+  // Subsample evenly: always keep first + last, fill the middle.
+  const out: number[] = [positions[0]!];
+  const keepInner = targetScreens - 2;
+  if (keepInner <= 0) {
+    if (maxScroll > 0) out.push(maxScroll);
     return out;
   }
-
-  return positions;
+  for (let i = 0; i < keepInner; i++) {
+    const t = (i + 1) / (keepInner + 1);
+    const y = Math.round(t * maxScroll);
+    if (out[out.length - 1] !== y) out.push(y);
+  }
+  if (out[out.length - 1] !== maxScroll) out.push(maxScroll);
+  return out.slice(0, targetScreens);
 }

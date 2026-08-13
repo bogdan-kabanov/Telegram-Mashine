@@ -26,4 +26,11 @@ describe("planScrollPositions", () => {
       expect(positions[i]! - positions[i - 1]!).toBeLessThanOrEqual(maxStep + 1);
     }
   });
+
+  it("hard-caps at 10 screens for long chats", () => {
+    const positions = planScrollPositions(20_000, 844, { targetScreens: 10, overlapPx: 160 });
+    expect(positions.length).toBeLessThanOrEqual(10);
+    expect(positions[0]).toBe(0);
+    expect(positions[positions.length - 1]).toBe(20_000);
+  });
 });

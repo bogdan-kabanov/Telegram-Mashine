@@ -90,13 +90,6 @@ function escapeHtml(text: string): string {
     .replace(/\n/g, "<br>");
 }
 
-function avatarBlock(url: string | null | undefined, fallback: string): string {
-  if (url) {
-    return `<img class="avatar" src="${url}" alt="" />`;
-  }
-  return `<div class="avatar avatar-fallback">${fallback.charAt(0).toUpperCase()}</div>`;
-}
-
 /**
  * Header pills: clipped pre-blurred wallpaper (Playwright-safe).
  * Input pills must NOT use this — wallpaper frost is opaque and hides chat bubbles.
@@ -140,7 +133,6 @@ function bubbleStyle(color: string): string {
 function renderBubble(
   msg: RenderMessage,
   theme: ProjectTheme,
-  clientAvatarUrl: string | null | undefined,
   opts: { firstInGroup: boolean; lastInGroup: boolean },
 ): string {
   const isOutgoing = msg.role === "manager";
@@ -157,20 +149,13 @@ function renderBubble(
     opts.lastInGroup ? "group-last" : "group-continued",
   ].join(" ");
 
-  // Telegram: avatar only on the last bubble of an incoming group; spacer keeps column straight.
-  const avatarSlot = !isOutgoing
-    ? opts.lastInGroup
-      ? avatarBlock(clientAvatarUrl, "C")
-      : `<div class="avatar avatar-spacer" aria-hidden="true"></div>`
-    : "";
-
+  // 1:1 Telegram: no side avatars next to bubbles (header avatar only).
   const tailClass = opts.lastInGroup ? (isOutgoing ? "has-tail-out" : "has-tail-in") : "";
   const style = bubbleStyle(bubbleColor);
 
   if (msg.type === "sticker" && msg.imageUrl) {
     return `
     <div class="${groupClass}">
-      ${avatarSlot}
       <div class="bubble-wrap">
         <div class="sticker-wrap">
           <img class="sticker-image" src="${msg.imageUrl}" alt="" />
@@ -190,7 +175,6 @@ function renderBubble(
     /* Media: CSS radii only (photo mosaic masking is separate). */
     return `
     <div class="${groupClass}">
-      ${avatarSlot}
       <div class="bubble-wrap">
         <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} bubble-media" style="${style}">
           ${media}
@@ -201,10 +185,9 @@ function renderBubble(
   `;
   }
 
-  // Text: time (+ ticks) float to the end of the last line — like Telegram, not absolute pad.
+  // Text: time (+ ticks) float to the end of the last line — like Telegram iOS.
   return `
     <div class="${groupClass}">
-      ${avatarSlot}
       <div class="bubble-wrap">
         <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} ${tailClass}" style="${style}">
           <div class="text">${formatChatTextHtml(msg.content)}${metaHtml(msg, isOutgoing, "inline")}</div>
@@ -214,16 +197,12 @@ function renderBubble(
   `;
 }
 
-function renderMessageList(
-  messages: RenderMessage[],
-  theme: ProjectTheme,
-  clientAvatarUrl?: string | null,
-): string {
+function renderMessageList(messages: RenderMessage[], theme: ProjectTheme): string {
   return messages
     .map((msg, i) => {
       const prev = messages[i - 1];
       const next = messages[i + 1];
-      return renderBubble(msg, theme, clientAvatarUrl, {
+      return renderBubble(msg, theme, {
         firstInGroup: !prev || prev.role !== msg.role,
         lastInGroup: !next || next.role !== msg.role,
       });
@@ -251,7 +230,7 @@ export function buildChatHtml(params: RenderChatParams): string {
   const cutoutFallback = params.wallpaperCutoutColor?.trim() || "#4a8fa8";
   const cutoutImageCss = cutoutUrl ? `url("${cutoutUrl}")` : "none";
 
-  const messageHtml = renderMessageList(messages, theme, params.clientAvatarUrl);
+  const messageHtml = renderMessageList(messages, theme);
 
   const wallpaperImg = wallpaperSrc
     ? `<img class="wallpaper-img" src="${wallpaperSrc}" alt="" draggable="false" />`
@@ -752,47 +731,24 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .message.group-last { margin-bottom: 6px; }
     .message.group-first.group-last { margin-bottom: 6px; }
-    .message.incoming { padding-right: 52px; }
+    .message.incoming { padding-right: 48px; }
     .message.outgoing {
       justify-content: flex-end;
-      padding-left: 52px;
-    }
-    .avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      object-fit: cover;
-      flex-shrink: 0;
-      margin-bottom: 1px;
-      position: relative;
-      z-index: 2;
-    }
-    .avatar-spacer {
-      visibility: hidden;
-      pointer-events: none;
-    }
-    .avatar-fallback {
-      background: #C7C7CC;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 600;
+      padding-left: 48px;
     }
     .bubble-wrap {
-      max-width: min(75%, 280px);
+      max-width: min(82%, 310px);
       display: flex;
       flex-direction: column;
       min-width: 0;
     }
     .message.outgoing .bubble-wrap {
       align-items: flex-end;
-      max-width: min(75%, 280px);
+      max-width: min(82%, 310px);
     }
-    .message.incoming .bubble-wrap { max-width: min(75%, calc(100% - 34px)); }
+    .message.incoming .bubble-wrap { max-width: min(82%, 310px); }
     .bubble {
-      padding: 5px 11px 6px 11px;
+      padding: 4px 10px 5px 10px;
       position: relative;
       display: inline-block;
       width: fit-content;
@@ -879,25 +835,24 @@ export function buildChatHtml(params: RenderChatParams): string {
       display: inline-block;
       object-fit: contain;
     }
-    /* Time (+ ticks) sit on the last text line like Telegram iOS */
+    /* Time (+ ticks) tuck into the last line like Telegram iOS (float, not a separate row). */
     .meta-inline {
       display: inline-flex;
-      align-items: flex-end;
+      align-items: center;
       gap: 3px;
-      margin: 0 0 -2px 7px;
-      position: relative;
-      top: 0;
-      vertical-align: -2px;
       float: right;
-      clear: none;
+      margin: 5px 0 -1px 8px;
+      position: relative;
+      top: 3px;
       line-height: 1;
       white-space: nowrap;
+      pointer-events: none;
     }
     .meta-inline .time {
       font-size: 11px;
       font-weight: 400;
-      color: rgba(82, 82, 82, 0.6);
-      letter-spacing: 0;
+      color: rgba(82, 82, 82, 0.55);
+      letter-spacing: 0.02em;
     }
     .outgoing .meta-inline .time {
       color: rgba(0, 140, 9, 0.8);

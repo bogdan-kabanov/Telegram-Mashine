@@ -60,12 +60,12 @@ export function MediaLibrary({ projects, legends }: Props) {
     LIBRARY_UPLOAD_TYPES[0] ?? "story_photo",
   );
   const [uploadProjectId, setUploadProjectId] = useState(projects[0]?.id ?? "");
+  const [uploadLegendId, setUploadLegendId] = useState("standalone");
   const [preview, setPreview] = useState<Asset | null>(null);
   const [useAiUpload, setUseAiUpload] = useState(false);
   const [genKind, setGenKind] = useState<string>("story_photo");
 
   const field = inputStyle();
-  void legends;
 
   const load = useCallback(async () => {
     try {
@@ -270,6 +270,29 @@ export function MediaLibrary({ projects, legends }: Props) {
               </select>
             </label>
           )}
+
+          {mediaType === "video_note" ? (
+            <label className="admin-field">
+              <LabelWithHelp
+                label="История (легенда)"
+                tip="Кружок должен совпадать с текстом отзыва: кредиты / болезнь / и т.д. Standalone — для недельных кружков без привязки к истории."
+                placement="below"
+              />
+              <select
+                name="legendId"
+                style={field}
+                value={uploadLegendId}
+                onChange={(e) => setUploadLegendId(e.target.value)}
+              >
+                <option value="standalone">Standalone (недельные / без истории)</option>
+                {legends.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <label className="admin-field">
             <LabelWithHelp label="Файл с компьютера" tip="Картинки (JPG/PNG) или видео кружка (MP4)." placement="below" />

@@ -267,7 +267,7 @@ async function screenshotChatByScrolling(params: {
     const positions = planScrollPositions(metrics.maxScroll, metrics.clientHeight, {
       targetScreens: TARGET_SCREENSHOTS,
       minOverlapPx: SCROLL_OVERLAP_PX,
-    });
+    }).slice(0, TARGET_SCREENSHOTS);
 
     for (let i = 0; i < positions.length; i++) {
       const scrollTop = positions[i]!;

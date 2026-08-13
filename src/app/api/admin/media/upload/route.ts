@@ -87,6 +87,13 @@ export async function POST(request: NextRequest) {
       relativePath = path
         .join("data", MEDIA_TYPE_DIRS.story_photo, folder, savedFilename)
         .replace(/\\/g, "/");
+    } else if (type === "video_note" && projectId) {
+      // Tag circle with a legend (or "standalone" for weekly thanks without hardship story).
+      const folder = legendId?.trim() || "standalone";
+      const subdir = path.join(MEDIA_TYPE_DIRS.video_note, projectId, folder);
+      destDir = path.resolve(dataDir, subdir);
+      savedFilename = safeUploadFilename(file.name);
+      relativePath = path.join("data", subdir, savedFilename).replace(/\\/g, "/");
     } else if (type === "sticker") {
       const base = MEDIA_TYPE_DIRS.sticker;
       destDir = path.resolve(dataDir, base);
@@ -154,7 +161,11 @@ export async function POST(request: NextRequest) {
             ? `Обои для проекта ${projectId} установлены.`
             : type === "conditions"
               ? `Условия для проекта ${projectId} сохранены${ext === ".gif" ? " (GIF)" : ""}.`
-              : "Файл загружен",
+              : type === "video_note"
+                ? legendId && legendId !== "standalone"
+                  ? `Кружок привязан к истории «${legendId}» — текст отзыва и кружок будут из одной легенды.`
+                  : "Кружок сохранён как standalone (недельные / без привязки к истории)."
+                : "Файл загружен",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

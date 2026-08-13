@@ -19,8 +19,19 @@ function resolveMediaPath(stored: string): string {
 }
 
 function extractLegendId(filePath: string): string | null {
-  const m = filePath.replace(/\\/g, "/").match(/story_photos\/([^/]+)\//);
-  return m?.[1] ?? null;
+  const norm = filePath.replace(/\\/g, "/");
+  const story = norm.match(/story_photos\/([^/]+)\//);
+  if (story) {
+    const id = story[1]!;
+    return id === "pool" ? null : id;
+  }
+  // video_notes/{projectId}/{legendId|standalone}/file.mp4
+  const circle = norm.match(/video_notes\/[^/]+\/([^/]+)\//);
+  if (circle) {
+    const id = circle[1]!;
+    return id;
+  }
+  return null;
 }
 
 /** Infer project from path: media/bets/nancy/x.png or media/wallpapers/nancy.jpg */
@@ -75,7 +86,11 @@ export async function GET() {
           const full = path.join(dir, name.name);
           if (name.isDirectory()) {
             if (type === "story_photo") walk(full, name.name);
-            else walk(full, legendId);
+            else if (type === "video_note") {
+              // project root → walk children; under project → folder name is legend/standalone
+              const isProjectRoot = path.resolve(dir) === path.resolve(root);
+              walk(full, isProjectRoot ? null : name.name);
+            } else walk(full, legendId);
             continue;
           }
           if (!/\.(jpg|jpeg|png|webp|gif|mp4|mov)$/i.test(name.name)) continue;
@@ -89,7 +104,10 @@ export async function GET() {
             filename: name.name,
             path: relPath,
             projectId: extractProjectId(relPath, type),
-            legendId: type === "story_photo" ? legendId : extractLegendId(relPath),
+            legendId:
+              type === "story_photo" || type === "video_note"
+                ? legendId ?? extractLegendId(relPath)
+                : extractLegendId(relPath),
             mimeType: null,
             createdAt: "",
             url: `/api/admin/media/file?path=${encodeURIComponent(relPath)}`,

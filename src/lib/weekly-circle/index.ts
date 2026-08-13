@@ -58,15 +58,25 @@ export async function markWeeklyCirclePinned(mediaPath: string, messageId: numbe
     .where(eq(usedWeeklyCircles.mediaPath, mediaPath));
 }
 
-/** Pick a video note not yet used for weekly unique circles; recycle pool when exhausted. */
+/**
+ * Pick a video note not yet used for weekly unique circles; recycle pool when exhausted.
+ * Prefers standalone circles (thanks not tied to a hardship legend).
+ */
 export async function pickUniqueWeeklyCircle(projectId?: string): Promise<MediaAsset | null> {
   const handler = getMediaHandler();
-  const assets = await handler.listMedia("video_note", projectId);
+  const assets = projectId
+    ? await handler.listMedia("video_note", projectId)
+    : await handler.listMedia("video_note");
   if (assets.length === 0) {
     return handler.pickRandom("video_note", projectId);
   }
 
-  const unused = shuffle(assets);
+  const standalone = assets.filter(
+    (a) => a.legendId === "standalone" || a.legendId == null || a.legendId === "",
+  );
+  const ordered = [...standalone, ...assets.filter((a) => !standalone.includes(a))];
+  const unused = shuffle(ordered);
+
   for (const asset of unused) {
     if (!(await isWeeklyCircleUsed(asset.path))) {
       return asset;
