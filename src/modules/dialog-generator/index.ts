@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
+import { betProfitForSlot } from "@/lib/amounts/split-profit";
 import { markCombinationUsed, pickUnusedCombination } from "@/lib/combinations";
 import { loadAppConfig } from "@/lib/config/loader";
 import { pickUniqueAccountDigits } from "@/lib/account-digits";
@@ -25,17 +26,22 @@ import { createLogger } from "@/lib/runtime/manager";
 import { getEnv } from "@/lib/schemas/env";
 import { isStandaloneLegend } from "@/lib/legends/standalone";
 import { getFileStore } from "@/lib/storage/file-store";
+import { DialogClock } from "@/lib/dialog/timing";
 import {
   clientLegendSchema,
   dialogMessageSchema,
   findAmountPackForBetPack,
   scenarioSchema,
   selectAmountPacksForProject,
+  type AmountPack,
   type ClientLegend,
   type DialogMessage,
   type MessageType,
   type Scenario,
 } from "@/lib/schemas";
+import type { CustomAmounts } from "@/lib/amounts/split-profit";
+
+const OPERATOR_CUSTOM_PACK_ID = "operator_custom";
 
 const logger = createLogger("dialog-generator");
 
@@ -83,6 +89,7 @@ export interface GeneratedDialog {
   deposit: number;
   profit1: number;
   profit2: number;
+  profit3?: number;
   profitFinal: number;
   /** Amount sent to client on payout slip (90% for Francesca). */
   payoutAmount: number;
@@ -110,31 +117,38 @@ const STAGE_ORDER = [
   "gratitude",
 ] as const;
 
-const STAGE_DELAY = {
-  greeting: 2,
-  trust_building: 12,
-  conditions: 22,
-  deposit: 32,
-  bet_1: 48,
-  bet_2: 78,
-  bet_3: 110,
-  /** After bets the lead is offline — leave room for 15–35 min replies. */
-  completion: 150,
-  payout: 158,
-  gratitude: 165,
-} as const satisfies Record<string, number>;
-
-function stageDelay(stage: string): number {
-  return STAGE_DELAY[stage as keyof typeof STAGE_DELAY] ?? 10;
-}
-
-/** Lead is not glued to chat — reply after a bet takes minutes, not ~1 min. */
-function delayAfterBetMinutes(baseDelay: number): number {
-  return baseDelay + 15 + Math.floor(Math.random() * 21); // +15…35 min
-}
-
 function pickRandom<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
+}
+
+/** Occasionally insert a client voice bubble after the personal story block. */
+function injectClientVoiceMessage(
+  messages: DialogMessage[],
+  chance: number,
+  rng: () => number = Math.random,
+): DialogMessage[] {
+  if (chance <= 0 || rng() >= chance) return messages;
+
+  let insertIdx = messages.findIndex((m) => m.type === "conditions");
+  if (insertIdx < 0) {
+    insertIdx = messages.findIndex((m) => m.type === "captura");
+  }
+  if (insertIdx < 0) insertIdx = messages.length;
+
+  const prevDelay = insertIdx > 0 ? (messages[insertIdx - 1]?.delayMinutes ?? 1) : 1;
+  const durationSec = 5 + Math.floor(rng() * 25);
+  const voiceMsg: DialogMessage = {
+    id: randomUUID(),
+    role: "client",
+    type: "voice",
+    content: "voice",
+    delayMinutes: prevDelay + 1,
+    metadata: { durationSec },
+  };
+
+  const result = [...messages];
+  result.splice(insertIdx, 0, voiceMsg);
+  return result;
 }
 
 function splitProblem(problem: string): string[] {
@@ -245,6 +259,7 @@ export class DialogGenerator {
       deposit: number;
       profitFinal: number;
     },
+    delayMinutes: number,
   ): Promise<DialogMessage> {
     const content = injectTemplate(stage.content, vars);
     const shouldAi =
@@ -263,7 +278,7 @@ export class DialogGenerator {
       role: stage.role,
       type: stage.type as MessageType,
       content: stripInvertedPunctuation(finalContent),
-      delayMinutes: stage.delayMinutes,
+      delayMinutes,
     });
   }
 
@@ -328,6 +343,7 @@ export class DialogGenerator {
   }): DialogMessage[] {
     const { bundle, legendId, stagesToUse, locale } = params;
     const messages: DialogMessage[] = [];
+    const clock = new DialogClock();
     const push = (msg: Omit<DialogMessage, "id">) =>
       this.pushMessage(messages, msg, bundle.legend);
     const pushTurn = (role: "client" | "manager", text: string, delayMinutes: number) => {
@@ -345,25 +361,26 @@ export class DialogGenerator {
     }
 
     // --- Personal legend conversation FIRST (Vlad: not just deposit→bets→payout) ---
-    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
+    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: clock.atStart("client") });
     push({
       role: "client",
       type: "text",
       content: bundle.legend.openingPhrase,
-      delayMinutes: 0,
+      delayMinutes: clock.clientBurst(),
     });
 
     const greetingTurns = turnsByStage.get("greeting") ?? [];
+    clock.setStage("greeting");
     if (greetingTurns.length > 0) {
       for (const turn of greetingTurns) {
-        pushTurn(turn.role, turn.text, STAGE_DELAY.greeting);
+        pushTurn(turn.role, turn.text, clock.next(turn.role));
       }
     } else {
       push({
         role: "manager",
         type: "text",
         content: fallbackManagerGreeting(locale),
-        delayMinutes: STAGE_DELAY.greeting,
+        delayMinutes: clock.next("manager"),
       });
     }
 
@@ -372,14 +389,14 @@ export class DialogGenerator {
         role: "client",
         type: "text",
         content: part,
-        delayMinutes: STAGE_DELAY.greeting + i + 1,
+        delayMinutes: clock.clientBurst(),
       });
       if (i === 0 && !isStandaloneLegend(legendId)) {
         push({
           role: "client",
           type: "image",
           content: legendId,
-          delayMinutes: STAGE_DELAY.greeting + i + 1,
+          delayMinutes: clock.sameTime(),
           metadata: { legendId },
         });
       }
@@ -389,22 +406,23 @@ export class DialogGenerator {
     const empathyTurns = trustTurns.slice(0, Math.min(4, trustTurns.length));
     const restTrustTurns = trustTurns.slice(empathyTurns.length);
 
+    clock.setStage("trust_building");
     if (empathyTurns.length > 0) {
       for (const turn of empathyTurns) {
-        pushTurn(turn.role, turn.text, STAGE_DELAY.trust_building);
+        pushTurn(turn.role, turn.text, clock.next(turn.role));
       }
     } else {
       push({
         role: "manager",
         type: "text",
         content: fallbackManagerEmpathy(locale),
-        delayMinutes: STAGE_DELAY.trust_building,
+        delayMinutes: clock.next("manager"),
       });
       push({
         role: "client",
         type: "text",
         content: pickRandom(bundle.legend.doubtPhrases),
-        delayMinutes: STAGE_DELAY.trust_building + 1,
+        delayMinutes: clock.next("client"),
       });
     }
 
@@ -412,12 +430,12 @@ export class DialogGenerator {
       role: "client",
       type: "text",
       content: bundle.legend.motivation,
-      delayMinutes: STAGE_DELAY.trust_building + 2,
+      delayMinutes: clock.clientBurst(),
     });
 
     if (restTrustTurns.length > 0) {
       for (const turn of restTrustTurns) {
-        pushTurn(turn.role, turn.text, STAGE_DELAY.trust_building + 3);
+        pushTurn(turn.role, turn.text, clock.next(turn.role));
       }
     } else if (empathyTurns.length === 0 && params.managerScript) {
       for (const stageMsg of params.managerScript.stages.trust_building ?? []) {
@@ -426,7 +444,7 @@ export class DialogGenerator {
             role: stageMsg.role,
             type: "text",
             content: stageMsg.content,
-            delayMinutes: stageMsg.delayMinutes,
+            delayMinutes: clock.next(stageMsg.role),
           });
         }
       }
@@ -434,7 +452,7 @@ export class DialogGenerator {
         role: "client",
         type: "text",
         content: pickRandom(bundle.legend.doubtPhrases),
-        delayMinutes: STAGE_DELAY.trust_building + 4,
+        delayMinutes: clock.next("client"),
       });
     }
 
@@ -442,7 +460,7 @@ export class DialogGenerator {
     for (const stageName of stagesToUse) {
       if (stageName === "greeting" || stageName === "trust_building") continue;
 
-      const baseDelay = stageDelay(stageName);
+      clock.setStage(stageName);
       const stageTurns = turnsByStage.get(stageName) ?? [];
 
       if (stageName === "conditions") {
@@ -452,7 +470,7 @@ export class DialogGenerator {
             role: "manager",
             type: "conditions",
             content: "conditions",
-            delayMinutes: baseDelay,
+            delayMinutes: clock.next("manager"),
           });
         }
         if (fixed.length > 0) {
@@ -461,12 +479,12 @@ export class DialogGenerator {
               role: "manager",
               type: "text",
               content: text,
-              delayMinutes: baseDelay,
+              delayMinutes: clock.managerBurst(),
             });
           }
         } else if (!params.includeConditionsImage) {
           for (const turn of stageTurns) {
-            pushTurn(turn.role, turn.text, baseDelay);
+            pushTurn(turn.role, turn.text, clock.next(turn.role));
           }
         }
         continue;
@@ -477,13 +495,12 @@ export class DialogGenerator {
           role: "manager",
           type: "text",
           content: params.depositMessage,
-          delayMinutes: baseDelay,
+          delayMinutes: clock.next("manager"),
         });
-        // Client reacts / asks if it will work (skip duplicate deposit template turns)
         let clientSpoke = false;
         for (const turn of stageTurns) {
           if (turn.role !== "client") continue;
-          pushTurn(turn.role, turn.text, baseDelay + 2);
+          pushTurn(turn.role, turn.text, clock.next("client"));
           clientSpoke = true;
         }
         if (!clientSpoke) {
@@ -491,21 +508,20 @@ export class DialogGenerator {
             role: "client",
             type: "text",
             content: pickRandom(bundle.legend.doubtPhrases),
-            delayMinutes: baseDelay + 2,
+            delayMinutes: clock.next("client"),
           });
         }
-        // Manager answers before the payment proof arrives
         push({
           role: "manager",
           type: "text",
           content: fallbackDepositEncourage(locale),
-          delayMinutes: baseDelay + 4,
+          delayMinutes: clock.next("manager"),
         });
         push({
           role: "client",
           type: "captura",
           content: "payment_proof",
-          delayMinutes: baseDelay + 8,
+          delayMinutes: clock.next("client", "captura"),
         });
         continue;
       }
@@ -515,7 +531,7 @@ export class DialogGenerator {
           role: "manager",
           type: "bet",
           content: stageName,
-          delayMinutes: baseDelay,
+          delayMinutes: clock.next("manager"),
         });
         const betIndex = stageName === "bet_1" ? 0 : stageName === "bet_2" ? 1 : 2;
         const fixedCaption = params.betCaptions?.[betIndex]?.trim();
@@ -524,17 +540,17 @@ export class DialogGenerator {
             role: "manager",
             type: "text",
             content: fixedCaption,
-            delayMinutes: baseDelay + 1,
+            delayMinutes: clock.managerBurst(),
           });
           for (const turn of stageTurns) {
-            if (turn.role === "client") pushTurn(turn.role, turn.text, delayAfterBetMinutes(baseDelay));
+            if (turn.role === "client") pushTurn(turn.role, turn.text, clock.next("client", "bet_reply"));
           }
         } else {
           for (const turn of stageTurns) {
             if (turn.role === "client") {
-              pushTurn(turn.role, turn.text, delayAfterBetMinutes(baseDelay));
+              pushTurn(turn.role, turn.text, clock.next("client", "bet_reply"));
             } else {
-              pushTurn(turn.role, turn.text, baseDelay + 1);
+              pushTurn(turn.role, turn.text, clock.managerBurst());
             }
           }
         }
@@ -553,13 +569,13 @@ export class DialogGenerator {
               role: turn.role,
               type: "text",
               content: params.completionMessage,
-              delayMinutes: baseDelay,
+              delayMinutes: clock.next("manager"),
             });
             injected = true;
           } else if (turn.role === "client") {
-            pushTurn(turn.role, turn.text, baseDelay + 1);
+            pushTurn(turn.role, turn.text, clock.next("client"));
           } else {
-            pushTurn(turn.role, turn.text, baseDelay);
+            pushTurn(turn.role, turn.text, clock.managerBurst());
           }
         }
         if (!injected) {
@@ -567,15 +583,14 @@ export class DialogGenerator {
             role: "manager",
             type: "text",
             content: params.completionMessage,
-            delayMinutes: baseDelay,
+            delayMinutes: clock.next("manager"),
           });
         }
-        // Client sends card before we pay out
         push({
           role: "client",
           type: "text",
           content: generateClientCardNumber(),
-          delayMinutes: baseDelay + 3,
+          delayMinutes: clock.next("client"),
         });
         continue;
       }
@@ -585,7 +600,7 @@ export class DialogGenerator {
           role: "manager",
           type: "receipt",
           content: "receipt",
-          delayMinutes: baseDelay,
+          delayMinutes: clock.next("manager"),
         });
         let injected = false;
         for (const turn of stageTurns) {
@@ -598,11 +613,11 @@ export class DialogGenerator {
               role: turn.role,
               type: "text",
               content: params.payoutMessage,
-              delayMinutes: baseDelay + 1,
+              delayMinutes: clock.managerBurst(),
             });
             injected = true;
           } else {
-            pushTurn(turn.role, turn.text, baseDelay + 1);
+            pushTurn(turn.role, turn.text, clock.next(turn.role));
           }
         }
         if (!injected) {
@@ -610,14 +625,14 @@ export class DialogGenerator {
             role: "manager",
             type: "text",
             content: params.payoutMessage,
-            delayMinutes: baseDelay + 1,
+            delayMinutes: clock.managerBurst(),
           });
         }
         continue;
       }
 
       for (const turn of stageTurns) {
-        pushTurn(turn.role, turn.text, baseDelay);
+        pushTurn(turn.role, turn.text, clock.next(turn.role));
       }
     }
 
@@ -640,12 +655,15 @@ export class DialogGenerator {
   }): Promise<DialogMessage[]> {
     const { legend, managerScript, vars, agentContext, stagesToUse, isUniqueCircle, locale } = params;
     const messages: DialogMessage[] = [];
+    const clock = new DialogClock();
     const push = (msg: Omit<DialogMessage, "id">) => this.pushMessage(messages, msg, legend);
 
     const pushStage = async (stageName: string) => {
+      clock.setStage(stageName);
       const stageMessages = managerScript.stages[stageName] ?? [];
       for (const stageMsg of stageMessages) {
-        push(await this.buildManagerMessage(stageMsg, stageName, vars, agentContext));
+        const delayMinutes = clock.next(stageMsg.role);
+        push(await this.buildManagerMessage(stageMsg, stageName, vars, agentContext, delayMinutes));
       }
 
       const clientReply = managerScript.clientReplies[stageName];
@@ -657,7 +675,7 @@ export class DialogGenerator {
                 role: "client",
                 type: item.type as MessageType,
                 content: item.content,
-                delayMinutes: item.delayMinutes,
+                delayMinutes: clock.next("client"),
               });
             }
           }
@@ -667,30 +685,24 @@ export class DialogGenerator {
             clientReply as string | string[],
             agentContext,
           );
-          const lastDelay = stageMessages.at(-1)?.delayMinutes ?? stageDelay(stageName);
           const isBetStage = stageName === "bet_1" || stageName === "bet_2" || stageName === "bet_3";
           push({
             role: "client",
             type: "text",
             content,
-            delayMinutes: isBetStage ? delayAfterBetMinutes(lastDelay) : lastDelay + 1,
+            delayMinutes: isBetStage ? clock.next("client", "bet_reply") : clock.next("client"),
           });
         }
       }
 
       if (stageName === "deposit") {
-        const capturaSteps = managerScript.clientReplies.deposit_captura;
-        const lastDelay =
-          messages.at(-1)?.delayMinutes ??
-          stageMessages.at(-1)?.delayMinutes ??
-          STAGE_DELAY.deposit ??
-          32;
         push({
           role: "manager",
           type: "text",
           content: fallbackDepositEncourage(locale),
-          delayMinutes: lastDelay + 2,
+          delayMinutes: clock.next("manager"),
         });
+        const capturaSteps = managerScript.clientReplies.deposit_captura;
         if (Array.isArray(capturaSteps)) {
           for (const step of capturaSteps) {
             if (typeof step === "object" && "type" in step) {
@@ -698,7 +710,7 @@ export class DialogGenerator {
                 role: "client",
                 type: step.type as MessageType,
                 content: step.content,
-                delayMinutes: step.delayMinutes,
+                delayMinutes: clock.next("client", "captura"),
               });
             }
           }
@@ -706,25 +718,24 @@ export class DialogGenerator {
       }
 
       if (stageName === "completion") {
-        const lastDelay = messages.at(-1)?.delayMinutes ?? STAGE_DELAY.completion ?? 112;
         push({
           role: "client",
           type: "text",
           content: generateClientCardNumber(),
-          delayMinutes: lastDelay + 2,
+          delayMinutes: clock.next("client"),
         });
       }
     };
 
     // Personal story first, then money stages (Vlad)
-    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: 0 });
+    push({ role: "client", type: "sticker", content: "greeting", delayMinutes: clock.atStart("client") });
 
     if (legend.openingPhrase) {
       push({
         role: "client",
         type: "text",
         content: legend.openingPhrase,
-        delayMinutes: 0,
+        delayMinutes: clock.clientBurst(),
       });
     }
 
@@ -740,7 +751,7 @@ export class DialogGenerator {
         role: "client",
         type: "text",
         content: part,
-        delayMinutes: i + 2,
+        delayMinutes: clock.clientBurst(),
       });
 
       if (i === photoAfterIndex && photoAfterIndex >= 0 && !isStandaloneLegend(legend.id)) {
@@ -748,7 +759,7 @@ export class DialogGenerator {
           role: "client",
           type: "image",
           content: legend.id,
-          delayMinutes: i + 2,
+          delayMinutes: clock.sameTime(),
           metadata: { legendId: legend.id },
         });
       }
@@ -759,7 +770,7 @@ export class DialogGenerator {
         role: "client",
         type: "text",
         content: legend.motivation,
-        delayMinutes: problemParts.length + 2,
+        delayMinutes: clock.clientBurst(),
       });
     }
 
@@ -773,12 +784,13 @@ export class DialogGenerator {
     }
 
     if (isUniqueCircle) {
+      clock.setStage("gratitude");
       const extraThanks = await this.resolveClientReply(legend, "gratitude", agentContext);
       push({
         role: "client",
         type: "text",
         content: extraThanks,
-        delayMinutes: STAGE_DELAY.gratitude,
+        delayMinutes: clock.next("client"),
       });
     }
 
@@ -793,6 +805,10 @@ export class DialogGenerator {
     forcedLegendId?: string;
     /** When set, force amount pack bound to this bet image pack (1:1). */
     betPack?: number;
+    /** Explicit amount pack from constructor / operator (overrides betPack mapping). */
+    amountPackId?: string;
+    /** Operator-defined amounts — decoupled from config/amounts.json rows. */
+    customAmounts?: CustomAmounts;
   }): Promise<GeneratedDialog> {
     const config = await loadAppConfig();
     const project = config.projects.projects.find((p) => p.id === params.projectId);
@@ -844,8 +860,28 @@ export class DialogGenerator {
         legends.find((l) => l.id === params.forcedLegendId)
       : null;
 
-    const forcedPack =
-      params.betPack != null ? findAmountPackForBetPack(projectPacks, params.betPack) : null;
+    const forcedPack = params.amountPackId
+      ? projectPacks.find((p) => p.id === params.amountPackId) ?? null
+      : params.customAmounts
+        ? ({
+            id: OPERATOR_CUSTOM_PACK_ID,
+            projectId: params.projectId,
+            deposit: params.customAmounts.deposit,
+            profit1: params.customAmounts.profit1,
+            profit2: params.customAmounts.profit2,
+            profit3: params.customAmounts.profit3,
+            profitFinal: params.customAmounts.profitFinal,
+            currency: project.currency,
+          } satisfies AmountPack & { profit3: number })
+        : params.betPack != null
+          ? findAmountPackForBetPack(projectPacks, params.betPack)
+          : null;
+    if (params.amountPackId && !forcedPack) {
+      throw new Error(`Пак сумм не найден для этого проекта: ${params.amountPackId}`);
+    }
+    if (params.customAmounts && !forcedPack) {
+      throw new Error("Некорректные суммы для отзыва");
+    }
     const amountPackIds = forcedPack ? [forcedPack.id] : projectPacks.map((p) => p.id);
     const combination = await pickUnusedCombination({
       projectId: params.projectId,
@@ -864,6 +900,18 @@ export class DialogGenerator {
       forcedPack ??
       projectPacks.find((p) => p.id === combination.amountPackId) ??
       projectPacks[0]!;
+    const profit3 =
+      "profit3" in amountPack && typeof amountPack.profit3 === "number" && amountPack.profit3 > 0
+        ? amountPack.profit3
+        : betProfitForSlot(
+            {
+              profit1: amountPack.profit1,
+              profit2: amountPack.profit2,
+              profit3: 0,
+              profitFinal: amountPack.profitFinal,
+            },
+            3,
+          );
 
     const depositBank = pickRandom(depositBanks.length > 0 ? depositBanks : config.banks.depositBanks);
     const payoutBank = pickRandom(payoutBanks.length > 0 ? payoutBanks : config.banks.payoutBanks);
@@ -998,6 +1046,10 @@ export class DialogGenerator {
     }
 
     await markCombinationUsed(params.projectId, combination);
+
+    const voiceChance = config.schedule.clientVoiceChance ?? 0.25;
+    messages = injectClientVoiceMessage(messages, voiceChance);
+
     await logger.info("Dialog generated", {
       projectId: params.projectId,
       scenarioId: scenario.id,
@@ -1017,6 +1069,7 @@ export class DialogGenerator {
       deposit: amountPack.deposit,
       profit1: amountPack.profit1,
       profit2: amountPack.profit2,
+      profit3,
       profitFinal: amountPack.profitFinal,
       payoutAmount: clientShareAmount,
       clabe,

@@ -245,20 +245,38 @@ export async function listCompleteBetPacks(projectId: string): Promise<BetPackPi
 }
 
 /**
+ * Use a specific numbered bet image pack (constructor amount-pack selection).
+ * Marks the three screenshots as used, same as the sequential cycle.
+ */
+export async function pickBetPackByNumber(params: {
+  projectId: string;
+  packNumber: number;
+  reviewId?: string | null;
+}): Promise<BetPackPick | null> {
+  if (params.packNumber < 1) return null;
+  const packs = await listCompleteBetPacks(params.projectId);
+  const chosen = packs.find((p) => p.packNumber === params.packNumber) ?? null;
+  if (!chosen) return null;
+  await markBetsUsed({
+    projectId: params.projectId,
+    ...(params.reviewId !== undefined ? { reviewId: params.reviewId } : {}),
+    paths: chosen.assets.map((a) => a.path),
+  });
+  return chosen;
+}
+
+/**
  * Next bet pack in cycle 1→N→1, aligned with amount `betPack`.
- * Prefers packs outside cooldown; soft-falls back if all blocked.
+ * Always picks the next pack after the last used — strict order, no random skip.
  */
 export async function pickNextBetPack(params: {
   projectId: string;
   reuseDays?: number;
   reviewId?: string | null;
 }): Promise<BetPackPick | null> {
-  const reuseDays =
-    params.reuseDays !== undefined ? params.reuseDays : await getConfiguredBetReuseDays();
   const packs = await listCompleteBetPacks(params.projectId);
   if (packs.length === 0) return null;
 
-  const blocked = await recentBetPaths(params.projectId, reuseDays);
   const db = getDb();
   const last = await db
     .select()
@@ -278,19 +296,36 @@ export async function pickNextBetPack(params: {
     }
   }
 
-  const isFresh = (pack: BetPackPick) => pack.assets.every((a) => !blocked.has(a.path));
+  const chosen = packs[startIdx] ?? packs[0]!;
 
-  let chosen: BetPackPick | null = null;
-  for (let i = 0; i < packs.length; i++) {
-    const pack = packs[(startIdx + i) % packs.length]!;
-    if (isFresh(pack)) {
-      chosen = pack;
-      break;
-    }
-  }
-  if (!chosen) {
-    chosen = packs[startIdx] ?? packs[0]!;
-  }
+  await markBetsUsed({
+    projectId: params.projectId,
+    ...(params.reviewId !== undefined ? { reviewId: params.reviewId } : {}),
+    paths: chosen.assets.map((a) => a.path),
+  });
+
+  return chosen;
+}
+
+/**
+ * Random complete bet pack, preferring packs outside cooldown.
+ * Used when amounts are operator-defined and not tied to pack number.
+ */
+export async function pickRandomBetPack(params: {
+  projectId: string;
+  reuseDays?: number;
+  reviewId?: string | null;
+}): Promise<BetPackPick | null> {
+  const reuseDays =
+    params.reuseDays !== undefined ? params.reuseDays : await getConfiguredBetReuseDays();
+  const packs = await listCompleteBetPacks(params.projectId);
+  if (packs.length === 0) return null;
+
+  const blocked = await recentBetPaths(params.projectId, reuseDays);
+  const isFresh = (pack: BetPackPick) => pack.assets.every((a) => !blocked.has(a.path));
+  const fresh = packs.filter(isFresh);
+  const pool = fresh.length > 0 ? fresh : packs;
+  const chosen = pool[Math.floor(Math.random() * pool.length)]!;
 
   await markBetsUsed({
     projectId: params.projectId,

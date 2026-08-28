@@ -22,6 +22,7 @@ export function messageVisualWeight(msg: RenderMessage): number {
     return 3;
   }
   if (msg.type === "sticker") return 2;
+  if (msg.type === "voice") return 2;
   const lines = msg.content.split("\n").length;
   const chars = msg.content.length;
   if (lines >= 4 || chars > 140) return 2;

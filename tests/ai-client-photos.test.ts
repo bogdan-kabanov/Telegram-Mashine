@@ -87,4 +87,35 @@ describe("resolveClientPhoto AI fallback", () => {
       }
     }
   });
+
+  it("reuses a used pool photo when unique is exhausted and AI fails", async () => {
+    const tmpRoot = path.join(os.tmpdir(), `bot-ai-photos-reuse-${randomUUID()}`);
+    const dataDir = path.join(tmpRoot, "data");
+    const pool = path.join(dataDir, "media/story_photos/pool");
+    mkdirSync(pool, { recursive: true });
+    writeFileSync(path.join(pool, "only.jpg"), Buffer.alloc(600, 1));
+
+    process.env.DATA_DIR = dataDir;
+    process.env.AI_CLIENT_PHOTOS = "fallback";
+    resetDbForTests();
+    generateClientPhoto.mockResolvedValue(null);
+
+    try {
+      const first = await resolveClientPhoto({ projectId: "nancy", reviewId: "r1" });
+      expect(first).not.toBeNull();
+      expect(first!.source).toBe("pool");
+
+      const second = await resolveClientPhoto({ projectId: "grisel", reviewId: "r2" });
+      expect(second).not.toBeNull();
+      expect(second!.path).toBe(first!.path);
+      expect(second!.source).toBe("pool");
+    } finally {
+      resetDbForTests();
+      try {
+        rmSync(tmpRoot, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  });
 });

@@ -13,8 +13,9 @@ export default async function ConstructorPage() {
 
   return (
     <AdminShell
+      wide
       title="Конструктор"
-      description="Одна вкладка: настройка проекта по шагам из ТЗ — от фона и условий до пробного отзыва и запуска."
+      description="Слева все шаги сразу. Справа — живой отзыв 1:1 (тот же рендер, что после генерации), с первой секунды."
     >
       <ProjectConstructor
         projects={config.projects.projects.map((p) => ({
@@ -39,6 +40,16 @@ export default async function ConstructorPage() {
           depositMessageTemplate: p.depositMessageTemplate,
           completionMessageTemplate: p.completionMessageTemplate,
           payoutMessageTemplate: p.payoutMessageTemplate,
+        }))}
+        amountPacks={config.amounts.packs.map((p) => ({
+          id: p.id,
+          projectId: p.projectId,
+          betPack: p.betPack,
+          deposit: p.deposit,
+          profit1: p.profit1,
+          profit2: p.profit2,
+          profitFinal: p.profitFinal,
+          currency: p.currency,
         }))}
         initialStatus={state.status}
       />

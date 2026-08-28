@@ -5,6 +5,7 @@ import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { bootstrapApp } from "@/lib/bootstrap";
+import { withBasePath } from "@/lib/base-path";
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
 import { MEDIA_TYPE_DIRS, MEDIA_TYPE_LABELS } from "@/lib/media/types";
@@ -65,7 +66,7 @@ export async function GET() {
           legendId: extractLegendId(a.path),
           mimeType: a.mimeType,
           createdAt: a.createdAt,
-          url: `/api/admin/media/file?id=${a.id}`,
+          url: withBasePath(`/api/admin/media/file?id=${a.id}`),
           isImage: /\.(jpg|jpeg|png|webp|gif)$/i.test(a.filename) || (a.mimeType?.startsWith("image/") ?? false),
           isVideo: /\.(mp4|mov)$/i.test(a.filename) || (a.mimeType?.startsWith("video/") ?? false),
         };
@@ -110,7 +111,7 @@ export async function GET() {
                 : extractLegendId(relPath),
             mimeType: null,
             createdAt: "",
-            url: `/api/admin/media/file?path=${encodeURIComponent(relPath)}`,
+            url: withBasePath(`/api/admin/media/file?path=${encodeURIComponent(relPath)}`),
             isImage: /\.(jpg|jpeg|png|webp|gif)$/i.test(name.name),
             isVideo: /\.(mp4|mov)$/i.test(name.name),
           });

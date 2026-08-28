@@ -226,7 +226,7 @@ export function AiSettingsForm() {
 
       <ModelSelect
         label="Модель картинок"
-        help="Фото клиента, ставки, условия, аватар, обои, стикеры. Рекомендуется gpt-image-1."
+        help="Фото клиента, условия, аватар, обои, стикеры. Ставки и чеки ИИ не рисует — суммы печатаются на готовом скрине."
         value={settings.OPENAI_IMAGE_MODEL}
         options={IMAGE_MODEL_OPTIONS}
         onChange={(OPENAI_IMAGE_MODEL) => setSettings({ ...settings, OPENAI_IMAGE_MODEL })}
@@ -267,7 +267,7 @@ export function AiSettingsForm() {
       </label>
 
       <label className="admin-field">
-        <LabelWithHelp label="Чеки (AI)" tip="Генерация банковских чеков: выкл / fallback / всегда." />
+        <LabelWithHelp label="Чеки (AI)" tip="Больше не рисует новую фотку чека. Суммы и имена печатаются на исходном скрине банка без OpenAI Images. Этот переключатель оставлен на случай старых настроек." />
         <select
           className="admin-select"
           style={field}

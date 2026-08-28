@@ -13,9 +13,9 @@ import {
 } from "react";
 
 import { chatUiForLocale } from "@/lib/i18n/chat-ui";
-
-import { AppleEmojiText } from "./ui/AppleEmojiText";
+import { withBasePath } from "@/lib/base-path";
 import { DialogReviewPanel } from "./dialog-review-panel";
+import { AppleEmojiText } from "./ui/AppleEmojiText";
 import { ScreenshotGallery } from "./screenshot-gallery";
 import { colors, inputStyle } from "./styles";
 import { HelpTip, LabelWithHelp } from "./ui/HelpTip";
@@ -54,7 +54,7 @@ export interface ProjectWorkspaceProps {
 
 function wallpaperPreviewUrl(path: string | null | undefined): string | null {
   if (!path) return null;
-  return `/api/admin/media/file?path=${encodeURIComponent(path)}`;
+  return withBasePath(`/api/admin/media/file?path=${encodeURIComponent(path)}`);
 }
 
 type Tab = "preview" | "dialog" | "settings";
@@ -120,8 +120,8 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
   const [saving, setSaving] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [wallpaperPath, setWallpaperPath] = useState<string | null>(project.wallpaperPath ?? null);
-  const [useAiWallpaper, setUseAiWallpaper] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const wallpaperFileRef = useRef<HTMLInputElement>(null);
   const [mediaAssets, setMediaAssets] = useState<PickerMediaAsset[]>([]);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -339,7 +339,6 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
       const data = (await res.json()) as { error?: string; path?: string };
       if (!res.ok && res.status !== 207) throw new Error(data.error ?? "Ошибка генерации фона");
       if (data.path) setWallpaperPath(data.path);
-      setUseAiWallpaper(false);
       await loadMediaAssets();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
@@ -361,7 +360,6 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
       if (!res.ok) throw new Error(data.error ?? "Не удалось сохранить фон");
       setWallpaperPath(asset.path);
       setPickerOpen(false);
-      setUseAiWallpaper(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
@@ -502,7 +500,7 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                   Фон чата (обои)
                   <HelpTip text="Выберите картинку из медиатеки или загрузите новую. Сразу ставится для этого проекта." />
                 </strong>
-                <span>Сначала выберите из медиахранилища. Загрузка / ИИ — если нужен новый файл.</span>
+                <span>Сначала из медиатеки. С компьютера — если файла ещё нет. ИИ нарисует новый фон.</span>
               </div>
               <div className="ctor-upload-row">
                 {wallpaperUrl ? (
@@ -516,44 +514,40 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                     type="button"
                     className="admin-btn"
                     disabled={mediaBusy}
-                    onClick={() => {
-                      setUseAiWallpaper(false);
-                      setPickerOpen(true);
-                    }}
+                    onClick={() => setPickerOpen(true)}
                   >
-                    Выбрать из медиатеки
+                    Из медиатеки
                   </button>
-                  <label className="ctor-ai-check">
-                    <input
-                      type="checkbox"
-                      checked={useAiWallpaper}
-                      disabled={mediaBusy}
-                      onChange={(e) => setUseAiWallpaper(e.target.checked)}
-                    />
-                    Сгенерировать через ИИ
-                  </label>
-                  {useAiWallpaper ? (
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      disabled={mediaBusy}
-                      onClick={() => void generateWallpaperAi()}
-                    >
-                      {mediaBusy ? "Генерация…" : "Сгенерировать"}
-                    </button>
-                  ) : (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={mediaBusy}
-                      title="Загрузить новый файл в медиатеку"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void uploadWallpaper(f);
-                        e.currentTarget.value = "";
-                      }}
-                    />
-                  )}
+                  <button
+                    type="button"
+                    className="admin-btn-secondary"
+                    disabled={mediaBusy}
+                    onClick={() => wallpaperFileRef.current?.click()}
+                  >
+                    С компьютера
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn-ghost"
+                    disabled={mediaBusy}
+                    onClick={() => void generateWallpaperAi()}
+                  >
+                    Сгенерировать ИИ
+                  </button>
+                  <input
+                    ref={wallpaperFileRef}
+                    type="file"
+                    accept="image/*"
+                    disabled={mediaBusy}
+                    className="ctor-file-input"
+                    tabIndex={-1}
+                    aria-hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void uploadWallpaper(f);
+                      e.currentTarget.value = "";
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -569,14 +563,14 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                 <input type="color" style={{ ...fieldInput, height: 38, padding: 2 }} value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} />
               </Field>
             </div>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem" }}>
+            <label className="admin-check">
               <input
                 type="checkbox"
                 checked={form.twoPhaseReview}
                 onChange={(e) => setForm({ ...form, twoPhaseReview: e.target.checked })}
                 disabled={project.id !== "nancy"}
               />
-              Двухчастная публикация
+              <span>Двухчастная публикация</span>
               <HelpTip text="Сначала 4 скрина, через ~1.5 часа — полный отзыв. По ТЗ включается только для Nancy." />
             </label>
             <button type="submit" className="admin-btn" style={{ alignSelf: "flex-start" }} disabled={saving || mediaBusy}>
@@ -592,17 +586,27 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
             <div
               ref={phoneRef}
               className="project-phone"
-              style={{ ["--chat-wallpaper" as string]: wallpaperImage } as CSSProperties}
+              style={
+                {
+                  ["--chat-wallpaper" as string]: wallpaperImage,
+                } as CSSProperties
+              }
             >
               <div className="project-phone-stage">
                 <div className="project-phone-wallpaper" aria-hidden />
                 <div className="project-phone-chat">
                   <div className="project-phone-chat-spacer" aria-hidden />
                   <div className="project-phone-chat-messages">
-                    <div className="project-phone-bubble is-in" style={{ background: form.incomingBubble }}>
+                    <div
+                      className="project-phone-bubble is-in"
+                      style={{ background: form.incomingBubble } as CSSProperties}
+                    >
                       <AppleEmojiText text={sampleIn[0]?.content ?? "Привет! Как это работает?"} />
                     </div>
-                    <div className="project-phone-bubble is-out" style={{ background: form.outgoingBubble }}>
+                    <div
+                      className="project-phone-bubble is-out"
+                      style={{ background: form.outgoingBubble } as CSSProperties}
+                    >
                       <AppleEmojiText
                         text={
                           previewSnippet(form.depositMessageTemplate) ||
@@ -628,12 +632,18 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                         </svg>
                       </span>
                     </div>
-                    <div className="project-phone-bubble is-in" style={{ background: form.incomingBubble }}>
+                    <div
+                      className="project-phone-bubble is-in"
+                      style={{ background: form.incomingBubble } as CSSProperties}
+                    >
                       <AppleEmojiText
                         text={sampleIn[2]?.content ?? sampleIn[1]?.content ?? "Готово, уже оплатил"}
                       />
                     </div>
-                    <div className="project-phone-bubble is-out" style={{ background: form.outgoingBubble }}>
+                    <div
+                      className="project-phone-bubble is-out"
+                      style={{ background: form.outgoingBubble } as CSSProperties}
+                    >
                       <AppleEmojiText
                         text={previewSnippet(form.payoutMessageTemplate) || "Деньги отправлены 💸"}
                       />

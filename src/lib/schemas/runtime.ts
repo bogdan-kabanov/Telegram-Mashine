@@ -48,6 +48,8 @@ export const reviewPackageSchema = z.object({
   renderMedia: reviewRenderMediaSchema.optional(),
   /** Operator RU translations keyed by message id (does not affect screenshots). */
   dialogTranslations: z.record(z.string()).optional(),
+  /** Per-screenshot generation time (ISO) — status bar, bubbles, receipts. */
+  slideTimes: z.array(z.string()).optional(),
 });
 
 export type BotStatus = z.infer<typeof botStatusSchema>;

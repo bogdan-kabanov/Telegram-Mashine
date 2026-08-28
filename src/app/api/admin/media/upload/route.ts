@@ -5,6 +5,7 @@ import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 
 import { bootstrapApp } from "@/lib/bootstrap";
+import { withBasePath } from "@/lib/base-path";
 import { updateProject } from "@/lib/config/writer";
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
       type,
       projectId,
       legendId,
-      url: `/api/admin/media/file?id=${id}`,
+      url: withBasePath(`/api/admin/media/file?id=${id}`),
       message:
         type === "story_photo"
           ? "Фото клиента добавлено в общий пул. Каждое фото используется только один раз."

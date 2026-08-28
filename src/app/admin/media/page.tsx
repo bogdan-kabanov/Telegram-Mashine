@@ -63,10 +63,10 @@ export default async function MediaPage() {
             <div>
               <h3>Чеки банков</h3>
               <p>
-                Не загружаются вручную: ИИ правит образцы из{" "}
-                <code>data/media/receipt_templates/&#123;project&#125;</code>. Нужны{" "}
-                <code>OPENAI_API_KEY</code> и <code>AI_RECEIPTS=fallback</code> (модель{" "}
-                <code>gpt-image-1</code>). Без ключа — HTML-заглушка.
+                Не загружаются вручную: на исходном скрине из{" "}
+                <code>data/media/receipt_templates/&#123;project&#125;</code> подставляются сумма,
+                имена и дата. Ставки тоже не перерисовываются: суммы печатаются на готовом скрине.
+                Если поля чека не прочитались — HTML-заглушка.
               </p>
             </div>
           </div>

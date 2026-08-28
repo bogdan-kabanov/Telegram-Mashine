@@ -34,6 +34,7 @@ export const generatedDialogSchema = z.object({
   deposit: z.number(),
   profit1: z.number(),
   profit2: z.number(),
+  profit3: z.number().optional(),
   profitFinal: z.number(),
   payoutAmount: z.number(),
   clabe: z.string(),
@@ -55,6 +56,7 @@ export const reviewRenderMediaSchema = z.object({
   bet3: z.string().nullable().optional(),
   receipt: z.string().nullable().optional(),
   captura: z.string().nullable().optional(),
+  voice: z.string().nullable().optional(),
 });
 
 export const dialogScriptSchema = z.object({
@@ -85,8 +87,8 @@ export const clientLegendSchema = z.object({
   motivation: z.string().min(1),
   gratitudePhrases: z.array(z.string().min(1)).min(1),
   doubtPhrases: z.array(z.string().min(1)).min(1),
-  /** Insert client photo after this problem sentence (0-based). Default: after first sentence. */
-  photoAfterProblemIndex: z.number().int().min(0).optional(),
+  /** Insert client photo after this problem sentence (0-based). -1 = never. Default: after first sentence. */
+  photoAfterProblemIndex: z.number().int().min(-1).optional(),
 });
 
 export const scenarioSchema = z.object({

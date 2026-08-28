@@ -1,7 +1,8 @@
 import type { AmountPack } from "@/lib/schemas/amounts";
 import type { Currency } from "@/lib/schemas/currencies";
 import { getCachedAppConfig } from "@/lib/config/loader";
-import { getMexicoCityParts } from "@/lib/timezone";
+import { localeClockConfig } from "@/lib/i18n/locale-profile";
+import { formatClockTime, formatLocalDate } from "@/lib/timezone";
 
 const FALLBACK_CURRENCIES: Currency[] = [
   {
@@ -124,26 +125,86 @@ export function amountPackToVars(pack: AmountPack): Record<string, number> {
   };
 }
 
-export function computeMessageTimes(
-  messages: Array<{ delayMinutes: number }>,
-  _baseDate = new Date(),
-): string[] {
-  const baseMinutes = 17 * 60 + 8;
-  let cursor = baseMinutes;
+export type MessageClockOptions = {
+  now?: Date;
+  timeZone?: string;
+  locale?: string;
+  dateFormat?: string;
+};
 
+export type DateTimeStamp = { date: string; time: string };
+
+export type MessageClock = {
+  times: string[];
+  lastTime: string;
+  stampAt: (index: number) => DateTimeStamp;
+  stampAtDelay: (delayMinutes: number) => DateTimeStamp;
+  stampForType: (messages: Array<{ type: string }>, type: string) => DateTimeStamp | null;
+};
+
+function monotonicDelays(messages: Array<{ delayMinutes: number }>): number[] {
+  let cursor = 0;
   return messages.map((msg, index) => {
-    const target = baseMinutes + Math.max(0, msg.delayMinutes);
+    const target = Math.max(0, msg.delayMinutes);
     // Never go backwards — AI stage delays can be non-monotonic vs message order.
     cursor = index === 0 ? target : Math.max(cursor, target);
-    const h = Math.floor((cursor / 60) % 24)
-      .toString()
-      .padStart(2, "0");
-    const m = (cursor % 60).toString().padStart(2, "0");
-    return `${h}:${m}`;
+    return cursor;
   });
 }
 
-export function formatStatusBarTime(date = new Date()): string {
-  const parts = getMexicoCityParts(date);
-  return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+/**
+ * One shared clock for bubbles, status bar, and bank slips.
+ * Last message = `now` in the project timezone; earlier turns walk back by delayMinutes.
+ */
+export function buildMessageClock(
+  messages: Array<{ delayMinutes: number }>,
+  options: MessageClockOptions = {},
+): MessageClock {
+  const now = options.now ?? new Date();
+  const localeCfg = localeClockConfig(options.locale);
+  const timeZone = options.timeZone ?? localeCfg.timeZone;
+  const locale = options.locale ?? localeCfg.locale;
+  const dateFormat = options.dateFormat ?? localeCfg.dateFormat;
+  const delays = monotonicDelays(messages);
+  const lastDelay = delays.at(-1) ?? 0;
+
+  const stampForWhen = (when: Date): DateTimeStamp => ({
+    date: formatLocalDate(when, { timeZone, locale, dateFormat }),
+    time: formatClockTime(timeZone, when),
+  });
+
+  const whenForDelay = (delay: number): Date =>
+    new Date(now.getTime() - (lastDelay - Math.max(0, delay)) * 60_000);
+
+  const stamps = delays.map((delay) => stampForWhen(whenForDelay(delay)));
+  const nowStamp = stampForWhen(now);
+
+  const stampAt = (index: number): DateTimeStamp => {
+    if (index < 0 || index >= stamps.length) return nowStamp;
+    return stamps[index]!;
+  };
+
+  return {
+    times: stamps.map((s) => s.time),
+    lastTime: stamps.at(-1)?.time ?? nowStamp.time,
+    stampAt,
+    stampAtDelay: (delayMinutes: number) => stampForWhen(whenForDelay(delayMinutes)),
+    stampForType: (typed, type) => {
+      const index = typed.findIndex((m) => m.type === type);
+      return index >= 0 ? stampAt(index) : null;
+    },
+  };
+}
+
+export function computeMessageTimes(
+  messages: Array<{ delayMinutes: number }>,
+  nowOrOptions?: Date | MessageClockOptions,
+): string[] {
+  const options: MessageClockOptions =
+    nowOrOptions instanceof Date ? { now: nowOrOptions } : (nowOrOptions ?? {});
+  return buildMessageClock(messages, options).times;
+}
+
+export function formatStatusBarTime(date = new Date(), timeZone?: string): string {
+  return formatClockTime(timeZone ?? localeClockConfig("es-MX").timeZone, date);
 }

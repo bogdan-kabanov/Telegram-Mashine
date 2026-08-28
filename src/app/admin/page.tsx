@@ -102,7 +102,7 @@ export default async function AdminDashboard() {
             <div>
               <strong>Пройти конструктор</strong>
               <div className="admin-muted" style={{ fontSize: "0.84rem" }}>
-                Фон, условия, тексты, медиа и пробный отзыв — в одной вкладке по шагам ТЗ
+                Фон, условия, тексты, медиа — все сразу. Живой отзыв справа, без мастера «Далее».
               </div>
             </div>
             <span className="admin-muted">→</span>

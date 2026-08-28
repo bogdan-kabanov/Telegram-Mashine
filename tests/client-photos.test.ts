@@ -8,9 +8,11 @@ import { resetDbForTests } from "../src/lib/db";
 import {
   markClientPhotoUsed,
   pickUniqueClientPhoto,
+  pickAvailableClientPhoto,
   listAvailableClientPhotos,
 } from "../src/lib/client-photos";
 import {
+  dialogToRenderMessages,
   messagesPerScreenForCount,
   paginateMessages,
   TARGET_SCREENSHOTS,
@@ -49,7 +51,7 @@ describe("screenshot pagination ~10", () => {
 });
 
 describe("unique client photos", () => {
-  it("never returns the same photo twice", async () => {
+  it("cycles photos 1→N→1 in filename order", async () => {
     const tmpRoot = path.join(os.tmpdir(), `bot-ai-photos-${randomUUID()}`);
     const dataDir = path.join(tmpRoot, "data");
     const pool = path.join(dataDir, "media/story_photos/pool");
@@ -69,8 +71,9 @@ describe("unique client photos", () => {
 
       expect(first).not.toBeNull();
       expect(second).not.toBeNull();
+      expect(third).not.toBeNull();
       expect(first!.path).not.toBe(second!.path);
-      expect(third).toBeNull();
+      expect(third!.path).toBe(first!.path);
 
       const available = await listAvailableClientPhotos();
       expect(available.length).toBe(2);
@@ -80,6 +83,10 @@ describe("unique client photos", () => {
         projectId: "nancy",
         reviewId: randomUUID(),
       });
+
+      const reused = await pickAvailableClientPhoto();
+      expect(reused).not.toBeNull();
+      expect([first!.path, second!.path]).toContain(reused!.path);
     } finally {
       if (prevDataDir === undefined) delete process.env.DATA_DIR;
       else process.env.DATA_DIR = prevDataDir;
@@ -90,5 +97,93 @@ describe("unique client photos", () => {
         // OneDrive / Windows locks — ignore cleanup failures
       }
     }
+  });
+
+  it("skips a missing file and picks another pool photo", async () => {
+    const tmpRoot = path.join(os.tmpdir(), `bot-ai-photos-skip-${randomUUID()}`);
+    const dataDir = path.join(tmpRoot, "data");
+    const pool = path.join(dataDir, "media/story_photos/pool");
+    mkdirSync(pool, { recursive: true });
+    writeFileSync(path.join(pool, "good.jpg"), Buffer.alloc(600, 1));
+    writeFileSync(path.join(pool, "gone.jpg"), Buffer.alloc(600, 1));
+
+    const prevDataDir = process.env.DATA_DIR;
+    process.env.DATA_DIR = dataDir;
+    resetDbForTests();
+
+    try {
+      rmSync(path.join(pool, "gone.jpg"), { force: true });
+      const pick = await pickAvailableClientPhoto({
+        excludePaths: ["data/media/story_photos/pool/gone.jpg"],
+      });
+      expect(pick).not.toBeNull();
+      expect(pick!.filename).toBe("good.jpg");
+    } finally {
+      if (prevDataDir === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = prevDataDir;
+      resetDbForTests();
+      try {
+        rmSync(tmpRoot, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  });
+});
+
+describe("story photo render messages", () => {
+  it("never turns a missing photo into a camera-emoji text bubble", () => {
+    const rendered = dialogToRenderMessages(
+      [
+        {
+          id: "t1",
+          role: "client",
+          type: "text",
+          content: "hola",
+          delayMinutes: 0,
+        },
+        {
+          id: "img",
+          role: "client",
+          type: "image",
+          content: "hospital",
+          delayMinutes: 1,
+          metadata: { legendId: "hospital" },
+        },
+        {
+          id: "t2",
+          role: "client",
+          type: "text",
+          content: "help",
+          delayMinutes: 1,
+        },
+      ],
+      { storyPhoto: null },
+    );
+
+    expect(rendered.some((m) => m.content.includes("📷"))).toBe(false);
+    expect(rendered.find((m) => m.id === "img")).toBeUndefined();
+    expect(rendered.map((m) => m.id)).toEqual(["t1", "t2"]);
+  });
+
+  it("keeps a real image bubble when a story photo is available", () => {
+    const rendered = dialogToRenderMessages(
+      [
+        {
+          id: "img",
+          role: "client",
+          type: "image",
+          content: "hospital",
+          delayMinutes: 0,
+          metadata: { legendId: "hospital" },
+        },
+      ],
+      { storyPhoto: "data:image/jpeg;base64,abc" },
+    );
+
+    expect(rendered).toHaveLength(1);
+    expect(rendered[0]!.type).toBe("image");
+    expect(rendered[0]!.imageUrl).toBe("data:image/jpeg;base64,abc");
+    expect(rendered[0]!.content).not.toContain("📷");
   });
 });

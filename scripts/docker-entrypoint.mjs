@@ -31,11 +31,18 @@ const child = spawn(args[0], args.slice(1), {
   env: process.env,
 });
 
+function appBasePath() {
+  const raw = (process.env.NEXT_PUBLIC_BASE_PATH || process.env.BASE_PATH || "").trim();
+  if (!raw || raw === "/") return "";
+  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
+}
+
 async function maybeSetupWebhook() {
   if (process.env.AUTO_SETUP_WEBHOOK !== "1") return;
 
   const port = process.env.PORT ?? "3000";
-  const url = `http://127.0.0.1:${port}/api/telegram/setup`;
+  const base = appBasePath();
+  const url = `http://127.0.0.1:${port}${base}/api/telegram/setup`;
 
   for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 2000));

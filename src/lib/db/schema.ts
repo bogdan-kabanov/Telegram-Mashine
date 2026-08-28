@@ -51,6 +51,7 @@ export const reviewPackages = sqliteTable("review_packages", {
   dialog: text("dialog"),
   renderMedia: text("render_media"),
   dialogTranslations: text("dialog_translations"),
+  slideTimes: text("slide_times"),
   publishedAt: text("published_at"),
   createdAt: text("created_at").notNull(),
 });
@@ -124,4 +125,11 @@ export const usedBets = sqliteTable("used_bets", {
   mediaPath: text("media_path").notNull(),
   reviewId: text("review_id"),
   usedAt: text("used_at").notNull(),
+});
+
+/** Last picked path per media pool — sequential rotation 1→N→1 (photos, circles, voices). */
+export const mediaRotationCursors = sqliteTable("media_rotation_cursors", {
+  poolKey: text("pool_key").primaryKey(),
+  lastMediaPath: text("last_media_path"),
+  updatedAt: text("updated_at").notNull(),
 });

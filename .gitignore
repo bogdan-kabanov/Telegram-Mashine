@@ -46,7 +46,7 @@ tmp-screen.png
 
 # generated media
 /data/media/capturas/
-/data/media/receipts/
+/data/media/stamped/
 /public/renders/*.png
 /public/renders/*.html
 !/public/renders/.gitkeep

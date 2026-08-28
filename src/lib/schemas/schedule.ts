@@ -43,6 +43,11 @@ export const scheduleConfigSchema = z
       /** Prefer this project for weekly unique circle; else rotate. */
       projectId: z.string().min(1).optional(),
     }),
+    /**
+     * Probability (0–1) that a client voice message appears in a review dialog.
+     * Requires voice files in data/media/voices/.
+     */
+    clientVoiceChance: z.number().min(0).max(1).default(0.25),
   })
   .superRefine((data, ctx) => {
     const hasWeeks = Boolean(data.weeks && data.weeks.length > 0);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { splitProfitProgression, type CustomAmounts } from "@/lib/amounts/split-profit";
 import { bootstrapApp } from "@/lib/bootstrap";
 import { getProjectById } from "@/lib/config/loader";
 import { toPublicScreenshotUrl } from "@/lib/media/screenshot-url";
@@ -15,6 +16,23 @@ function sseLine(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
+function resolveCustomAmounts(body: {
+  customAmounts?: CustomAmounts;
+  profitFinal?: number;
+  deposit?: number;
+}): CustomAmounts | undefined {
+  if (body.customAmounts?.profitFinal && body.customAmounts.profitFinal > 0) {
+    return body.customAmounts;
+  }
+  const profitFinal = Number(body.profitFinal);
+  if (!Number.isFinite(profitFinal) || profitFinal <= 0) return undefined;
+  const deposit = Number(body.deposit);
+  return splitProfitProgression({
+    profitFinal,
+    ...(deposit > 0 ? { deposit } : {}),
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     await bootstrapApp();
@@ -24,6 +42,12 @@ export async function POST(request: NextRequest) {
       queue?: boolean;
       autoPublish?: boolean;
       stream?: boolean;
+      slideTimes?: string[];
+      now?: string;
+      amountPackId?: string;
+      customAmounts?: CustomAmounts;
+      profitFinal?: number;
+      deposit?: number;
     };
 
     if (!body.projectId) {
@@ -48,6 +72,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const customAmounts = resolveCustomAmounts(body);
+
+    const extra = {
+      ...(body.slideTimes?.length ? { slideTimes: body.slideTimes } : {}),
+      ...(body.now ? { now: new Date(body.now) } : {}),
+      ...(customAmounts
+        ? { customAmounts }
+        : body.amountPackId?.trim()
+          ? { amountPackId: body.amountPackId.trim() }
+          : {}),
+    };
+
     if (body.stream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -61,6 +97,7 @@ export async function POST(request: NextRequest) {
               projectId: body.projectId!,
               reviewType: body.reviewType ?? "big",
               autoPublish,
+              ...extra,
               onProgress: async (event: PipelineProgressEvent) => {
                 send({ type: "progress", ...event });
               },
@@ -96,6 +133,7 @@ export async function POST(request: NextRequest) {
       projectId: body.projectId,
       reviewType: body.reviewType ?? "big",
       autoPublish,
+      ...extra,
     });
 
     return NextResponse.json({

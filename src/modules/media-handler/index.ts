@@ -3,9 +3,11 @@ import { existsSync, statSync } from "fs";
 import path from "path";
 import { and, eq, sql } from "drizzle-orm";
 
+import { pickNextInRotation, sortPathsStable } from "@/lib/media-rotation";
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
-import { generateAiReceipt, getAiReceiptsMode, materializeReceiptTemplate } from "@/lib/openai/receipts";
+import { overlayReceiptTemplate } from "@/lib/media/overlay-receipt";
+import { materializeReceiptTemplate } from "@/lib/openai/receipts";
 import { createLogger } from "@/lib/runtime/manager";
 import { isStandaloneLegend } from "@/lib/legends/standalone";
 import type { ProjectConfig } from "@/lib/schemas/projects";
@@ -51,7 +53,7 @@ function isValidMediaFile(filename: string, filePath: string): boolean {
   if (filename.startsWith(".")) return false;
   if (filename === ".gitkeep") return false;
   if (filePath.includes(".gitkeep")) return false;
-  if (!/\.(jpg|jpeg|png|webp|gif|mp4|mov)$/i.test(filename) && !/\.(jpg|jpeg|png|webp|gif|mp4|mov)$/i.test(filePath)) {
+  if (!/\.(jpg|jpeg|png|webp|gif|mp4|mov|ogg|opus|m4a|mp3)$/i.test(filename) && !/\.(jpg|jpeg|png|webp|gif|mp4|mov|ogg|opus|m4a|mp3)$/i.test(filePath)) {
     return false;
   }
   const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
@@ -98,7 +100,7 @@ export class MediaHandler {
     if (!existsSync(resolved)) return false;
     try {
       const stat = statSync(resolved);
-      return stat.size >= minBytes && /\.(jpg|jpeg|png|webp|gif|mp4|mov)$/i.test(path.basename(resolved));
+      return stat.size >= minBytes && /\.(jpg|jpeg|png|webp|gif|mp4|mov|ogg|opus|m4a|mp3)$/i.test(path.basename(resolved));
     } catch {
       return false;
     }
@@ -198,7 +200,7 @@ export class MediaHandler {
   }
 
   /**
-   * Pick a video circle for a review.
+   * Pick a video circle for a review (sequential 1→N→1 per project + legend filter).
    * Only the same legend or standalone/untagged — never another legend's circle.
    */
   async pickVideoNote(
@@ -208,7 +210,7 @@ export class MediaHandler {
   ): Promise<MediaAsset | null> {
     const assets = await this.listMedia("video_note", projectId);
     if (assets.length === 0) {
-      return this.pickRandomFromDb("video_note", projectId);
+      return this.pickVideoNoteSequentialFromDb(projectId, legendId, options);
     }
 
     const standalone = assets.filter(
@@ -239,7 +241,11 @@ export class MediaHandler {
       return null;
     }
 
-    const pick = shuffleInPlace(unique)[0] ?? null;
+    const sorted = sortPathsStable(unique.map((a) => a.path));
+    const poolKey = `video_note:${projectId}:${legendId ?? "any"}`;
+    const pickPath = await pickNextInRotation({ poolKey, paths: sorted });
+    const pick = unique.find((a) => a.path === pickPath) ?? unique[0] ?? null;
+
     if (pick && legendId && pick.legendId && pick.legendId !== legendId && pick.legendId !== "standalone") {
       await logger.warn("Video circle legend mismatch skipped", {
         wanted: legendId,
@@ -249,22 +255,65 @@ export class MediaHandler {
     return pick;
   }
 
-  async pickStoryPhoto(legendId: string): Promise<MediaAsset | null> {
+  private async pickVideoNoteSequentialFromDb(
+    projectId: string,
+    legendId?: string | null,
+    options?: { preferStandalone?: boolean },
+  ): Promise<MediaAsset | null> {
     const db = getDb();
     const rows = await db
       .select()
       .from(mediaAssets)
-      .where(eq(mediaAssets.type, "story_photo"))
-      .orderBy(sql`RANDOM()`)
-      .limit(30);
+      .where(and(eq(mediaAssets.type, "video_note"), eq(mediaAssets.projectId, projectId)));
+
+    const assets = rows
+      .filter((r) => isValidMediaFile(r.filename, r.path))
+      .map((r) => ({
+        id: r.id,
+        type: "video_note" as const,
+        filename: r.filename,
+        path: r.path,
+        projectId: r.projectId,
+        legendId: legendIdFromPath(r.path),
+      }));
+
+    if (assets.length === 0) return null;
+
+    const standalone = assets.filter(
+      (a) => a.legendId === "standalone" || a.legendId == null || a.legendId === "",
+    );
+    const tagged =
+      legendId && !options?.preferStandalone && !isStandaloneLegend(legendId)
+        ? assets.filter((a) => a.legendId === legendId)
+        : [];
+    const pool =
+      options?.preferStandalone || isStandaloneLegend(legendId ?? "")
+        ? standalone
+        : [...tagged, ...standalone];
+    if (pool.length === 0) return null;
+
+    const poolKey = `video_note:${projectId}:${legendId ?? "any"}`;
+    const pickPath = await pickNextInRotation({ poolKey, paths: pool.map((a) => a.path) });
+    return pool.find((a) => a.path === pickPath) ?? pool[0] ?? null;
+  }
+
+  async pickStoryPhoto(legendId: string): Promise<MediaAsset | null> {
+    const db = getDb();
+    const rows = await db.select().from(mediaAssets).where(eq(mediaAssets.type, "story_photo"));
 
     const tagged = rows.filter(
       (r) =>
         isValidMediaFile(r.filename, r.path) &&
         (r.path.includes(`story_photos/${legendId}`) || r.path.includes(`story_photos\\${legendId}`)),
     );
-    const pick = tagged[Math.floor(Math.random() * tagged.length)];
-    if (pick) {
+
+    if (tagged.length > 0) {
+      const poolKey = `story_photo:legend:${legendId}`;
+      const pickPath = await pickNextInRotation({
+        poolKey,
+        paths: tagged.map((r) => r.path),
+      });
+      const pick = tagged.find((r) => r.path === pickPath) ?? tagged[0]!;
       return {
         id: pick.id,
         type: "story_photo",
@@ -279,7 +328,12 @@ export class MediaHandler {
     const files = (await this.store.listFiles(dir)).filter((f) =>
       isValidMediaFile(f, this.store.resolve(`${dir}/${f}`)),
     );
-    const file = files[Math.floor(Math.random() * files.length)];
+    if (files.length === 0) return null;
+
+    const poolKey = `story_photo:legend:${legendId}`;
+    const relPaths = files.map((f) => `data/${dir}/${f}`);
+    const pickPath = await pickNextInRotation({ poolKey, paths: relPaths });
+    const file = pickPath ? path.basename(pickPath) : files[0]!;
     if (!file) return null;
 
     const filePath = `data/${dir}/${file}`;
@@ -290,6 +344,17 @@ export class MediaHandler {
       path: filePath,
       legendId,
     };
+  }
+
+  /** Client voice message from library — sequential rotation. */
+  async pickVoice(): Promise<MediaAsset | null> {
+    const assets = await this.listMedia("voice");
+    if (assets.length === 0) return null;
+    const pickPath = await pickNextInRotation({
+      poolKey: "voice:global",
+      paths: assets.map((a) => a.path),
+    });
+    return assets.find((a) => a.path === pickPath) ?? assets[0] ?? null;
   }
 
   async pickSticker(projectId?: string): Promise<MediaAsset | null> {
@@ -321,8 +386,9 @@ export class MediaHandler {
           ? await this.pickSticker(params.projectId)
           : await this.pickRandomFromDb(type, params.projectId);
       if (existing) return existing;
-      if (mode === "off") return null;
+      if (mode === "off" || type === "bet") return null;
     }
+    if (type === "bet") return null;
 
     const generated = await generateSceneMedia({
       kind: type,
@@ -357,15 +423,14 @@ export class MediaHandler {
     /** Project-level style overrides bank mapping when set. */
     style?: ReceiptBankStyle;
     project?: ProjectConfig;
-  }): Promise<{ id: string; path: string; source: "ai" | "template" | "html" }> {
+  }): Promise<{ id: string; path: string; source: "overlay" | "template" | "html" }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/receipts");
     const outputPath = path.join(outputDir, `${id}.png`);
-    const time = params.time ?? "14:32";
-    const mode = getAiReceiptsMode();
+    const time = params.time ?? "12:00";
 
-    if (params.project && mode !== "off") {
-      const ai = await generateAiReceipt({
+    if (params.project) {
+      const overlay = await overlayReceiptTemplate({
         project: params.project,
         role: "manager",
         amount: params.amount,
@@ -375,16 +440,15 @@ export class MediaHandler {
         accountLastDigits: params.accountLastDigits,
         date: params.date,
         time,
-        bankName: params.bankName,
         outputPath,
       });
-      if (ai) {
-        return { id, path: outputPath, source: "ai" };
-      }
-      if (mode === "always") {
-        await logger.warn("AI receipt required but failed — trying template/HTML", {
-          projectId: params.project.id,
+      if (overlay) {
+        await logger.info("Receipt stamped on original screenshot", {
+          id,
+          template: overlay.template,
+          fields: overlay.fields,
         });
+        return { id, path: outputPath, source: "overlay" };
       }
     }
 
@@ -440,18 +504,17 @@ export class MediaHandler {
     style?: CapturaBankStyle;
     project?: ProjectConfig;
     accountLastDigits?: string;
-  }): Promise<{ id: string; path: string; source: "ai" | "template" | "html" }> {
+  }): Promise<{ id: string; path: string; source: "overlay" | "template" | "html" }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/capturas");
     const outputPath = path.join(outputDir, `${id}.png`);
-    const time = params.time ?? "17:18";
-    const mode = getAiReceiptsMode();
+    const time = params.time ?? "12:00";
     const digits =
       params.accountLastDigits ??
       params.clabe.replace(/\D/g, "").slice(-4).padStart(4, "0");
 
-    if (params.project && mode !== "off") {
-      const ai = await generateAiReceipt({
+    if (params.project) {
+      const overlay = await overlayReceiptTemplate({
         project: params.project,
         role: "client",
         amount: params.amount,
@@ -461,17 +524,15 @@ export class MediaHandler {
         accountLastDigits: digits,
         date: params.date,
         time,
-        bankName: params.bankName,
-        clabe: params.clabe,
         outputPath,
       });
-      if (ai) {
-        return { id, path: outputPath, source: "ai" };
-      }
-      if (mode === "always") {
-        await logger.warn("AI captura required but failed — trying template/HTML", {
-          projectId: params.project.id,
+      if (overlay) {
+        await logger.info("Captura stamped on original screenshot", {
+          id,
+          template: overlay.template,
+          fields: overlay.fields,
         });
+        return { id, path: outputPath, source: "overlay" };
       }
     }
 

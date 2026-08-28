@@ -68,6 +68,7 @@ function initTables(sqlite: Database.Database): void {
       dialog TEXT,
       render_media TEXT,
       dialog_translations TEXT,
+      slide_times TEXT,
       published_at TEXT,
       created_at TEXT NOT NULL
     );
@@ -141,6 +142,12 @@ function initTables(sqlite: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_used_bets_project_used
       ON used_bets (project_id, used_at);
+
+    CREATE TABLE IF NOT EXISTS media_rotation_cursors (
+      pool_key TEXT PRIMARY KEY,
+      last_media_path TEXT,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   const row = sqlite.prepare("SELECT COUNT(*) as count FROM runtime_state").get() as { count: number };
@@ -170,6 +177,9 @@ function initTables(sqlite: Database.Database): void {
   }
   if (!reviewColNames.has("dialog_translations")) {
     sqlite.exec(`ALTER TABLE review_packages ADD COLUMN dialog_translations TEXT`);
+  }
+  if (!reviewColNames.has("slide_times")) {
+    sqlite.exec(`ALTER TABLE review_packages ADD COLUMN slide_times TEXT`);
   }
 }
 

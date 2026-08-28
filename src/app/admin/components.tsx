@@ -50,10 +50,12 @@ export function AdminShell({
   title,
   description,
   children,
+  wide,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
+  wide?: boolean;
 }) {
   return (
     <div className="admin-root">
@@ -69,7 +71,7 @@ export function AdminShell({
       </aside>
 
       <div className="admin-main">
-        <div className="admin-main-inner">
+        <div className={`admin-main-inner${wide ? " is-wide" : ""}`}>
           <header className="admin-topbar">
             <div>
               <div className="admin-brand-kicker">Раздел</div>

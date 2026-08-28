@@ -125,6 +125,7 @@ export async function saveReviewToDb(review: ReviewPackage, clientAvatarPath?: s
       dialogTranslations: review.dialogTranslations
         ? JSON.stringify(review.dialogTranslations)
         : null,
+      slideTimes: review.slideTimes ? JSON.stringify(review.slideTimes) : null,
       publishedAt: review.publishedAt,
       createdAt: review.createdAt,
     })
@@ -141,6 +142,7 @@ export async function saveReviewToDb(review: ReviewPackage, clientAvatarPath?: s
         dialogTranslations: review.dialogTranslations
           ? JSON.stringify(review.dialogTranslations)
           : null,
+        slideTimes: review.slideTimes ? JSON.stringify(review.slideTimes) : null,
         publishedAt: review.publishedAt,
       },
     });
@@ -170,6 +172,7 @@ function mapReviewRow(row: {
   dialog?: string | null;
   renderMedia?: string | null;
   dialogTranslations?: string | null;
+  slideTimes?: string | null;
   publishedAt: string | null;
 }): ReviewPackage {
   const dialog = safeJsonParse<ReviewPackage["dialog"]>(row.dialog, undefined);
@@ -178,6 +181,7 @@ function mapReviewRow(row: {
     row.dialogTranslations,
     undefined,
   );
+  const slideTimes = safeJsonParse<string[] | undefined>(row.slideTimes, undefined);
 
   return reviewPackageSchema.parse({
     id: row.id,
@@ -195,6 +199,7 @@ function mapReviewRow(row: {
     ...(dialog ? { dialog } : {}),
     ...(renderMedia ? { renderMedia } : {}),
     ...(dialogTranslations ? { dialogTranslations } : {}),
+    ...(slideTimes?.length ? { slideTimes } : {}),
   });
 }
 

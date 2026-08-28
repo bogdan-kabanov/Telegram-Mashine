@@ -3,16 +3,8 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { mediaAssets, usedWeeklyCircles } from "@/lib/db/schema";
+import { pickNextInRotation, sortPathsStable } from "@/lib/media-rotation";
 import { getMediaHandler, type MediaAsset } from "@/modules/media-handler";
-
-function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy;
-}
 
 export async function isWeeklyCircleUsed(mediaPath: string): Promise<boolean> {
   const db = getDb();
@@ -60,7 +52,7 @@ export async function markWeeklyCirclePinned(mediaPath: string, messageId: numbe
 
 /**
  * Pick a video note not yet used for weekly unique circles; recycle pool when exhausted.
- * Prefers standalone circles (thanks not tied to a hardship legend).
+ * Within each pass, walks circles sequentially (standalone first).
  */
 export async function pickUniqueWeeklyCircle(projectId?: string): Promise<MediaAsset | null> {
   const handler = getMediaHandler();
@@ -75,9 +67,10 @@ export async function pickUniqueWeeklyCircle(projectId?: string): Promise<MediaA
     (a) => a.legendId === "standalone" || a.legendId == null || a.legendId === "",
   );
   const ordered = [...standalone, ...assets.filter((a) => !standalone.includes(a))];
-  const unused = shuffle(ordered);
+  const sorted = sortPathsStable(ordered.map((a) => a.path));
 
-  for (const asset of unused) {
+  for (const path of sorted) {
+    const asset = ordered.find((a) => a.path === path)!;
     if (!(await isWeeklyCircleUsed(asset.path))) {
       return asset;
     }
@@ -85,7 +78,9 @@ export async function pickUniqueWeeklyCircle(projectId?: string): Promise<MediaA
 
   const db = getDb();
   await db.delete(usedWeeklyCircles);
-  return unused[0] ?? null;
+  const poolKey = `video_note:weekly:${projectId ?? "all"}`;
+  const pickPath = await pickNextInRotation({ poolKey, paths: sorted });
+  return ordered.find((a) => a.path === pickPath) ?? ordered[0] ?? null;
 }
 
 export async function pickUnusedVideoNoteFromDb(projectId?: string): Promise<MediaAsset | null> {
@@ -94,16 +89,20 @@ export async function pickUnusedVideoNoteFromDb(projectId?: string): Promise<Med
   const used = await db.select({ path: usedWeeklyCircles.mediaPath }).from(usedWeeklyCircles);
   const usedSet = new Set(used.map((u) => u.path));
 
-  const candidates = shuffle(
-    rows.filter((r) => {
-      if (usedSet.has(r.path)) return false;
-      if (projectId && r.projectId && r.projectId !== projectId) return false;
-      return true;
-    }),
-  );
+  const candidates = rows.filter((r) => {
+    if (usedSet.has(r.path)) return false;
+    if (projectId && r.projectId && r.projectId !== projectId) return false;
+    return true;
+  });
 
-  const pick = candidates[0];
-  if (!pick) return pickUniqueWeeklyCircle(projectId);
+  if (candidates.length === 0) return pickUniqueWeeklyCircle(projectId);
+
+  const poolKey = `video_note:weekly:${projectId ?? "all"}`;
+  const pickPath = await pickNextInRotation({
+    poolKey,
+    paths: candidates.map((c) => c.path),
+  });
+  const pick = candidates.find((c) => c.path === pickPath) ?? candidates[0]!;
 
   return {
     id: pick.id,

@@ -7,6 +7,7 @@ import sharp from "sharp";
 
 import { formatStatusBarTime } from "@/lib/format";
 import { chatUiForLocale } from "@/lib/i18n/chat-ui";
+import { localeClockConfig } from "@/lib/i18n/locale-profile";
 import {
   pickRandomClientAvatar,
   resolveImageForRender,
@@ -221,6 +222,7 @@ async function screenshotChatByScrolling(params: {
   htmlPath: string;
   reviewId: string;
   publicDir: string;
+  slideTimes?: Array<Date | null | undefined>;
 }): Promise<string[]> {
   const { launchChromium } = await import("@/lib/playwright");
   const browser = await launchChromium();
@@ -301,6 +303,13 @@ async function screenshotChatByScrolling(params: {
         },
         { top: scrollTop, maxScroll: metrics.maxScroll },
       );
+      const slideNow = params.slideTimes?.[i];
+      if (slideNow) {
+        await page.evaluate((iso) => {
+          const w = window as unknown as { applyChatClock?: (nowIso: string) => void };
+          w.applyChatClock?.(iso);
+        }, slideNow.toISOString());
+      }
       await page.waitForTimeout(80);
       await bakeInputGlass(page, DEVICE_SCALE_FACTOR);
       await page.waitForTimeout(40);
@@ -349,6 +358,9 @@ export class ChatRenderer {
 
   async renderPreview(projectId: string, project: RenderChatParams["project"]): Promise<RenderResult> {
     const ui = chatUiForLocale(project.locale);
+    const clockCfg = localeClockConfig(project.locale);
+    const now = new Date();
+    const messages = getSampleMessages(project.locale, now);
     const [wallpaperUrl, avatar] = await Promise.all([
       resolveWallpaperForProject(projectId, project.wallpaperPath),
       pickRandomClientAvatar(projectId, project.clientAvatarPath),
@@ -361,14 +373,14 @@ export class ChatRenderer {
     return this.render({
       project,
       clientName: ui.sampleClientName,
-      messages: getSampleMessages(project.locale),
-      statusText: ui.statusRecently,
+      messages,
       wallpaperUrl,
       frostWallpaperUrl,
       wallpaperCutoutUrl,
       wallpaperCutoutColor,
       clientAvatarUrl: avatar.dataUri,
-      statusBarTime: formatStatusBarTime(),
+      statusBarTime: messages.at(-1)?.time ?? formatStatusBarTime(now, clockCfg.timeZone),
+      clockTimeZone: clockCfg.timeZone,
     });
   }
 
@@ -377,11 +389,14 @@ export class ChatRenderer {
     project: RenderChatParams["project"];
     mediaAssets: DialogMediaAssets;
     reviewId: string;
+    /** Same instant used for bank slips so chat + receipts stay in sync. */
+    now?: Date;
+    /** Per-screenshot clock. Status bar + bubbles remapped before each PNG. */
+    slideTimes?: Array<Date | string | null | undefined>;
   }): Promise<RenderDialogResult> {
     const { dialog, project, mediaAssets, reviewId } = params;
-    const ui = chatUiForLocale(project.locale);
 
-    const [wallpaperUrl, avatar, stickerUri, storyPhotoUri, conditionsUri, bet1Uri, bet2Uri, bet3Uri, receiptUri, capturaUri] =
+    const [wallpaperUrl, avatar, stickerUri, resolvedStoryPhoto, conditionsUri, bet1Uri, bet2Uri, bet3Uri, receiptUri, capturaUri] =
       await Promise.all([
         resolveWallpaperForProject(dialog.projectId, project.wallpaperPath),
         pickRandomClientAvatar(dialog.projectId, project.clientAvatarPath),
@@ -394,6 +409,26 @@ export class ChatRenderer {
         resolveImageForRender(mediaAssets.receipt ?? null),
         resolveImageForRender(mediaAssets.captura ?? null),
       ]);
+    let storyPhotoUri = resolvedStoryPhoto;
+    const needsStoryPhoto = dialog.messages.some((m) => m.type === "image");
+    if (needsStoryPhoto && !storyPhotoUri) {
+      const { pickAvailableClientPhoto } = await import("@/lib/client-photos");
+      const fallback = await pickAvailableClientPhoto({
+        excludePaths: mediaAssets.storyPhoto ? [mediaAssets.storyPhoto] : [],
+      });
+      if (fallback) {
+        storyPhotoUri = await resolveImageForRender(fallback.path);
+        if (storyPhotoUri) {
+          await logger.info("Story photo missing — used another pool image", {
+            reviewId,
+            broken: mediaAssets.storyPhoto ?? null,
+            used: fallback.path,
+          });
+        }
+      } else {
+        await logger.warn("Story photo required but no usable pool image", { reviewId });
+      }
+    }
     const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
     const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperUrl
       ? await Promise.all([wallpaperCutoutDataUri(wallpaperUrl), averageWallpaperColor(wallpaperUrl)])
@@ -410,8 +445,15 @@ export class ChatRenderer {
       captura: capturaUri,
     };
 
-    const renderMessages = dialogToRenderMessages(dialog.messages, enrichedMedia);
-    const lastTime = renderMessages[renderMessages.length - 1]?.time ?? formatStatusBarTime();
+    const clockCfg = localeClockConfig(project.locale);
+    const now = params.now ?? (dialog.createdAt ? new Date(dialog.createdAt) : new Date());
+    const renderMessages = dialogToRenderMessages(dialog.messages, enrichedMedia, {
+      now,
+      timeZone: clockCfg.timeZone,
+      locale: clockCfg.locale,
+    });
+    const lastTime =
+      renderMessages[renderMessages.length - 1]?.time ?? formatStatusBarTime(now, clockCfg.timeZone);
 
     const dataDir = process.env.DATA_DIR ?? "./data";
     const publicDir = path.resolve(process.cwd(), "public/renders");
@@ -423,22 +465,27 @@ export class ChatRenderer {
       project,
       clientName: dialog.clientName,
       messages: renderMessages,
-      statusText: ui.statusRecently,
       wallpaperUrl,
       frostWallpaperUrl,
       wallpaperCutoutUrl,
       wallpaperCutoutColor,
       clientAvatarUrl: avatar.dataUri,
       statusBarTime: lastTime,
-      // Vlad: Stories ring on peer avatar (Telegram iOS). Always on for review screenshots.
-      hasStories: true,
+      clockTimeZone: clockCfg.timeZone,
     });
     writeFileSync(htmlPath, html, "utf-8");
+
+    const slideTimes = (params.slideTimes ?? []).map((t) => {
+      if (!t) return null;
+      const d = t instanceof Date ? t : new Date(t);
+      return Number.isNaN(d.getTime()) ? null : d;
+    });
 
     const screenshots = await screenshotChatByScrolling({
       htmlPath,
       reviewId,
       publicDir,
+      ...(slideTimes.some(Boolean) ? { slideTimes } : {}),
     });
 
     await logger.info("Dialog rendered", {

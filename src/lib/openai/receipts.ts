@@ -98,7 +98,11 @@ function formatReceiptAmount(amount: number, currency: string, locale: string): 
   }
 }
 
-function buildReceiptEditPrompt(params: {
+/**
+ * Receipt templates are real bank screenshots. High input_fidelity keeps original
+ * glyphs (names, amounts) — so we use low fidelity and a replace-not-copy prompt.
+ */
+export function buildReceiptEditPrompt(params: {
   role: ReceiptRole;
   amount: number;
   currency: string;
@@ -119,21 +123,23 @@ function buildReceiptEditPrompt(params: {
       : "This is a manager payout transfer receipt sent by the manager to the client.";
 
   return [
-    "Edit this bank transfer receipt screenshot to show a new realistic transaction.",
-    "Keep the EXACT same app UI, layout, colors, logos, icons, fonts, spacing, and button styles.",
+    "Edit this bank transfer receipt screenshot. The file is a TEMPLATE: every name, amount, date, time, and account number printed on it is PLACEHOLDER TEXT and MUST be overwritten.",
+    "Do NOT copy, keep, or slightly tweak the original person's name, the original amount, or the original last-4 digits. Those values are wrong.",
+    "KEEP unchanged: the same bank app, layout, colors, logos, icons, fonts, spacing, buttons, status-bar chrome.",
     "CRITICAL FRAMING: full-bleed mobile screenshot — fill the entire canvas edge-to-edge.",
     "No white margins, no letterboxing, no floating card on a blank background, no extra borders around the phone UI.",
     "Crop tightly like a real phone screenshot of the bank app (portrait). Do not shrink the receipt into the center.",
-    "Do not invent a different bank app. Only change the variable transaction fields.",
+    "Do not invent a different bank app. Only rewrite the variable transaction fields listed below.",
     roleHint,
-    `Amount: ${amountStr} ${params.currency} (use the same amount formatting style as the template: separators, decimals, currency symbol/code placement).`,
-    `Sender / origin name: ${params.senderName}`,
-    `Recipient / destination name: ${params.recipientName}`,
+    `REPLACE amount / total / sent value with EXACTLY: ${amountStr} ${params.currency} (same separators, decimals, and currency symbol/code placement as the template UI).`,
+    `REPLACE sender / origin / "De" / "From" name with EXACTLY: ${params.senderName}`,
+    `REPLACE recipient / destination / "Para" / "To" / "Beneficiario" name with EXACTLY: ${params.recipientName}`,
     params.bankName ? `Bank / institution labels where relevant: ${params.bankName}` : "",
-    `Account / CLABE / CBU last 4 digits visible where the template shows digits: ${digits}`,
-    params.clabe ? `If a full CLABE/CBU is shown masked, keep masking but end with ${digits}.` : "",
-    `Date: ${params.date}`,
-    `Time: ${params.time} (24h or am/pm — match the template style exactly)`,
+    `REPLACE visible account / CLABE / CBU last 4 digits with EXACTLY: ${digits}`,
+    params.clabe ? `If a full CLABE/CBU is shown masked, keep masking but the visible tail MUST be ${digits}.` : "",
+    `REPLACE date with: ${params.date}`,
+    `REPLACE time with: ${params.time} (this exact clock; 24-hour HH:mm unless the template clearly shows am/pm)`,
+    "If several amounts appear (fee, total, sent), make the PRIMARY/total amount match the value above; do not leave the template's old figure anywhere prominent.",
     "Replace any redacted bars with plausible short reference/operation IDs OR keep similar solid redaction bars.",
     "Photorealistic mobile screenshot, sharp text, no captions, no AI watermark, no Telegram chrome.",
   ]
@@ -205,8 +211,8 @@ export async function generateAiReceipt(
       prompt,
       n: 1,
       size: "1024x1536",
-      // High fidelity keeps bank UI details from the reference.
-      input_fidelity: "high",
+      // Low: high fidelity copies the template's original names/amounts glyph-for-glyph.
+      input_fidelity: "low",
       quality: "high",
     });
 

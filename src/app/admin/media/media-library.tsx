@@ -42,7 +42,7 @@ const SHARED_TYPES = new Set(["story_photo", "sticker"]);
 
 /** Upload/AI types available in media library (no wallpaper assignment). */
 const LIBRARY_UPLOAD_TYPES = UPLOAD_MEDIA_TYPES.filter((t) => t !== "wallpaper");
-const LIBRARY_GEN_KINDS = ["story_photo", "bet", "conditions", "avatar", "sticker"] as const;
+const LIBRARY_GEN_KINDS = ["story_photo", "conditions", "avatar", "sticker"] as const;
 
 const SHARED_TAB = "__shared__";
 
@@ -166,6 +166,10 @@ export function MediaLibrary({ projects, legends }: Props) {
     const kind = kindOverride ?? genKind;
     if (kind === "video_note") {
       setMessage("Кружки (MP4) ИИ не генерирует — загрузите файл.");
+      return;
+    }
+    if (kind === "bet") {
+      setMessage("Ставки ИИ не рисует. Загрузите готовый скрин — суммы проставляются в конструкторе на том же кадре.");
       return;
     }
     if (PROJECT_REQUIRED.has(kind) && !uploadProjectId) {
@@ -306,7 +310,7 @@ export function MediaLibrary({ projects, legends }: Props) {
             />
           </label>
 
-          {mediaType !== "video_note" ? (
+          {mediaType !== "video_note" && mediaType !== "bet" ? (
             <label className="admin-field" style={{ alignSelf: "center" }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.875rem" }}>
                 <input
@@ -343,10 +347,10 @@ export function MediaLibrary({ projects, legends }: Props) {
       <section className="admin-card" data-tour="tour-media-ai-photo">
         <h2 className="admin-card-title">
           Генерация через ИИ
-          <HelpTip text="Нужен OPENAI_API_KEY. Фото клиента — в общий пул; ставки/условия/аватар — в выбранный проект. Фон чата — в Проекты → Настройки." />
+          <HelpTip text="Нужен OPENAI_API_KEY. Фото клиента — в общий пул; условия/аватар — в выбранный проект. Ставки ИИ не рисует. Фон чата — в Проекты → Настройки." />
         </h2>
         <p className="admin-card-desc">
-          Альтернатива загрузке файла. Кружки (MP4) ИИ не создаёт. Чеки генерируются сами при отзыве.
+          Альтернатива загрузке файла. Кружки и ставки ИИ не создаёт: ставки — готовые скрины, суммы печатаются в конструкторе. Чеки генерируются сами при отзыве.
         </p>
         <div
           style={{

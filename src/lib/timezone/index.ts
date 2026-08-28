@@ -1,36 +1,39 @@
 const TZ = "America/Mexico_City";
 
-export function getMexicoCityParts(date = new Date()): {
+export interface TimeZoneParts {
   year: number;
   month: number;
   day: number;
   hour: number;
   minute: number;
   dayOfWeek: number;
-} {
+}
+
+const WEEKDAY_MAP: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+export function getTimeZoneParts(timeZone: string, date = new Date()): TimeZoneParts {
   const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    hourCycle: "h23",
     weekday: "short",
   });
 
   const parts = formatter.formatToParts(date);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
-
-  const weekdayMap: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
 
   return {
     year: Number(get("year")),
@@ -38,24 +41,108 @@ export function getMexicoCityParts(date = new Date()): {
     day: Number(get("day")),
     hour: Number(get("hour")) % 24,
     minute: Number(get("minute")),
-    dayOfWeek: weekdayMap[get("weekday")] ?? 0,
+    dayOfWeek: WEEKDAY_MAP[get("weekday")] ?? 0,
+  };
+}
+
+export function getMexicoCityParts(date = new Date()): TimeZoneParts {
+  return getTimeZoneParts(TZ, date);
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function zonedMinuteKey(p: TimeZoneParts): number {
+  return (((p.year * 12 + p.month) * 32 + p.day) * 24 + p.hour) * 60 + p.minute;
+}
+
+/** `YYYY-MM-DDTHH:mm` wall clock in the given IANA timezone (for datetime-local inputs). */
+export function formatDateTimeLocal(date: Date, timeZone: string): string {
+  const p = getTimeZoneParts(timeZone, date);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}T${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+/**
+ * Interpret `YYYY-MM-DDTHH:mm` as a wall clock in `timeZone` (not the browser's TZ).
+ */
+export function dateFromZonedLocal(local: string, timeZone: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim());
+  if (!m) {
+    const parsed = new Date(local);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const want = (((year * 12 + month) * 32 + day) * 24 + hour) * 60 + minute;
+  const guess = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  let lo = guess - 16 * 3600_000;
+  let hi = guess + 16 * 3600_000;
+  for (let i = 0; i < 48; i++) {
+    const mid = Math.floor((lo + hi) / 2);
+    const k = zonedMinuteKey(getTimeZoneParts(timeZone, new Date(mid)));
+    if (k === want) {
+      let t = mid - 90_000;
+      for (let j = 0; j < 180; j++) {
+        const d = new Date(t);
+        if (zonedMinuteKey(getTimeZoneParts(timeZone, d)) === want) {
+          d.setUTCSeconds(0, 0);
+          return d;
+        }
+        t += 1000;
+      }
+      return new Date(mid);
+    }
+    if (k < want) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  return new Date(guess);
+}
+
+/** 24-hour `HH:mm` in the given IANA timezone. */
+export function formatClockTime(timeZone: string, date = new Date()): string {
+  const p = getTimeZoneParts(timeZone, date);
+  return `${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+export function formatLocalDate(
+  date: Date,
+  options: { timeZone: string; locale: string; dateFormat?: string },
+): string {
+  const { timeZone, locale, dateFormat = "" } = options;
+  if (/dd\/MM\/yyyy/i.test(dateFormat)) {
+    const p = getTimeZoneParts(timeZone, date);
+    return `${String(p.day).padStart(2, "0")}/${String(p.month).padStart(2, "0")}/${p.year}`;
+  }
+
+  const localeTag = locale.toLowerCase().startsWith("ru") ? "ru-RU" : locale || "es-MX";
+  return date.toLocaleDateString(localeTag, {
+    timeZone,
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+export function formatLocalDateTime(
+  date: Date,
+  options: { timeZone: string; locale: string; dateFormat?: string },
+): { date: string; time: string } {
+  return {
+    date: formatLocalDate(date, options),
+    time: formatClockTime(options.timeZone, date),
   };
 }
 
 export function formatMexicoDateTime(date = new Date()): { date: string; time: string } {
-  return {
-    date: date.toLocaleDateString("es-MX", {
-      timeZone: TZ,
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }),
-    time: date.toLocaleTimeString("es-MX", {
-      timeZone: TZ,
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  };
+  return formatLocalDateTime(date, {
+    timeZone: TZ,
+    locale: "es-MX",
+    dateFormat: "d 'de' MMMM yyyy",
+  });
 }
 
 export function getMexicoMinutesSinceMidnight(date = new Date()): number {

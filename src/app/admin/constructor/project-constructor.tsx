@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+
+import { splitProfitProgression, type CustomAmounts } from "@/lib/amounts/split-profit";
+import { withBasePath } from "@/lib/base-path";
 
 import { ControlButtons } from "../control-buttons";
 import { ScreenshotGallery } from "../screenshot-gallery";
-import { colors, inputStyle } from "../styles";
-import { AppleEmojiText } from "../ui/AppleEmojiText";
+import { inputStyle } from "../styles";
 import { HelpTip, LabelWithHelp } from "../ui/HelpTip";
 import { MediaPicker, type PickerMediaAsset } from "../ui/MediaPicker";
+import { LivePreviewPane, applyLibraryPick, type LiveMediaPaths } from "./live-preview-pane";
 
 export interface ConstructorProject {
   id: string;
@@ -103,20 +106,38 @@ const STEPS: Array<{
   },
 ];
 
+function parseAmountInput(raw: string): number {
+  const n = Number(raw.replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
 function fileUrl(path: string | null | undefined): string | null {
   if (!path) return null;
-  return `/api/admin/media/file?path=${encodeURIComponent(path)}`;
+  return withBasePath(`/api/admin/media/file?path=${encodeURIComponent(path)}`);
+}
+
+export interface ConstructorAmountPack {
+  id: string;
+  projectId?: string | undefined;
+  betPack?: number | undefined;
+  deposit: number;
+  profit1: number;
+  profit2: number;
+  profit3?: number;
+  profitFinal: number;
+  currency: string;
 }
 
 export function ProjectConstructor({
   projects,
+  amountPacks,
   initialStatus,
 }: {
   projects: ConstructorProject[];
+  amountPacks: ConstructorAmountPack[];
   initialStatus: string;
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
-  const [stepIndex, setStepIndex] = useState(0);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -124,8 +145,13 @@ export function ProjectConstructor({
   const [reviewId, setReviewId] = useState("");
   const [localProjects, setLocalProjects] = useState(projects);
   const [pickerKind, setPickerKind] = useState<
-    null | "avatar" | "conditions" | "bet" | "video_note" | "story_photo"
+    null | "avatar" | "wallpaper" | "conditions" | "bet" | "video_note" | "story_photo"
   >(null);
+  const [livePickSlot, setLivePickSlot] = useState<string | null>(null);
+  const [liveMedia, setLiveMedia] = useState<LiveMediaPaths>({});
+  const [slideTimesIso, setSlideTimesIso] = useState<string[]>([]);
+  const [amountPackId, setAmountPackId] = useState("");
+  const [customProfitFinal, setCustomProfitFinal] = useState("");
   const [mediaPreview, setMediaPreview] = useState<{
     bet?: string | null;
     video_note?: string | null;
@@ -147,8 +173,23 @@ export function ProjectConstructor({
   }, [genProgress]);
 
   const project = localProjects.find((p) => p.id === projectId) ?? localProjects[0];
-  const step = STEPS[Math.min(stepIndex, STEPS.length - 1)]!;
+  const projectPacks = useMemo(() => {
+    const scoped = amountPacks.filter((p) => p.projectId === projectId);
+    if (scoped.length > 0) return scoped;
+    const currency = project?.currency;
+    return amountPacks.filter((p) => !p.projectId && (!currency || p.currency === currency));
+  }, [amountPacks, projectId, project?.currency]);
+  const selectedPack = projectPacks.find((p) => p.id === amountPackId) ?? null;
+  const computedCustomAmounts = useMemo((): CustomAmounts | null => {
+    const profitFinal = parseAmountInput(customProfitFinal);
+    if (profitFinal <= 0) return null;
+    return splitProfitProgression({ profitFinal });
+  }, [customProfitFinal]);
+  const effectiveAmounts = computedCustomAmounts ?? selectedPack ?? null;
   const field = inputStyle();
+  const handleSlideTimes = useCallback((iso: string[]) => {
+    setSlideTimesIso(iso);
+  }, []);
 
   const [form, setForm] = useState({
     managerHandle: project?.managerHandle ?? "",
@@ -180,6 +221,11 @@ export function ProjectConstructor({
     setMessage("");
     setMediaPreview({});
     setPickerKind(null);
+    setLivePickSlot(null);
+    setLiveMedia({});
+    setSlideTimesIso([]);
+    setAmountPackId("");
+    setCustomProfitFinal("");
   }, [project?.id]);
 
   const loadAssets = useCallback(async () => {
@@ -233,10 +279,24 @@ export function ProjectConstructor({
     return assets.filter((a) => a.isImage && a.type === "story_photo");
   }, [assets]);
 
+  const wallpaperLibraryAssets = useMemo((): PickerMediaAsset[] => {
+    const pid = projectId.toLowerCase();
+    return assets.filter((a) => {
+      if (!a.isImage) return false;
+      const isWallpaper =
+        a.type === "wallpaper" || a.path.replace(/\\/g, "/").includes("/wallpapers/");
+      if (!isWallpaper) return false;
+      const base = a.path.replace(/\\/g, "/").split("/").pop()?.replace(/\.[^.]+$/, "") ?? "";
+      return base.toLowerCase() === pid || a.projectId === projectId;
+    });
+  }, [assets, projectId]);
+
   const activePickerAssets = useMemo(() => {
     switch (pickerKind) {
       case "avatar":
         return avatarLibraryAssets;
+      case "wallpaper":
+        return wallpaperLibraryAssets;
       case "conditions":
         return conditionsLibraryAssets;
       case "bet":
@@ -251,6 +311,7 @@ export function ProjectConstructor({
   }, [
     pickerKind,
     avatarLibraryAssets,
+    wallpaperLibraryAssets,
     conditionsLibraryAssets,
     betLibraryAssets,
     videoNoteLibraryAssets,
@@ -321,6 +382,10 @@ export function ProjectConstructor({
     count = 1,
   ) {
     if (!project) return;
+    if (kind === "bet" && !effectiveAmounts) {
+      setMessage("Укажите итоговую прибыль или выберите пак сумм");
+      return;
+    }
     if (kind !== "story_photo" && kind !== "sticker" && !projectId) {
       setMessage("Сначала выберите проект");
       return;
@@ -336,6 +401,19 @@ export function ProjectConstructor({
           count,
           projectId: project.id,
           clientName: kind === "avatar" || kind === "story_photo" ? undefined : form.managerName || undefined,
+          ...(kind === "bet" && effectiveAmounts
+            ? {
+                deposit: effectiveAmounts.deposit,
+                profit1: effectiveAmounts.profit1,
+                profit2: effectiveAmounts.profit2,
+                profit3:
+                  "profit3" in effectiveAmounts && effectiveAmounts.profit3 > 0
+                    ? effectiveAmounts.profit3
+                    : effectiveAmounts.profitFinal - effectiveAmounts.profit1 - effectiveAmounts.profit2,
+                profitFinal: effectiveAmounts.profitFinal,
+                randomPack: !selectedPack || computedCustomAmounts != null,
+              }
+            : {}),
         }),
       });
       const data = (await res.json()) as {
@@ -345,7 +423,11 @@ export function ProjectConstructor({
         assets?: Array<{ url: string; path: string }>;
       };
       if (!res.ok && res.status !== 207) throw new Error(data.error ?? "Ошибка генерации ИИ");
-      setMessage(data.message ?? "Сгенерировано через ИИ");
+      setMessage(
+        kind === "bet"
+          ? (data.message ?? "Суммы проставлены на исходных скринах ставок")
+          : (data.message ?? "Сгенерировано через ИИ"),
+      );
       if (data.path) {
         setLocalProjects((prev) =>
           prev.map((p) => {
@@ -357,11 +439,24 @@ export function ProjectConstructor({
           }),
         );
       }
-      if (kind === "bet" && data.assets?.[0]?.url) {
-        setMediaPreview((prev) => ({ ...prev, bet: data.assets![0]!.url }));
+      if (kind === "bet" && data.assets?.length) {
+        setLiveMedia((prev) => {
+          const next = { ...prev };
+          if (data.assets![0]?.path) next.bet1 = data.assets![0].path;
+          if (data.assets![1]?.path) next.bet2 = data.assets![1].path;
+          if (data.assets![2]?.path) next.bet3 = data.assets![2].path;
+          return next;
+        });
+        if (data.assets[0]?.url) {
+          setMediaPreview((prev) => ({ ...prev, bet: data.assets![0]!.url }));
+        }
       }
-      if (kind === "story_photo" && data.assets?.[0]?.url) {
+      if (kind === "story_photo" && data.assets?.[0]?.path) {
+        setLiveMedia((prev) => ({ ...prev, storyPhoto: data.assets![0]!.path }));
         setMediaPreview((prev) => ({ ...prev, story_photo: data.assets![0]!.url }));
+      }
+      if (kind === "conditions" && data.path) {
+        setLiveMedia((prev) => ({ ...prev, conditions: data.path! }));
       }
       await loadAssets();
     } catch (err) {
@@ -395,6 +490,30 @@ export function ProjectConstructor({
     }
   }
 
+  async function selectWallpaper(asset: PickerMediaAsset) {
+    if (!project) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/admin/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallpaperPath: asset.path }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Не удалось сохранить фон");
+      setLocalProjects((prev) =>
+        prev.map((p) => (p.id === project.id ? { ...p, wallpaperPath: asset.path } : p)),
+      );
+      setPickerKind(null);
+      setMessage("Фон выбран из медиатеки");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function selectConditions(asset: PickerMediaAsset) {
     if (!project) return;
     setBusy(true);
@@ -420,8 +539,27 @@ export function ProjectConstructor({
   }
 
   function selectLibraryAsset(asset: PickerMediaAsset) {
-    if (pickerKind === "avatar") {
+    if (livePickSlot === "avatar" || pickerKind === "avatar") {
       void selectClientAvatar(asset);
+      setLivePickSlot(null);
+      return;
+    }
+    if (pickerKind === "wallpaper") {
+      void selectWallpaper(asset);
+      return;
+    }
+    if (livePickSlot) {
+      setLiveMedia((prev) => applyLibraryPick(livePickSlot, asset, prev));
+      if (reviewId) {
+        void fetch(`/api/admin/reviews/${reviewId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "replaceMedia", slot: livePickSlot, path: asset.path }),
+        });
+      }
+      setLivePickSlot(null);
+      setPickerKind(null);
+      setMessage("Медиа в превью заменено");
       return;
     }
     if (pickerKind === "conditions") {
@@ -517,6 +655,12 @@ export function ProjectConstructor({
           reviewType: "big",
           autoPublish: false,
           stream: true,
+          ...(slideTimesIso.length ? { slideTimes: slideTimesIso } : {}),
+          ...(computedCustomAmounts
+            ? { customAmounts: computedCustomAmounts }
+            : amountPackId
+              ? { amountPackId }
+              : {}),
         }),
       });
 
@@ -591,56 +735,48 @@ export function ProjectConstructor({
     }
   }
 
+  function openLivePicker(slot: string) {
+    setLivePickSlot(slot);
+    if (slot === "storyPhoto") setPickerKind("story_photo");
+    else if (slot === "conditions") setPickerKind("conditions");
+    else if (slot === "avatar") setPickerKind("avatar");
+    else if (slot.startsWith("bet")) setPickerKind("bet");
+    else setPickerKind(null);
+  }
+
   if (!project) {
     return <p className="admin-muted">Нет проектов в config/projects.json</p>;
   }
 
   return (
-    <div className="ctor" data-tour="tour-constructor">
-      <div className="ctor-rail" role="tablist" aria-label="Шаги конструктора">
-        {STEPS.map((s, i) => {
-          const done = stepDone[s.id];
-          const active = i === stepIndex;
-          return (
-            <button
+    <div className="ctor ctor-split" data-tour="tour-constructor">
+      <div className="ctor-split-main">
+        <nav className="ctor-jump" aria-label="Разделы конструктора">
+          {STEPS.map((s) => (
+            <a
               key={s.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className={`ctor-rail-item${active ? " is-active" : ""}${done ? " is-done" : ""}`}
-              onClick={() => setStepIndex(i)}
+              href={`#ctor-${s.id}`}
+              className={`ctor-jump-item${stepDone[s.id] ? " is-done" : ""}`}
             >
-              <span className="ctor-rail-num">{done && !active ? "✓" : i + 1}</span>
-              <span className="ctor-rail-text">
-                <strong>{s.short}</strong>
-                <span>{s.title}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              {stepDone[s.id] ? "✓" : "·"} {s.short}
+            </a>
+          ))}
+        </nav>
 
-      <section className="admin-card ctor-panel">
-        <div className="ctor-panel-head">
-          <div>
+        <section id="ctor-project" className="admin-card ctor-section">
+          <div className="ctor-section-head">
             <h2 className="admin-card-title">
-              Шаг {stepIndex + 1}. {step.title}
-              <HelpTip text={step.doc} />
+              Проект
+              <HelpTip text={STEPS[0]!.doc} />
             </h2>
-            <p className="admin-card-desc" style={{ marginBottom: 0 }}>
-              {step.doc}
-            </p>
+            <div className="ctor-project-chip">
+              <span className="admin-muted">Сейчас</span>
+              <strong>
+                {project.name}
+                {project.id === "nancy" ? " · 2 фазы" : ""}
+              </strong>
+            </div>
           </div>
-          <div className="ctor-project-chip">
-            <span className="admin-muted">Проект</span>
-            <strong>
-              {project.name}
-              {project.id === "nancy" ? " · 2 фазы" : ""}
-            </strong>
-          </div>
-        </div>
-
-        {step.id === "project" && (
           <div className="ctor-projects">
             {localProjects.map((p) => (
               <button
@@ -657,9 +793,13 @@ export function ProjectConstructor({
               </button>
             ))}
           </div>
-        )}
+        </section>
 
-        {step.id === "profile" && (
+        <section id="ctor-profile" className="admin-card ctor-section">
+          <h2 className="admin-card-title">
+            Профиль
+            <HelpTip text={STEPS[1]!.doc} />
+          </h2>
           <div className="ctor-form">
             <Field label={<LabelWithHelp label="Имя в шапке чата" tip="Видно вверху скриншота." />}>
               <input
@@ -677,7 +817,7 @@ export function ProjectConstructor({
             </Field>
             <LibraryPickBlock
               label="Аватар клиента (в шапке)"
-              hint="Выберите фото из медиатеки — аватар проекта или общий пул клиентов."
+              hint="Сначала из медиатеки (аватар проекта или общий пул). С компьютера — если нужен новый файл."
               accept="image/*"
               previewUrl={
                 fileUrl(project.clientAvatarPath) ??
@@ -693,18 +833,24 @@ export function ProjectConstructor({
               {busy ? "…" : "Сохранить профиль"}
             </button>
           </div>
-        )}
+        </section>
 
-        {step.id === "look" && (
+        <section id="ctor-look" className="admin-card ctor-section">
+          <h2 className="admin-card-title">
+            Вид чата
+            <HelpTip text={STEPS[2]!.doc} />
+          </h2>
           <div className="ctor-form">
-            <UploadBlock
+            <LibraryPickBlock
               label="Фон чата (обои)"
-              hint="Один файл на проект — новая загрузка заменяет старую. Можно сгенерировать через ИИ."
+              hint="Сначала из медиатеки. С компьютера — если файла ещё нет. ИИ нарисует новый фон."
               accept="image/*"
               previewUrl={fileUrl(project.wallpaperPath)}
               disabled={busy}
+              onPick={() => setPickerKind("wallpaper")}
               onFile={(f) => void upload("wallpaper", f)}
               onGenerateAi={() => void generateAiMedia("wallpaper")}
+              aiLabel="Сгенерировать ИИ"
             />
             <div className="ctor-colors">
               <Field label={<LabelWithHelp label="Пузырь клиента" tip="Входящие сообщения." />}>
@@ -732,28 +878,20 @@ export function ProjectConstructor({
                 />
               </Field>
             </div>
-            <div
-              className="ctor-theme-preview"
-              style={{
-                backgroundImage: project.wallpaperPath
-                  ? `url(${fileUrl(project.wallpaperPath)})`
-                  : "linear-gradient(180deg, #6ba3be, #4a8fa8)",
-              }}
-            >
-              <div className="ctor-bubble" style={{ background: form.incomingBubble }}>
-                Hola, ¿cómo funciona?
-              </div>
-              <div className="ctor-bubble is-out" style={{ background: form.outgoingBubble }}>
-                <AppleEmojiText text="Te explico las condiciones 💙" />
-              </div>
-            </div>
+            <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+              Цвета и фон сразу видны в живом отзыве справа — тот же HTML, что у скриншотов.
+            </p>
             <button type="button" className="admin-btn" disabled={busy} onClick={() => void saveSettings()}>
               {busy ? "…" : "Сохранить цвета"}
             </button>
           </div>
-        )}
+        </section>
 
-        {step.id === "conditions" && (
+        <section id="ctor-conditions" className="admin-card ctor-section">
+          <h2 className="admin-card-title">
+            Условия
+            <HelpTip text={STEPS[3]!.doc} />
+          </h2>
           <div className="ctor-form">
             <p className="admin-muted" style={{ margin: 0, fontSize: "0.875rem" }}>
               Условия из ТЗ Влада: картинка и/или фиксированный текст в{" "}
@@ -799,9 +937,13 @@ export function ProjectConstructor({
               onGenerateAi={() => void generateAiMedia("conditions")}
             />
           </div>
-        )}
+        </section>
 
-        {step.id === "texts" && (
+        <section id="ctor-texts" className="admin-card ctor-section">
+          <h2 className="admin-card-title">
+            Тексты
+            <HelpTip text={STEPS[4]!.doc} />
+          </h2>
           <div className="ctor-form">
             <Field
               label={
@@ -839,22 +981,26 @@ export function ProjectConstructor({
               />
             </Field>
             {project.id === "nancy" && (
-              <label className="ctor-check">
+              <label className="admin-check">
                 <input
                   type="checkbox"
                   checked={form.twoPhaseReview}
                   onChange={(e) => setForm({ ...form, twoPhaseReview: e.target.checked })}
                 />
-                Двухчастная публикация (~{project.phaseDelayMinutes} мин) — ТЗ §4.2, только Nancy
+                <span>Двухчастная публикация (~{project.phaseDelayMinutes} мин) — ТЗ §4.2, только Nancy</span>
               </label>
             )}
             <button type="button" className="admin-btn" disabled={busy} onClick={() => void saveSettings()}>
               {busy ? "…" : "Сохранить тексты"}
             </button>
           </div>
-        )}
+        </section>
 
-        {step.id === "media" && (
+        <section id="ctor-media" className="admin-card ctor-section">
+          <h2 className="admin-card-title">
+            Живое медиа
+            <HelpTip text={STEPS[5]!.doc} />
+          </h2>
           <div className="ctor-form">
             <div className="ctor-media-stats">
               <Stat ok={counts.bet >= 3} label="Ставки" value={`${counts.bet} / 3+`} />
@@ -863,7 +1009,7 @@ export function ProjectConstructor({
             </div>
             <LibraryPickBlock
               label="Ставка (скрин)"
-              hint="ТЗ: 3 ставки в истории с паузами. Медиатека, загрузка или ИИ."
+              hint="ТЗ: 3 ставки в истории с паузами. Загрузите готовые скрины без сумм — укажите «Итоговую прибыль» ниже в «Полном отзыве» и нажмите «Проставить суммы»."
               accept="image/*"
               previewUrl={
                 mediaPreview.bet ??
@@ -874,7 +1020,7 @@ export function ProjectConstructor({
               onPick={() => setPickerKind("bet")}
               onFile={(f) => void upload("bet", f)}
               onGenerateAi={() => void generateAiMedia("bet", 3)}
-              aiLabel="Сгенерировать 3 ставки через ИИ"
+              aiLabel="Проставить суммы на 3 ставках"
             />
             <LibraryPickBlock
               label="Кружок (MP4)"
@@ -904,23 +1050,93 @@ export function ProjectConstructor({
               onPick={() => setPickerKind("story_photo")}
               onFile={(f) => void upload("story_photo", f, false)}
               onGenerateAi={() => void generateAiMedia("story_photo", 3)}
-              aiLabel="Сгенерировать фото через ИИ"
+              aiLabel="ИИ: фото"
             />
             <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-              Чеки не грузятся вручную: ИИ правит образцы из{" "}
-              <code>data/media/receipt_templates/{project.id}</code>.
+              Чеки не грузятся вручную: на исходном скрине из{" "}
+              <code>data/media/receipt_templates/{project.id}</code> подставляются сумма, имена, дата
+              и 4 цифры счёта. Ставки — так же: суммы на готовом скрине, ИИ кадр не перерисовывает.
+              Клик по чеку или ставке справа — указать сумму и перепечатать поля.
             </p>
           </div>
-        )}
+        </section>
 
-        {step.id === "preview" && (
+        <section id="ctor-preview" className="admin-card ctor-section">
+          <h2 className="admin-card-title">
+            Полный отзыв
+            <HelpTip text="Необязательно, чтобы увидеть чат справа. Собирает диалог ИИ, чеки и PNG для канала." />
+          </h2>
           <div className="ctor-form">
             <p className="admin-muted" style={{ margin: 0, fontSize: "0.875rem" }}>
-              Полный сценарий из ТЗ §2: контакт → условия → депозит → ставки → выплата. В канал не уйдёт.
-              Генерация чеков через ИИ обычно занимает 1–2 минуты — это нормально.
+              Чат справа уже живой. Эта кнопка собирает полный пакет: диалог ИИ, чеки и PNG для
+              публикации. В канал не уйдёт. Обычно 1–2 минуты.
             </p>
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Итоговая прибыль клиента"
+                  tip="Сколько клиент заработает к концу (3-я ставка). Система сама разобьёт на 3 ставки (25% / 35% / 40%), посчитает депозит (~1–5% от прибыли) и перепишет суммы на скринах ставок и чеке captura."
+                />
+              }
+            >
+              <input
+                className="admin-input"
+                style={field}
+                inputMode="numeric"
+                placeholder={`например 10000 ${project.currency}`}
+                value={customProfitFinal}
+                onChange={(e) => setCustomProfitFinal(e.target.value)}
+              />
+            </Field>
+            {computedCustomAmounts ? (
+              <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                Ставка 1: {computedCustomAmounts.profit1} {project.currency} → ставка 2:{" "}
+                {computedCustomAmounts.profit2} → ставка 3: {computedCustomAmounts.profit3} → итог:{" "}
+                {computedCustomAmounts.profitFinal}. Депозит в банк:{" "}
+                {computedCustomAmounts.deposit} {project.currency}. На скринах OKX — Depósito:{" "}
+                {computedCustomAmounts.deposit1} / {computedCustomAmounts.deposit2} /{" "}
+                {computedCustomAmounts.deposit3} (реинвест после каждой ставки). Скрины — случайный
+                пак из медиатеки.
+              </p>
+            ) : null}
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Или готовый пак сумм"
+                  tip="Устаревший режим: пак из config/amounts.json. Если указана итоговая прибыль выше — она важнее."
+                />
+              }
+            >
+              <select
+                className="admin-select"
+                style={field}
+                value={amountPackId}
+                onChange={(e) => setAmountPackId(e.target.value)}
+              >
+                <option value="">Авто — следующий пак по циклу ставок</option>
+                {projectPacks.map((pack) => (
+                  <option key={pack.id} value={pack.id}>
+                    {pack.betPack ? `Пак ${pack.betPack}` : pack.id}: депозит {pack.deposit} → выплата{" "}
+                    {pack.profitFinal} {pack.currency}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {effectiveAmounts ? (
+              <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                Чек депозита: {effectiveAmounts.deposit} {project.currency}. Чек выплаты:{" "}
+                {effectiveAmounts.profitFinal} {project.currency}
+                {project.id === "francesca" ? " (минус 10% комиссия на чеке)" : ""}. Имена на чеке —
+                клиент и {form.managerName || "менеджер"}.
+              </p>
+            ) : (
+              <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                Укажите итоговую прибыль или выберите готовый пак. Без сумм отзыв соберётся из
+                цикла amounts.json.
+              </p>
+            )}
             <button type="button" className="admin-btn" disabled={busy} onClick={() => void generatePreview()}>
-              {busy ? "Генерируем…" : "Сделать пробный отзыв"}
+              {busy ? "Собираем…" : "Собрать полный отзыв (ИИ)"}
             </button>
             {genProgress ? (
               <div className="ctor-progress" aria-live="polite">
@@ -967,13 +1183,17 @@ export function ProjectConstructor({
               <ScreenshotGallery screenshots={screenshots} reviewId={reviewId} />
             ) : (
               <p className="admin-muted" style={{ margin: 0, fontSize: "0.875rem" }}>
-                Скриншотов пока нет.
+                PNG-альбом появится после сборки полного отзыва. Живой чат справа уже 1:1.
               </p>
             )}
           </div>
-        )}
+        </section>
 
-        {step.id === "launch" && (
+        <section id="ctor-launch" className="admin-card ctor-section">
+          <h2 className="admin-card-title">
+            Запуск
+            <HelpTip text={STEPS[7]!.doc} />
+          </h2>
           <div className="ctor-form">
             <div className="ctor-ready">
               {(
@@ -1000,70 +1220,108 @@ export function ProjectConstructor({
             )}
             <ControlButtons currentStatus={initialStatus} />
           </div>
-        )}
+        </section>
 
         {message ? (
           <p className="admin-muted" style={{ margin: "0.85rem 0 0", fontSize: "0.875rem" }}>
             {message}
           </p>
         ) : null}
+      </div>
 
-        <div className="ctor-nav">
-          <button
-            type="button"
-            className="admin-btn-secondary"
-            disabled={stepIndex === 0}
-            onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-          >
-            Назад
-          </button>
-          <button
-            type="button"
-            className="admin-btn"
-            disabled={stepIndex >= STEPS.length - 1}
-            onClick={() => setStepIndex((i) => Math.min(STEPS.length - 1, i + 1))}
-          >
-            Далее
-          </button>
-        </div>
-      </section>
+      <LivePreviewPane
+        projectId={project.id}
+        locale={project.locale}
+        reviewId={reviewId}
+        overrides={{
+          managerName: form.managerName,
+          managerHandle: form.managerHandle,
+          incomingBubble: form.incomingBubble,
+          outgoingBubble: form.outgoingBubble,
+          accentColor: form.accentColor,
+          depositMessageTemplate: form.depositMessageTemplate,
+          completionMessageTemplate: form.completionMessageTemplate,
+          payoutMessageTemplate: form.payoutMessageTemplate,
+          wallpaperPath: project.wallpaperPath,
+          clientAvatarPath: liveMedia.avatar ?? project.clientAvatarPath,
+        }}
+        mediaPaths={{
+          ...liveMedia,
+          conditions: liveMedia.conditions ?? project.conditionsImagePath,
+          avatar: liveMedia.avatar ?? project.clientAvatarPath,
+        }}
+        onReviewId={setReviewId}
+        onMediaPaths={setLiveMedia}
+        onPickMedia={openLivePicker}
+        onError={(msg) => setMessage(msg ?? "")}
+        onSlideTimes={handleSlideTimes}
+        amountDefaults={{
+          currency: selectedPack?.currency ?? project.currency,
+          deposit: effectiveAmounts?.deposit ?? null,
+          payout: effectiveAmounts
+            ? project.id === "francesca"
+              ? Math.round(effectiveAmounts.profitFinal * 0.9)
+              : effectiveAmounts.profitFinal
+            : null,
+          profit1: effectiveAmounts?.profit1 ?? null,
+          profit2: effectiveAmounts?.profit2 ?? null,
+          profit3:
+            effectiveAmounts
+              ? effectiveAmounts.profit3 && effectiveAmounts.profit3 > 0
+                ? effectiveAmounts.profit3
+                : effectiveAmounts.profitFinal - effectiveAmounts.profit1 - effectiveAmounts.profit2
+              : null,
+          profitFinal: effectiveAmounts?.profitFinal ?? null,
+        }}
+      />
 
       <MediaPicker
         open={pickerKind !== null}
         title={
           pickerKind === "avatar"
             ? "Аватар из медиатеки"
-            : pickerKind === "conditions"
-              ? "Условия из медиатеки"
-              : pickerKind === "bet"
-                ? "Ставки из медиатеки"
-                : pickerKind === "video_note"
-                  ? "Кружки из медиатеки"
-                  : pickerKind === "story_photo"
-                    ? "Фото клиентов из медиатеки"
-                    : "Медиатека"
+            : pickerKind === "wallpaper"
+              ? "Фон чата из медиатеки"
+              : pickerKind === "conditions"
+                ? "Условия из медиатеки"
+                : pickerKind === "bet"
+                  ? "Ставки из медиатеки"
+                  : pickerKind === "video_note"
+                    ? "Кружки из медиатеки"
+                    : pickerKind === "story_photo"
+                      ? "Фото клиентов из медиатеки"
+                      : "Медиатека"
         }
         emptyHint={
           pickerKind === "story_photo"
-            ? "В общем пуле пока пусто. Загрузите фото ниже или во вкладке «Медиатека»."
-            : "В медиатеке проекта пока нет таких файлов. Загрузите новый файл кнопкой рядом или во вкладке «Медиатека»."
+            ? "В общем пуле пока пусто. Загрузите фото кнопкой «С компьютера» или во вкладке «Медиатека»."
+            : pickerKind === "wallpaper"
+              ? "Нет обоев для этого проекта. Загрузите файл кнопкой «С компьютера» или во вкладке «Медиатека»."
+              : "В медиатеке проекта пока нет таких файлов. Загрузите новый файл кнопкой «С компьютера» или во вкладке «Медиатека»."
         }
         footNote={
           pickerKind === "story_photo"
             ? "Общий пул фото клиентов — каждое используется один раз."
-            : "Файлы проекта из раздела «Медиатека»."
+            : pickerKind === "wallpaper"
+              ? "Выбор сразу ставит фон для этого проекта."
+              : "Файлы проекта из раздела «Медиатека»."
         }
         assets={activePickerAssets}
         selectedPath={
           pickerKind === "avatar"
             ? project?.clientAvatarPath
-            : pickerKind === "conditions"
-              ? project?.conditionsImagePath
-              : null
+            : pickerKind === "wallpaper"
+              ? project?.wallpaperPath
+              : pickerKind === "conditions"
+                ? project?.conditionsImagePath
+                : null
         }
         allowVideo={pickerKind === "video_note"}
         disabled={busy}
-        onClose={() => setPickerKind(null)}
+        onClose={() => {
+          setPickerKind(null);
+          setLivePickSlot(null);
+        }}
         onSelect={selectLibraryAsset}
       />
     </div>
@@ -1096,7 +1354,7 @@ function LibraryPickBlock({
   previewIsVideo = false,
   disabled,
   aiAvailable = true,
-  aiLabel = "Сгенерировать через ИИ",
+  aiLabel = "Сгенерировать ИИ",
   onPick,
   onFile,
   onGenerateAi,
@@ -1107,14 +1365,13 @@ function LibraryPickBlock({
   previewUrl?: string | null;
   previewIsVideo?: boolean;
   disabled?: boolean;
-  /** Show AI checkbox alternative (images only). */
   aiAvailable?: boolean;
   aiLabel?: string;
   onPick: () => void;
   onFile: (file: File) => void;
   onGenerateAi?: () => void;
 }) {
-  const [useAi, setUseAi] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="ctor-upload">
@@ -1137,106 +1394,40 @@ function LibraryPickBlock({
         )}
         <div className="ctor-upload-actions">
           <button type="button" className="admin-btn" disabled={disabled} onClick={onPick}>
-            Выбрать из медиатеки
+            Из медиатеки
+          </button>
+          <button
+            type="button"
+            className="admin-btn-secondary"
+            disabled={disabled}
+            onClick={() => fileRef.current?.click()}
+          >
+            С компьютера
           </button>
           {aiAvailable && onGenerateAi ? (
-            <label className="ctor-ai-check">
-              <input
-                type="checkbox"
-                checked={useAi}
-                disabled={disabled}
-                onChange={(e) => setUseAi(e.target.checked)}
-              />
+            <button type="button" className="admin-btn-ghost" disabled={disabled} onClick={onGenerateAi}>
               {aiLabel}
-            </label>
-          ) : null}
-          {useAi && aiAvailable && onGenerateAi ? (
-            <button type="button" className="admin-btn" disabled={disabled} onClick={onGenerateAi}>
-              {disabled ? "Генерация…" : "Сгенерировать"}
             </button>
-          ) : (
-            <input
-              type="file"
-              accept={accept}
-              disabled={disabled}
-              title="Загрузить новый файл в медиатеку"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onFile(f);
-                e.currentTarget.value = "";
-              }}
-            />
-          )}
+          ) : null}
+          <input
+            ref={fileRef}
+            type="file"
+            accept={accept}
+            disabled={disabled}
+            className="ctor-file-input"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFile(f);
+              e.currentTarget.value = "";
+            }}
+          />
         </div>
       </div>
       {!aiAvailable ? (
-        <span className="ctor-ai-note">Кружки (MP4) ИИ не рисует — только загрузка / медиатека.</span>
+        <span className="ctor-ai-note">Кружки (MP4) ИИ не рисует — только медиатека или файл с компьютера.</span>
       ) : null}
-    </div>
-  );
-}
-
-function UploadBlock({
-  label,
-  hint,
-  accept,
-  previewUrl,
-  disabled,
-  onFile,
-  onGenerateAi,
-}: {
-  label: string;
-  hint: string;
-  accept: string;
-  previewUrl?: string | null;
-  disabled?: boolean;
-  onFile: (file: File) => void;
-  onGenerateAi?: () => void;
-}) {
-  const [useAi, setUseAi] = useState(false);
-  return (
-    <div className="ctor-upload">
-      <div className="ctor-upload-meta">
-        <strong>{label}</strong>
-        <span>{hint}</span>
-      </div>
-      <div className="ctor-upload-row">
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt="" className="ctor-upload-preview" />
-        ) : (
-          <div className="ctor-upload-preview is-empty">нет</div>
-        )}
-        <div className="ctor-upload-actions">
-          {onGenerateAi ? (
-            <label className="ctor-ai-check">
-              <input
-                type="checkbox"
-                checked={useAi}
-                disabled={disabled}
-                onChange={(e) => setUseAi(e.target.checked)}
-              />
-              Сгенерировать через ИИ
-            </label>
-          ) : null}
-          {useAi && onGenerateAi ? (
-            <button type="button" className="admin-btn" disabled={disabled} onClick={onGenerateAi}>
-              {disabled ? "Генерация…" : "Сгенерировать"}
-            </button>
-          ) : (
-            <input
-              type="file"
-              accept={accept}
-              disabled={disabled}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onFile(f);
-                e.currentTarget.value = "";
-              }}
-            />
-          )}
-        </div>
-      </div>
     </div>
   );
 }

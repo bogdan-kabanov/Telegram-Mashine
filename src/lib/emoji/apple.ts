@@ -3,6 +3,8 @@
  * Browser preview loads PNGs via /api/emoji/:code.
  */
 
+import { withBasePath } from "@/lib/base-path";
+
 /** Emoji + ZWJ sequences (💙, 👨‍👩‍👧, flags, etc.). */
 export const EMOJI_RE =
   /(?:\p{Extended_Pictographic}(?:\uFE0F)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F)?)*)|\p{Regional_Indicator}{2}/gu;
@@ -67,7 +69,7 @@ export function emojiToAppleCode(emoji: string): string {
 /** Browser / React: served by /api/emoji/[code]. */
 export function appleEmojiUrl(emoji: string): string {
   const code = emojiToAppleCode(emoji);
-  return `/api/emoji/${code}`;
+  return withBasePath(`/api/emoji/${code}`);
 }
 
 /** Split plain text into text / emoji parts for React rendering. */

@@ -1,4 +1,5 @@
 ARG PLAYWRIGHT_VERSION=1.61.1
+ARG BASE_PATH=/ai
 
 # ---- deps ----
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy AS deps
@@ -14,10 +15,13 @@ RUN npm ci --ignore-scripts && npm rebuild better-sqlite3
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy AS builder
 WORKDIR /app
 
+ARG BASE_PATH=/ai
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV BASE_PATH=${BASE_PATH}
+ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
 
 # Dummy env so Next can compile routes that touch getEnv at analysis time
 ENV TELEGRAM_BOT_TOKEN=build_placeholder_token
@@ -38,6 +42,7 @@ RUN npm run build \
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy AS runner
 WORKDIR /app
 
+ARG BASE_PATH=/ai
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
@@ -47,6 +52,8 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV DATA_DIR=/app/data
 ENV CONFIG_DIR=/app/config
+ENV BASE_PATH=${BASE_PATH}
+ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
@@ -69,7 +76,7 @@ USER pwuser
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=5 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "const b=(process.env.NEXT_PUBLIC_BASE_PATH||process.env.BASE_PATH||'').replace(/\\/$/,'');fetch('http://127.0.0.1:'+(process.env.PORT||3000)+b+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["node", "docker-entrypoint.mjs"]
 CMD ["node", "server.js"]

@@ -135,6 +135,10 @@ export async function generateSceneMedia(params: {
   /** Admin / explicit generate ignores AI_MEDIA=off when OpenAI is configured. */
   force?: boolean;
 }): Promise<{ path: string; filename: string; assetId: string } | null> {
+  if (params.kind === "bet") {
+    throw new Error("Ставки не генерируются ИИ — суммы печатаются на готовом скрине.");
+  }
+
   if (!isOpenAIConfigured()) {
     await logger.warn("OpenAI not configured — cannot generate scene media");
     return null;

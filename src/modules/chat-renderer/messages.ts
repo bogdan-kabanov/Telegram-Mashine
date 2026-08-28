@@ -19,11 +19,20 @@ export interface DialogMediaAssets {
   bet3?: string | null;
   receipt?: string | null;
   captura?: string | null;
+  voice?: string | null;
+}
+
+function formatVoiceDuration(seconds: number): string {
+  const s = Math.max(1, Math.min(599, Math.floor(seconds)));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
 }
 
 export function dialogToRenderMessages(
   messages: DialogMessage[],
   mediaAssets: DialogMediaAssets,
+  clock?: { now?: Date; timeZone?: string; locale?: string },
 ): RenderMessage[] {
   const prepared = messages
     .map((msg) => {
@@ -37,25 +46,16 @@ export function dialogToRenderMessages(
         msg.type === "image";
 
       if (needsMedia && !imageUrl) {
-        // Never silently drop the client's story photo — leave a visible gap warning
-        // only for other media; story images stay as a text stub so pagination still
-        // includes the turn (operator sees something went wrong in-chat).
-        if (msg.type === "image") {
-          return {
-            id: msg.id,
-            role: msg.role,
-            type: "text" as const,
-            content: "📷",
-            delayMinutes: msg.delayMinutes,
-            read: msg.role === "manager",
-          };
-        }
+        return null;
+      }
+      if (msg.type === "voice" && !mediaAssets.voice) {
         return null;
       }
 
       let content = msg.content;
       let type: RenderMessage["type"] = "text";
       let mediaKind: RenderMessage["mediaKind"];
+      const mediaSlot = mediaSlotFor(msg);
 
       if (msg.type === "conditions" || msg.type === "bet" || msg.type === "receipt" || msg.type === "captura") {
         content = "__image__";
@@ -68,10 +68,20 @@ export function dialogToRenderMessages(
         content = "__image__";
         type = "image";
         mediaKind = "story";
+      } else if (msg.type === "voice") {
+        content = "__voice__";
+        type = "voice";
       } else {
         type = "text";
         content = msg.content;
       }
+
+      const voiceDuration =
+        msg.type === "voice"
+          ? formatVoiceDuration(
+              typeof msg.metadata?.durationSec === "number" ? msg.metadata.durationSec : 12,
+            )
+          : undefined;
 
       return {
         id: msg.id,
@@ -82,22 +92,42 @@ export function dialogToRenderMessages(
         read: msg.role === "manager",
         ...(imageUrl ? { imageUrl } : {}),
         ...(mediaKind ? { mediaKind } : {}),
+        ...(mediaSlot ? { mediaSlot } : {}),
+        ...(voiceDuration ? { voiceDuration } : {}),
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);
 
-  const times = computeMessageTimes(prepared);
+  const times = computeMessageTimes(prepared, clock);
 
   return prepared.map((msg, index) => ({
     id: msg.id,
     role: msg.role,
     type: msg.type,
     content: msg.content,
-    time: times[index] ?? "17:08",
+    time: times[index] ?? times.at(-1) ?? "12:00",
     read: msg.read,
+    delayMinutes: msg.delayMinutes,
     ...(msg.imageUrl ? { imageUrl: msg.imageUrl } : {}),
     ...(msg.mediaKind ? { mediaKind: msg.mediaKind } : {}),
+    ...(msg.mediaSlot ? { mediaSlot: msg.mediaSlot } : {}),
+    ...(msg.voiceDuration ? { voiceDuration: msg.voiceDuration } : {}),
   }));
+}
+
+export function mediaSlotFor(msg: { type: string; content?: string }): string | undefined {
+  if (msg.type === "image") return "storyPhoto";
+  if (msg.type === "voice") return "voice";
+  if (msg.type === "conditions") return "conditions";
+  if (msg.type === "sticker") return "sticker";
+  if (msg.type === "receipt") return "receipt";
+  if (msg.type === "captura") return "captura";
+  if (msg.type === "bet") {
+    if (msg.content === "bet_1") return "bet1";
+    if (msg.content === "bet_2") return "bet2";
+    if (msg.content === "bet_3") return "bet3";
+  }
+  return undefined;
 }
 
 function resolveImageUrl(
@@ -106,10 +136,9 @@ function resolveImageUrl(
 ): string | undefined {
   if (msg.type === "sticker") return mediaAssets.sticker ?? undefined;
   if (msg.type === "image") {
-    if (msg.metadata?.legendId || msg.content) {
-      return mediaAssets.storyPhoto ?? undefined;
-    }
+    if (mediaAssets.storyPhoto) return mediaAssets.storyPhoto;
     if (msg.metadata?.imagePath) return String(msg.metadata.imagePath);
+    return undefined;
   }
   if (msg.type === "conditions") return mediaAssets.conditions ?? undefined;
   if (msg.type === "captura") return mediaAssets.captura ?? undefined;

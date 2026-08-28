@@ -38,6 +38,7 @@ describe("bet reuse capacity formula", () => {
         },
       ],
       weeklyUniqueCircle: { dayOfWeek: 1, hour: 12, minute: 0 },
+      clientVoiceChance: 0.25,
     } satisfies ScheduleConfig;
 
     expect(maxDailyReviewsForProject(schedule, "nancy")).toBe(3);

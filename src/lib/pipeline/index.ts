@@ -3,12 +3,16 @@ import { randomUUID } from "crypto";
 import { loadAppConfig } from "@/lib/config/loader";
 import { resolveClientPhoto } from "@/lib/client-photos";
 import { getReviewFromDb, saveReviewToDb } from "@/lib/db/reviews";
-import { formatMexicoDateTime } from "@/lib/timezone";
+import { buildMessageClock } from "@/lib/format";
+import { localeClockConfig } from "@/lib/i18n/locale-profile";
 import { isStandaloneLegend, legendIdFromCircleTag } from "@/lib/legends/standalone";
 import { createLogger, getRuntimeManager } from "@/lib/runtime/manager";
 import type { ReviewPackage } from "@/lib/schemas";
+import { resolveBetPackNumber } from "@/lib/schemas/amounts";
 import { pickUniqueWeeklyCircle } from "@/lib/weekly-circle";
-import { pickNextBetPack } from "@/lib/bet-cycle";
+import type { CustomAmounts } from "@/lib/amounts/split-profit";
+import { pickNextBetPack, pickBetPackByNumber } from "@/lib/bet-cycle";
+import { stampProjectBetPack } from "@/lib/media/stamp-bets";
 import { getChatRenderer } from "@/modules/chat-renderer";
 import { getDialogGenerator } from "@/modules/dialog-generator";
 import { getMediaHandler } from "@/modules/media-handler";
@@ -33,6 +37,14 @@ export interface GenerateReviewParams {
   autoPublish?: boolean;
   pinVideoNote?: boolean;
   onProgress?: PipelineProgressHandler;
+  /** Conversation clock (`now` = last bubble). */
+  now?: Date;
+  /** Per-screenshot timestamps (ISO). Applied when Playwright captures each slide. */
+  slideTimes?: string[];
+  /** Operator-selected amount pack (constructor). Aligns dialog + receipts + bet pack. */
+  amountPackId?: string;
+  /** Operator-defined profit split — random bet pack + OCR stamp. */
+  customAmounts?: CustomAmounts;
 }
 
 export interface GenerateReviewResult {
@@ -76,11 +88,46 @@ export class ReviewPipeline {
       const progress = params.onProgress;
       const mediaHandler = getMediaHandler();
       const reviewId = randomUUID();
-      const betPackPick = await pickNextBetPack({
-        projectId: params.projectId,
-        reviewId,
-        reuseDays: config.schedule.betReuseDays,
-      });
+      const amountPack =
+        params.amountPackId != null
+          ? config.amounts.packs.find((p) => p.id === params.amountPackId)
+          : undefined;
+      if (params.amountPackId && !amountPack) {
+        throw new Error(`Пак сумм не найден: ${params.amountPackId}`);
+      }
+      if (amountPack?.projectId && amountPack.projectId !== params.projectId) {
+        throw new Error("Этот пак сумм принадлежит другому проекту");
+      }
+
+      const requestedBetPack = amountPack ? resolveBetPackNumber(amountPack) : null;
+      const useCustomAmounts = params.customAmounts != null;
+
+      let betPackPick =
+        useCustomAmounts
+          ? await pickNextBetPack({
+              projectId: params.projectId,
+              reviewId,
+              reuseDays: config.schedule.betReuseDays,
+            })
+          : requestedBetPack && requestedBetPack > 0
+            ? await pickBetPackByNumber({
+                projectId: params.projectId,
+                packNumber: requestedBetPack,
+                reviewId,
+              })
+            : await pickNextBetPack({
+                projectId: params.projectId,
+                reviewId,
+                reuseDays: config.schedule.betReuseDays,
+              });
+
+      if (!betPackPick && requestedBetPack) {
+        betPackPick = await pickNextBetPack({
+          projectId: params.projectId,
+          reviewId,
+          reuseDays: config.schedule.betReuseDays,
+        });
+      }
 
       // Weekly unique_circle: pick circle first → dialog uses the same legend (or neutral standalone).
       let preselectedVideoNote: Awaited<ReturnType<typeof pickUniqueWeeklyCircle>> = null;
@@ -105,13 +152,35 @@ export class ReviewPipeline {
       const dialog = await getDialogGenerator().generate({
         projectId: params.projectId,
         reviewType,
-        ...(betPackPick ? { betPack: betPackPick.packNumber } : {}),
+        ...(params.amountPackId
+          ? { amountPackId: params.amountPackId }
+          : useCustomAmounts && params.customAmounts
+            ? { customAmounts: params.customAmounts }
+            : betPackPick
+              ? { betPack: betPackPick.packNumber }
+              : {}),
         ...(forcedLegendId ? { forcedLegendId } : {}),
       });
 
       const depositBank = config.banks.depositBanks.find((b) => b.id === dialog.depositBankId);
       const payoutBank = config.banks.payoutBanks.find((b) => b.id === dialog.payoutBankId);
-      const mxNow = formatMexicoDateTime();
+      const clockCfg = localeClockConfig(project.locale);
+      const lastSlide = params.slideTimes?.filter(Boolean).at(-1);
+      const clockNow =
+        params.now ??
+        (lastSlide ? new Date(lastSlide) : null) ??
+        (dialog.createdAt ? new Date(dialog.createdAt) : new Date());
+      const messageClock = buildMessageClock(dialog.messages, {
+        now: clockNow,
+        timeZone: clockCfg.timeZone,
+        locale: clockCfg.locale,
+        dateFormat: clockCfg.dateFormat,
+      });
+      const capturaStamp =
+        messageClock.stampForType(dialog.messages, "captura") ?? messageClock.stampAtDelay(40);
+      const receiptStamp =
+        messageClock.stampForType(dialog.messages, "receipt") ??
+        messageClock.stampAt(dialog.messages.length - 1);
 
       await report(
         progress,
@@ -142,9 +211,9 @@ export class ReviewPipeline {
       const sequentialBets = betPackPick?.assets ?? [];
       // Use one complete pack only — never fill slots from random other packs
       // (that produced mixed/out-of-order bets in QA).
-      const bet1 = sequentialBets[0] ?? null;
-      const bet2 = sequentialBets[1] ?? null;
-      const bet3 = sequentialBets[2] ?? null;
+      let bet1 = sequentialBets[0] ?? null;
+      let bet2 = sequentialBets[1] ?? null;
+      let bet3 = sequentialBets[2] ?? null;
       if (!bet1?.path || !bet2?.path || !bet3?.path) {
         await logger.warn("Incomplete bet pack — slots left empty rather than mixing packs", {
           projectId: params.projectId,
@@ -152,6 +221,41 @@ export class ReviewPipeline {
           pack: betPackPick?.packNumber ?? null,
           have: sequentialBets.map((a) => a.filename),
         });
+      } else {
+        try {
+          await report(
+            progress,
+            reviewType === "unique_circle" ? 3 : 2,
+            "bets",
+            "Печать сумм на ставках",
+            "OCR переписывает цифры на скринах из медиатеки…",
+          );
+          const stamped = await stampProjectBetPack({
+            projectId: params.projectId,
+            deposit: dialog.deposit,
+            profit1: dialog.profit1,
+            profit2: dialog.profit2,
+            profit3: dialog.profit3 ?? dialog.profitFinal - dialog.profit1 - dialog.profit2,
+            currency: project.currency,
+            sourcePaths: [bet1.path, bet2.path, bet3.path],
+            name: dialog.clientName,
+          });
+          if (stamped[0]) bet1 = { ...bet1, path: stamped[0].path, filename: stamped[0].filename };
+          if (stamped[1]) bet2 = { ...bet2, path: stamped[1].path, filename: stamped[1].filename };
+          if (stamped[2]) bet3 = { ...bet3, path: stamped[2].path, filename: stamped[2].filename };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (useCustomAmounts) {
+            throw new Error(
+              `Не удалось проставить суммы на всех 3 ставках (OCR): ${message}. Перегенерируйте отзыв или загрузите другой пак скринов.`,
+            );
+          }
+          await logger.warn("Bet OCR stamp failed — using raw bet screenshots", {
+            projectId: params.projectId,
+            reviewId,
+            error: message,
+          });
+        }
       }
 
       await report(progress, 3, "photo", "Фото клиента", "Пул медиатеки или генерация ИИ…");
@@ -202,6 +306,17 @@ export class ReviewPipeline {
         });
       }
 
+      if (uniquePhoto && !mediaHandler.isValidFile(uniquePhoto.path)) {
+        await logger.warn("Assigned client photo missing — picking another", {
+          projectId: params.projectId,
+          path: uniquePhoto.path,
+        });
+        const { pickAvailableClientPhoto } = await import("@/lib/client-photos");
+        uniquePhoto = await pickAvailableClientPhoto({
+          excludePaths: [uniquePhoto.path],
+        });
+      }
+
       if (!uniquePhoto) {
         await logger.warn(
           "No client photo — upload story_photo assets or set AI_CLIENT_PHOTOS=fallback/always with OPENAI_API_KEY",
@@ -222,12 +337,24 @@ export class ReviewPipeline {
         });
       }
 
+      const dialogHasVoice = dialog.messages.some((m) => m.type === "voice");
+      let voiceAsset: Awaited<ReturnType<typeof mediaHandler.pickVoice>> = null;
+      if (dialogHasVoice) {
+        voiceAsset = await mediaHandler.pickVoice();
+        if (!voiceAsset) {
+          await logger.warn("Dialog includes voice but no voice files in media/voices", {
+            projectId: params.projectId,
+            reviewId,
+          });
+        }
+      }
+
       await report(
         progress,
         4,
         "slips",
-        "Генерация чеков",
-        "ИИ правит шаблоны банка — обычно 30–90 секунд…",
+        "Правка чеков",
+        "На исходном скрине банка меняем сумму, имена и дату — без новой картинки…",
       );
       const [captura, receipt] = await Promise.all([
         mediaHandler.generateCaptura({
@@ -238,8 +365,8 @@ export class ReviewPipeline {
           clabe: dialog.clabe,
           bankId: dialog.depositBankId,
           bankName: depositBank?.shortName ?? depositBank?.name ?? "Banco",
-          date: mxNow.date,
-          time: mxNow.time,
+          date: capturaStamp.date,
+          time: capturaStamp.time,
           accountLastDigits: dialog.accountLastDigits,
           project,
           ...(project.capturaStyle ? { style: project.capturaStyle } : {}),
@@ -252,14 +379,14 @@ export class ReviewPipeline {
           bankId: dialog.payoutBankId,
           bankName: payoutBank?.shortName ?? payoutBank?.name ?? "Banco",
           accountLastDigits: dialog.accountLastDigits,
-          date: mxNow.date,
-          time: mxNow.time,
+          date: receiptStamp.date,
+          time: receiptStamp.time,
           project,
           ...(project.receiptStyle ? { style: project.receiptStyle } : {}),
         }),
       ]);
 
-      if (captura.source === "ai" || receipt.source === "ai") {
+      if (captura.source === "overlay" || receipt.source === "overlay") {
         await logger.info("Bank slips generated", {
           reviewId,
           captura: captura.source,
@@ -288,6 +415,7 @@ export class ReviewPipeline {
         bet3: bet3?.path ?? null,
         receipt: receipt.path,
         captura: captura.path,
+        voice: voiceAsset?.path ?? null,
       };
 
       const renderResult = await getChatRenderer().renderDialog({
@@ -295,6 +423,8 @@ export class ReviewPipeline {
         project,
         reviewId,
         mediaAssets: renderMedia,
+        now: clockNow,
+        ...(params.slideTimes?.length ? { slideTimes: params.slideTimes } : {}),
       });
 
       const media: ReviewPackage["media"] = [];
@@ -316,6 +446,9 @@ export class ReviewPipeline {
           reviewType,
         });
       }
+      if (voiceAsset?.path && mediaHandler.isValidFile(voiceAsset.path)) {
+        media.push({ type: "voice", path: voiceAsset.path });
+      }
 
       review = {
         ...review,
@@ -323,6 +456,7 @@ export class ReviewPipeline {
         media,
         dialog,
         renderMedia,
+        ...(params.slideTimes?.length ? { slideTimes: params.slideTimes } : {}),
         phase: "partial",
       };
 

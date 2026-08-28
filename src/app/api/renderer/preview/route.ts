@@ -3,6 +3,7 @@ import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 
 import { bootstrapApp } from "@/lib/bootstrap";
+import { withBasePath } from "@/lib/base-path";
 import { getProjectById } from "@/lib/config/loader";
 import { getChatRenderer } from "@/modules/chat-renderer";
 
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const renderer = getChatRenderer();
     const result = await renderer.renderPreview(body.projectId, project);
 
-    const pngUrl = `/renders/${path.basename(result.pngPath)}`;
+    const pngUrl = withBasePath(`/renders/${path.basename(result.pngPath)}`);
 
     return NextResponse.json({
       ok: true,
