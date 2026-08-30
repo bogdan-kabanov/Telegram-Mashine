@@ -1,5 +1,5 @@
 ARG PLAYWRIGHT_VERSION=1.61.1
-ARG BASE_PATH=/ai
+ARG BASE_PATH=
 
 # ---- deps ----
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy AS deps
@@ -15,7 +15,7 @@ RUN npm ci --ignore-scripts && npm rebuild better-sqlite3
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy AS builder
 WORKDIR /app
 
-ARG BASE_PATH=/ai
+ARG BASE_PATH=
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -42,7 +42,7 @@ RUN npm run build \
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy AS runner
 WORKDIR /app
 
-ARG BASE_PATH=/ai
+ARG BASE_PATH=
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1

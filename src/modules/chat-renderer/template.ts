@@ -180,6 +180,7 @@ function glassLiveHtml(): string {
   return `<span class="glass-tint" aria-hidden="true"></span><span class="glass-grain" aria-hidden="true"></span>`;
 }
 
+/** Status/nick under the chat title — exact typed text, never auto-prefixed with "@". */
 export function chatHandleText(handle: string | undefined, fallback: string): string {
   const raw = (handle ?? "").trim();
   return raw || fallback;
@@ -748,9 +749,10 @@ export function buildChatHtml(params: RenderChatParams): string {
       left: auto;
       transform: none;
       text-align: center;
-      /* Hug content — do not stretch across the row */
+      /* Hug the longer of name/status; avoid max-width:100% on children
+         (that collapsed status to ~1 glyph next to a short name). */
       width: max-content;
-      max-width: 100%;
+      max-width: min(220px, 100%);
       justify-self: center;
       min-height: 44px;
       height: auto;
@@ -773,7 +775,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 100%;
+      width: max-content;
+      max-width: 188px;
     }
     .nav-status {
       font-size: 13px;
@@ -786,7 +789,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 100%;
+      width: max-content;
+      max-width: 188px;
     }
     .nav-avatar {
       width: 40px;

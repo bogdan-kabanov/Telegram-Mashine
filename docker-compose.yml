@@ -4,12 +4,12 @@ services:
       context: .
       args:
         PLAYWRIGHT_VERSION: "1.61.1"
-        BASE_PATH: "${BASE_PATH:-/ai}"
+        BASE_PATH: "${BASE_PATH:-}"
     image: bot-ai:latest
     container_name: bot-ai
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${PORT:-3002}:3000"
+      - "127.0.0.1:${PORT:-3000}:3000"
     env_file:
       - .env
     environment:
@@ -19,8 +19,8 @@ services:
       HOSTNAME: "0.0.0.0"
       DATA_DIR: /app/data
       CONFIG_DIR: /app/config
-      BASE_PATH: "${BASE_PATH:-/ai}"
-      NEXT_PUBLIC_BASE_PATH: "${BASE_PATH:-/ai}"
+      BASE_PATH: "${BASE_PATH:-}"
+      NEXT_PUBLIC_BASE_PATH: "${BASE_PATH:-}"
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
       # Set to 1 to auto-register Telegram webhook on start

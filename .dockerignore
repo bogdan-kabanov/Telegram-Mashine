@@ -25,14 +25,33 @@ data/logs
 data/runtime
 data/reviews
 data/renders
-public/renders/*.png
-public/renders/*.html
+public/renders
+public/2026.*
+public/ставки
+data/media/receipt_templates/_backup_*
+data/media/receipt_templates/_vlad_fit_refs
+# Media is volume-mounted at runtime — keep image context tiny
+data/media
+
+# Local dev / preview dumps (can be hundreds of MB)
+.tmp-test-photos
+.tmp-tails
+.tmp-sf-pro
+.tmp-*
+фит
+deploy/.tmp-*
+deploy/_diag_*.py
+deploy/_check_urls.py
+tests/fixtures/large
 
 # Docs / misc
 *.md
 !README.md
 agent-transcripts
 terminals
+tests
+.github
+deploy
 
 # OS
 .DS_Store
