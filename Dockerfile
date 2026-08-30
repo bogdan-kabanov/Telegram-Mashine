@@ -66,8 +66,12 @@ COPY --from=builder /app/data/scenarios ./data/scenarios
 COPY --from=builder /app/data/media ./data/media
 COPY --from=builder /app/data/history ./data/history
 COPY --from=builder /app/scripts/docker-entrypoint.mjs ./docker-entrypoint.mjs
+# Pre-bake Tesseract language packs so OCR does not download from CDN on cold start.
+COPY --from=builder /app/tessdata ./tessdata
 
-RUN mkdir -p /app/data/logs /app/data/runtime /app/data/reviews /app/data/renders \
+RUN test -s /app/tessdata/eng.traineddata \
+  && test -s /app/tessdata/spa.traineddata \
+  && mkdir -p /app/data/logs /app/data/runtime /app/data/reviews /app/data/renders \
       /app/public/renders \
   && chown -R pwuser:pwuser /app
 

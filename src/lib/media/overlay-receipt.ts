@@ -118,7 +118,17 @@ function escapeXml(text: string): string {
 
 let workerPromise: Promise<Tesseract.Worker> | null = null;
 
-const OCR_TIMEOUT_MS = 45_000;
+/** Cold start can be slow in Docker; models should be baked into the image. */
+const OCR_TIMEOUT_MS = 180_000;
+
+function tesseractCachePath(): string {
+  const baked = path.join(process.cwd(), "tessdata");
+  if (existsSync(path.join(baked, "eng.traineddata")) && existsSync(path.join(baked, "spa.traineddata"))) {
+    return baked;
+  }
+  // Dev / legacy: models at repo root next to package.json
+  return process.cwd();
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -164,10 +174,14 @@ async function resetOcrWorker(): Promise<void> {
 async function getOcrWorker(): Promise<Tesseract.Worker> {
   if (!workerPromise) {
     workerPromise = (async () => {
+      const cachePath = tesseractCachePath();
       const worker = await Tesseract.createWorker("spa+eng", 1, {
         logger: () => undefined,
         workerPath: tesseractWorkerPath(),
-        cachePath: process.cwd(),
+        // Prefer pre-baked spa+eng.traineddata (no CDN download at runtime).
+        langPath: cachePath,
+        cachePath,
+        gzip: false,
         errorHandler: (err) => {
           void logger.warn("OCR worker error", { error: String(err) });
         },

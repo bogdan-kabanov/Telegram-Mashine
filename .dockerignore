@@ -53,6 +53,9 @@ tests
 .github
 deploy
 
+# Keep OCR language packs in the build context (do NOT ignore *.traineddata)
+# tessdata/*.traineddata must be present for production OCR cold-start.
+
 # OS
 .DS_Store
 Thumbs.db
