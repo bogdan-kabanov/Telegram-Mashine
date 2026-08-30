@@ -749,9 +749,10 @@ export function buildChatHtml(params: RenderChatParams): string {
       left: auto;
       transform: none;
       text-align: center;
-      /* Hug the longer of name/status; avoid max-width:100% on children
-         (that collapsed status to ~1 glyph next to a short name). */
+      /* Size to the longer of name/status. min-content stops the old
+         max-width:100% collapse that showed only "@в" from "в сети". */
       width: max-content;
+      min-width: min-content;
       max-width: min(220px, 100%);
       justify-self: center;
       min-height: 44px;
@@ -776,6 +777,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       overflow: hidden;
       text-overflow: ellipsis;
       width: max-content;
+      min-width: min-content;
       max-width: 188px;
     }
     .nav-status {
@@ -790,7 +792,12 @@ export function buildChatHtml(params: RenderChatParams): string {
       overflow: hidden;
       text-overflow: ellipsis;
       width: max-content;
+      min-width: min-content;
       max-width: 188px;
+    }
+    .nav-status::before,
+    .nav-status::after {
+      content: none;
     }
     .nav-avatar {
       width: 40px;

@@ -55,6 +55,9 @@ describe("buildChatHtml status line", () => {
     expect(html).not.toContain('class="nav-status">@');
     expect(html).not.toContain("@в сети");
     expect(html).not.toContain(">@в<");
+    expect(html).toContain(".nav-status::before");
+    expect(html).toMatch(/\.nav-status::before,\s*\n\s*\.nav-status::after \{\s*content: none;/);
+    expect(html).toMatch(/\.nav-status \{[^}]*min-width: min-content;/s);
   });
 
   it("keeps user-typed @ in the status line", () => {

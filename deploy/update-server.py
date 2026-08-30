@@ -36,8 +36,7 @@ EXCLUDE_PREFIXES = (
     "public/renders/",
     "public/2026.",
     "public/ставки/",
-    "data/media/receipt_templates/_backup_",
-    "data/media/receipt_templates/_vlad_fit_refs/",
+    "data/media/",
     ".tmp-",
 )
 
