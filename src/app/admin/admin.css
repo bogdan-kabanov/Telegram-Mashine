@@ -1293,6 +1293,29 @@ textarea.admin-input:focus {
   font-style: normal;
 }
 
+.ctor-live-error {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #b91c1c;
+  background: rgba(185, 28, 28, 0.08);
+  border: 1px solid rgba(185, 28, 28, 0.2);
+}
+
+.ctor-live-retry {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.45rem;
+}
+
+.ctor-review-ready {
+  padding: 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 199, 89, 0.35);
+  background: rgba(52, 199, 89, 0.06);
+}
+
 .ctor-live-phone-wrap {
   width: 100%;
   max-width: 390px;

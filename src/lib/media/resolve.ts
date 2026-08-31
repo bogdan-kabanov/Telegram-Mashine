@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { and, desc, eq, sql } from "drizzle-orm";
 
+import { withBasePath } from "@/lib/base-path";
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
 
@@ -11,6 +12,13 @@ function getMimeType(filePath: string): string {
   if (ext === ".webp") return "image/webp";
   if (ext === ".gif") return "image/gif";
   return "image/jpeg";
+}
+
+/** Browser-loadable URL for a stored media path (live preview — avoids huge data-URIs). */
+export function mediaPathToServeUrl(filePath: string | null | undefined): string | null {
+  if (!filePath?.trim()) return null;
+  const normalized = filePath.replace(/\\/g, "/");
+  return withBasePath(`/api/admin/media/file?path=${encodeURIComponent(normalized)}`);
 }
 
 export function fileToDataUri(filePath: string): string | null {

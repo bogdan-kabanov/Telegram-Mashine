@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { TARGET_SCREENSHOTS } from "@/modules/chat-renderer/pagination";
+import { withBasePath } from "@/lib/base-path";
 import { dateFromZonedLocal, formatDateTimeLocal } from "@/lib/timezone";
 
 import { HelpTip } from "../ui/HelpTip";
@@ -80,6 +81,8 @@ type Props = {
   };
 };
 
+const LIVE_FETCH_TIMEOUT_MS = 90_000;
+
 export function LivePreviewPane({
   projectId,
   locale,
@@ -96,9 +99,12 @@ export function LivePreviewPane({
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const fetchGenRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
   const [phoneScale, setPhoneScale] = useState(1);
   const [html, setHtml] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [mode, setMode] = useState<"sample" | "review">("sample");
   const [timeZone, setTimeZone] = useState("America/Mexico_City");
   const [clockLocal, setClockLocal] = useState("");
@@ -111,6 +117,7 @@ export function LivePreviewPane({
   useEffect(() => {
     setClockLocal("");
     setHtml("");
+    setPreviewError(null);
   }, [projectId]);
 
   useLayoutEffect(() => {
@@ -128,11 +135,18 @@ export function LivePreviewPane({
   }, []);
 
   const fetchHtml = useCallback(async () => {
+    const gen = ++fetchGenRef.current;
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    const hangTimer = window.setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS);
+
     setLoading(true);
+    setPreviewError(null);
     onError(null);
     try {
       const currentLocal = clockLocal;
-      const res = await fetch("/api/renderer/live", {
+      const res = await fetch(withBasePath("/api/renderer/live"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -142,6 +156,7 @@ export function LivePreviewPane({
           overrides,
           mediaPaths,
         }),
+        signal: ctrl.signal,
       });
       const data = (await res.json()) as {
         error?: string;
@@ -150,14 +165,27 @@ export function LivePreviewPane({
         mode?: "sample" | "review";
         reviewId?: string | null;
       };
+      if (gen !== fetchGenRef.current) return;
       if (!res.ok) throw new Error(data.error ?? "Не удалось собрать превью");
-      setHtml(data.html ?? "");
+      if (!data.html?.trim()) throw new Error("Пустой ответ превью");
+      setHtml(data.html);
       if (data.timeZone) setTimeZone(data.timeZone);
       if (data.mode) setMode(data.mode);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Ошибка превью");
+      if (gen !== fetchGenRef.current) return;
+      const aborted =
+        (err instanceof DOMException && err.name === "AbortError") ||
+        (err instanceof Error && err.name === "AbortError");
+      const msg = aborted
+        ? "Превью не ответило за 90 с — обновите страницу или попробуйте ещё раз."
+        : err instanceof Error
+          ? err.message
+          : "Ошибка превью";
+      setPreviewError(msg);
+      onError(msg);
     } finally {
-      setLoading(false);
+      window.clearTimeout(hangTimer);
+      if (gen === fetchGenRef.current) setLoading(false);
     }
   }, [projectId, reviewId, overrides, mediaPaths, clockLocal, onError]);
 
@@ -384,7 +412,18 @@ export function LivePreviewPane({
           </span>
         </div>
         {loading ? <em className="ctor-live-busy">обновляем…</em> : null}
+        {!loading && previewError ? (
+          <button type="button" className="admin-btn-ghost ctor-live-retry" onClick={() => void fetchHtml()}>
+            Повторить
+          </button>
+        ) : null}
       </div>
+
+      {previewError ? (
+        <p className="ctor-live-error" role="alert">
+          {previewError}
+        </p>
+      ) : null}
 
       <div
         ref={wrapRef}
@@ -401,7 +440,9 @@ export function LivePreviewPane({
               sandbox="allow-scripts allow-same-origin"
             />
           ) : (
-            <div className="ctor-live-placeholder">{loading ? "Собираем чат…" : "Нет превью"}</div>
+            <div className="ctor-live-placeholder">
+              {loading ? "Собираем чат…" : previewError ? "Ошибка превью" : "Нет превью"}
+            </div>
           )}
         </div>
         {mediaSlot ? (

@@ -191,6 +191,56 @@ export function ProjectConstructor({
     setSlideTimesIso(iso);
   }, []);
 
+  const loadLastReview = useCallback(async (pid: string) => {
+    try {
+      const res = await fetch(`/api/admin/reviews?projectId=${encodeURIComponent(pid)}&limit=1`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        reviews?: Array<{ id: string; screenshots: string[] }>;
+      };
+      const last = data.reviews?.[0];
+      if (!last) return;
+
+      setReviewId(last.id);
+      setScreenshots(last.screenshots ?? []);
+
+      const detailRes = await fetch(`/api/admin/reviews/${last.id}`);
+      if (!detailRes.ok) return;
+      const detail = (await detailRes.json()) as {
+        review?: { renderMedia?: LiveMediaPaths };
+      };
+      if (detail.review?.renderMedia) {
+        setLiveMedia(detail.review.renderMedia);
+      }
+    } catch {
+      // no prior review
+    }
+  }, []);
+
+  const applyReviewResult = useCallback(
+    async (nextReviewId: string, nextScreenshots: string[]) => {
+      setReviewId(nextReviewId);
+      setScreenshots(nextScreenshots);
+      if (!nextReviewId) return;
+      try {
+        const detailRes = await fetch(`/api/admin/reviews/${nextReviewId}`);
+        if (!detailRes.ok) return;
+        const detail = (await detailRes.json()) as {
+          review?: { renderMedia?: LiveMediaPaths };
+        };
+        if (detail.review?.renderMedia) {
+          setLiveMedia(detail.review.renderMedia);
+        }
+      } catch {
+        // preview will still switch via reviewId
+      }
+      window.requestAnimationFrame(() => {
+        document.getElementById("ctor-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    },
+    [],
+  );
+
   const [form, setForm] = useState({
     managerHandle: project?.managerHandle ?? "",
     managerName: project?.managerName ?? "",
@@ -226,7 +276,8 @@ export function ProjectConstructor({
     setSlideTimesIso([]);
     setAmountPackId("");
     setCustomProfitFinal("");
-  }, [project?.id]);
+    void loadLastReview(project.id);
+  }, [project?.id, loadLastReview]);
 
   const loadAssets = useCallback(async () => {
     const res = await fetch("/api/admin/media");
@@ -635,6 +686,34 @@ export function ProjectConstructor({
     }
   }
 
+  async function generatePreviewViaJson() {
+    if (!project) return;
+    const res = await fetch("/api/pipeline/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        reviewType: "big",
+        autoPublish: false,
+        ...(slideTimesIso.length ? { slideTimes: slideTimesIso } : {}),
+        ...(computedCustomAmounts
+          ? { customAmounts: computedCustomAmounts }
+          : amountPackId
+            ? { amountPackId }
+            : {}),
+      }),
+    });
+    const data = (await res.json()) as {
+      error?: string;
+      reviewId?: string;
+      screenshots?: string[];
+    };
+    if (!res.ok) throw new Error(data.error ?? "Ошибка генерации");
+    await applyReviewResult(data.reviewId ?? "", data.screenshots ?? []);
+    setMessage(`Готово: ${(data.screenshots ?? []).length} скринов`);
+    setGenProgress(null);
+  }
+
   async function generatePreview() {
     if (!project) return;
     setBusy(true);
@@ -646,6 +725,7 @@ export function ProjectConstructor({
       detail: "Подключаемся к пайплайну",
       startedAt: Date.now(),
     });
+    let streamTruncated = false;
     try {
       const res = await fetch("/api/pipeline/generate", {
         method: "POST",
@@ -714,8 +794,7 @@ export function ProjectConstructor({
             }));
           } else if (event.type === "done") {
             gotDone = true;
-            setReviewId(event.reviewId ?? "");
-            setScreenshots(event.screenshots ?? []);
+            await applyReviewResult(event.reviewId ?? "", event.screenshots ?? []);
             setMessage(`Готово: ${(event.screenshots ?? []).length} скринов`);
             setGenProgress(null);
           } else if (event.type === "error") {
@@ -725,11 +804,43 @@ export function ProjectConstructor({
       }
 
       if (!gotDone) {
+        streamTruncated = true;
         throw new Error("Поток оборвался до завершения");
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-      setGenProgress(null);
+      if (streamTruncated) {
+        try {
+          setGenProgress((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  label: "Повтор без стрима…",
+                  detail: "nginx мог обрезать поток прогресса",
+                }
+              : {
+                  step: 1,
+                  total: 6,
+                  label: "Повтор без стрима…",
+                  detail: "Собираем отзыв обычным запросом",
+                  startedAt: Date.now(),
+                },
+          );
+          await generatePreviewViaJson();
+          return;
+        } catch (fallbackErr) {
+          setMessage(
+            fallbackErr instanceof Error
+              ? fallbackErr.message
+              : err instanceof Error
+                ? err.message
+                : "Ошибка",
+          );
+          setGenProgress(null);
+        }
+      } else {
+        setMessage(err instanceof Error ? err.message : "Ошибка");
+        setGenProgress(null);
+      }
     } finally {
       setBusy(false);
     }
@@ -1180,7 +1291,9 @@ export function ProjectConstructor({
               </div>
             ) : null}
             {screenshots.length > 0 ? (
-              <ScreenshotGallery screenshots={screenshots} reviewId={reviewId} />
+              <div className="ctor-review-ready">
+                <ScreenshotGallery screenshots={screenshots} reviewId={reviewId} />
+              </div>
             ) : (
               <p className="admin-muted" style={{ margin: 0, fontSize: "0.875rem" }}>
                 PNG-альбом появится после сборки полного отзыва. Живой чат справа уже 1:1.

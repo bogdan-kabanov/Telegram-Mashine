@@ -7,9 +7,10 @@ import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
 import { chatUiForLocale } from "@/lib/i18n/chat-ui";
 import { localeClockConfig } from "@/lib/i18n/locale-profile";
-import { blurWallpaperDataUri, averageWallpaperColor, wallpaperCutoutDataUri } from "@/lib/media/blur-wallpaper";
+import { averageWallpaperColor } from "@/lib/media/blur-wallpaper";
 import {
   fileToDataUri,
+  mediaPathToServeUrl,
   pickRandomClientAvatar,
   resolveImageForRender,
   resolveWallpaperForProject,
@@ -250,21 +251,37 @@ function enrichSampleMessages(
   return extra.map((m, i) => ({ ...m, time: times[i] ?? times.at(-1) ?? m.time }));
 }
 
-async function resolveMediaUris(paths: DialogMediaAssets): Promise<DialogMediaAssets> {
-  const [sticker, storyPhoto, conditions, bet1, bet2, bet3, receipt, captura] = await Promise.all([
-    resolveImageForRender(paths.sticker ?? null, { removeWhiteBackground: true }),
-    resolveImageForRender(paths.storyPhoto ?? null),
-    resolveImageForRender(paths.conditions ?? null),
-    resolveImageForRender(paths.bet1 ?? null),
-    resolveImageForRender(paths.bet2 ?? null),
-    resolveImageForRender(paths.bet3 ?? null),
-    resolveImageForRender(paths.receipt ?? null),
-    resolveImageForRender(paths.captura ?? null),
-  ]);
-  return { sticker, storyPhoto, conditions, bet1, bet2, bet3, receipt, captura };
+async function resolveMediaServeUrls(paths: DialogMediaAssets): Promise<DialogMediaAssets> {
+  const sticker = paths.sticker
+    ? await resolveImageForRender(paths.sticker, { removeWhiteBackground: true })
+    : null;
+  return {
+    sticker,
+    storyPhoto: mediaPathToServeUrl(paths.storyPhoto),
+    conditions: mediaPathToServeUrl(paths.conditions),
+    bet1: mediaPathToServeUrl(paths.bet1),
+    bet2: mediaPathToServeUrl(paths.bet2),
+    bet3: mediaPathToServeUrl(paths.bet3),
+    receipt: mediaPathToServeUrl(paths.receipt),
+    captura: mediaPathToServeUrl(paths.captura),
+  };
 }
 
-async function resolveLiveWallpaper(projectId: string, wallpaperPath?: string | null): Promise<string | null> {
+async function resolveLiveWallpaper(
+  projectId: string,
+  wallpaperPath?: string | null,
+  lightweight = false,
+): Promise<string | null> {
+  if (lightweight) {
+    if (wallpaperPath) {
+      const url = mediaPathToServeUrl(wallpaperPath);
+      if (url) return url;
+    }
+    const embedded = await resolveWallpaperForProject(projectId, wallpaperPath ?? undefined);
+    if (embedded?.startsWith("data:")) return embedded;
+    return mediaPathToServeUrl(wallpaperPath);
+  }
+
   if (wallpaperPath) {
     const direct = fileToDataUri(wallpaperPath);
     if (direct) return direct;
@@ -272,6 +289,18 @@ async function resolveLiveWallpaper(projectId: string, wallpaperPath?: string | 
     if (resolved) return resolved;
   }
   return resolveWallpaperForProject(projectId, wallpaperPath ?? undefined);
+}
+
+async function resolveLiveAvatarUrl(
+  projectId: string,
+  preferredPath?: string | null,
+): Promise<string | null> {
+  if (preferredPath) {
+    const url = mediaPathToServeUrl(preferredPath);
+    if (url) return url;
+  }
+  const picked = await pickRandomClientAvatar(projectId, preferredPath);
+  return mediaPathToServeUrl(picked.filePath) ?? picked.dataUri;
 }
 
 export async function composeLiveChatHtml(params: {
@@ -298,15 +327,17 @@ export async function composeLiveChatHtml(params: {
       }
     : await sampleMediaPaths(project, params.mediaPaths);
 
-  const [wallpaperUrl, avatar, uris] = await Promise.all([
-    resolveLiveWallpaper(project.id, project.wallpaperPath),
-    pickRandomClientAvatar(project.id, project.clientAvatarPath),
-    resolveMediaUris(rawPaths),
+  const [wallpaperUrl, avatarUrl, uris] = await Promise.all([
+    resolveLiveWallpaper(project.id, project.wallpaperPath, true),
+    resolveLiveAvatarUrl(project.id, project.clientAvatarPath),
+    resolveMediaServeUrls(rawPaths),
   ]);
 
-  const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
-  const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperUrl
-    ? await Promise.all([wallpaperCutoutDataUri(wallpaperUrl), averageWallpaperColor(wallpaperUrl)])
+  const wallpaperForColor = project.wallpaperPath ? fileToDataUri(project.wallpaperPath) : null;
+
+  const frostWallpaperUrl = wallpaperUrl;
+  const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperForColor
+    ? [null, await averageWallpaperColor(wallpaperForColor)]
     : [null, null];
 
   let messages: RenderMessage[];
@@ -338,7 +369,7 @@ export async function composeLiveChatHtml(params: {
     frostWallpaperUrl,
     wallpaperCutoutUrl,
     wallpaperCutoutColor,
-    clientAvatarUrl: avatar.dataUri,
+    clientAvatarUrl: avatarUrl,
     statusBarTime,
     clockTimeZone: clockCfg.timeZone,
     livePreview: true,
