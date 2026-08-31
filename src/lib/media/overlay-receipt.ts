@@ -117,9 +117,24 @@ function escapeXml(text: string): string {
 }
 
 let workerPromise: Promise<Tesseract.Worker> | null = null;
+let warmPromise: Promise<void> | null = null;
 
 /** Cold start can be slow in Docker; models should be baked into the image. */
 const OCR_TIMEOUT_MS = 180_000;
+const OCR_WARM_TIMEOUT_MS = 120_000;
+
+const TESSERACT_CORE_WASM = [
+  "tesseract-core-relaxedsimd-lstm.wasm",
+  "tesseract-core-relaxedsimd.wasm",
+  "tesseract-core-simd-lstm.wasm",
+  "tesseract-core-lstm.wasm",
+  "tesseract-core-simd.wasm",
+  "tesseract-core.wasm",
+] as const;
+
+function tesseractCoreDir(): string {
+  return path.join(process.cwd(), "node_modules/tesseract.js-core");
+}
 
 function tesseractCachePath(): string {
   const baked = path.join(process.cwd(), "tessdata");
@@ -128,6 +143,16 @@ function tesseractCachePath(): string {
   }
   // Dev / legacy: models at repo root next to package.json
   return process.cwd();
+}
+
+function assertTesseractCoreWasm(): void {
+  const coreDir = tesseractCoreDir();
+  const missing = TESSERACT_CORE_WASM.filter((file) => !existsSync(path.join(coreDir, file)));
+  if (missing.length > 0) {
+    throw new Error(
+      `OCR WASM не найден (${missing.join(", ")}). Проверьте node_modules/tesseract.js-core в Docker-образе.`,
+    );
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -174,9 +199,15 @@ async function resetOcrWorker(): Promise<void> {
 async function getOcrWorker(): Promise<Tesseract.Worker> {
   if (!workerPromise) {
     workerPromise = (async () => {
+      assertTesseractCoreWasm();
       const cachePath = tesseractCachePath();
+      const started = Date.now();
       const worker = await Tesseract.createWorker("spa+eng", 1, {
-        logger: () => undefined,
+        logger: (m) => {
+          if (m.status === "loading tesseract core" || m.status === "initializing tesseract") {
+            void logger.info("OCR worker loading", { status: m.status, progress: m.progress });
+          }
+        },
         workerPath: tesseractWorkerPath(),
         // Prefer pre-baked spa+eng.traineddata (no CDN download at runtime).
         langPath: cachePath,
@@ -190,6 +221,7 @@ async function getOcrWorker(): Promise<Tesseract.Worker> {
         tessedit_pageseg_mode: Tesseract.PSM.AUTO,
         preserve_interword_spaces: "1",
       });
+      await logger.info("OCR worker ready", { ms: Date.now() - started, cachePath });
       return worker;
     })().catch((err) => {
       workerPromise = null;
@@ -197,6 +229,23 @@ async function getOcrWorker(): Promise<Tesseract.Worker> {
     });
   }
   return withTimeout(workerPromise, OCR_TIMEOUT_MS, "OCR не запустился");
+}
+
+/** Pre-load OCR worker at app boot so constructor pipeline does not hit cold-start hangs. */
+export async function warmOcrWorker(): Promise<void> {
+  if (warmPromise) return warmPromise;
+  warmPromise = (async () => {
+    try {
+      await withTimeout(getOcrWorker(), OCR_WARM_TIMEOUT_MS, "OCR прогрев не удался");
+      await logger.info("OCR worker pre-warmed");
+    } catch (error) {
+      warmPromise = null;
+      const message = error instanceof Error ? error.message : String(error);
+      await logger.error("OCR worker pre-warm failed", { error: message });
+      throw error;
+    }
+  })();
+  return warmPromise;
 }
 
 async function ocrWords(imagePath: string): Promise<OcrWord[]> {

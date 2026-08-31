@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   serverExternalPackages: ["better-sqlite3", "playwright", "tesseract.js", "tesseract.js-core"],
+  // Next file tracing copies JS from tesseract.js-core but skips .wasm binaries.
+  outputFileTracingIncludes: {
+    "/**/*": ["./node_modules/tesseract.js-core/*.wasm"],
+  },
   // Next 15.5 Segment Explorer crashes the client with:
   // Cannot read properties of undefined (reading 'page.tsx')
   // (next-devtools segmentExplorerNodeAdd)

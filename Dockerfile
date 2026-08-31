@@ -68,9 +68,13 @@ COPY --from=builder /app/data/history ./data/history
 COPY --from=builder /app/scripts/docker-entrypoint.mjs ./docker-entrypoint.mjs
 # Pre-bake Tesseract language packs so OCR does not download from CDN on cold start.
 COPY --from=builder /app/tessdata ./tessdata
+# Standalone trace includes tesseract.js-core JS but not Emscripten .wasm binaries.
+COPY --from=builder /app/node_modules/tesseract.js-core/*.wasm ./node_modules/tesseract.js-core/
 
 RUN test -s /app/tessdata/eng.traineddata \
   && test -s /app/tessdata/spa.traineddata \
+  && test -s /app/node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm \
+  && test -s /app/node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm \
   && mkdir -p /app/data/logs /app/data/runtime /app/data/reviews /app/data/renders \
       /app/public/renders \
   && chown -R pwuser:pwuser /app

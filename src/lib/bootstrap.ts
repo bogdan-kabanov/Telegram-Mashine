@@ -31,6 +31,11 @@ export async function bootstrapApp(): Promise<void> {
         await logger.info("Bot was running — scheduler worker resumed");
       }
 
+      // Pre-warm Tesseract in background — constructor OCR must not wait on WASM cold start.
+      void import("@/lib/media/overlay-receipt")
+        .then(({ warmOcrWorker }) => warmOcrWorker())
+        .catch(() => undefined);
+
       await logger.info("Application bootstrapped (stages 2-5 active)");
       bootstrapped = true;
     } catch (error) {
