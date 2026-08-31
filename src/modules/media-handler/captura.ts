@@ -148,7 +148,8 @@ export function buildCapturaHtml(params: CapturaParams): string {
 }
 
 export async function renderCapturaPng(params: CapturaParams, outputPath: string): Promise<string> {
-  const { launchChromium } = await import("@/lib/playwright");
+  const { configureScreenshotPage, launchChromium, screenshotOptions, waitForPageRenderReady } =
+    await import("@/lib/playwright");
   const html = buildCapturaHtml(params);
   const htmlPath = outputPath.replace(/\.png$/, ".html");
 
@@ -158,9 +159,11 @@ export async function renderCapturaPng(params: CapturaParams, outputPath: string
   const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 2 });
+    configureScreenshotPage(page);
     await page.setContent(html, { waitUntil: "load" });
+    await waitForPageRenderReady(page);
     await page.waitForTimeout(200);
-    await page.screenshot({ path: outputPath, type: "png" });
+    await page.screenshot(screenshotOptions({ path: outputPath, type: "png" }));
   } finally {
     await browser.close();
   }

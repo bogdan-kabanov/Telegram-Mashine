@@ -2,7 +2,80 @@ import { existsSync, readdirSync } from "fs";
 import os from "os";
 import path from "path";
 
-import type { Browser, LaunchOptions } from "playwright";
+import type { Browser, LaunchOptions, Page, PageScreenshotOptions } from "playwright";
+
+/** Playwright default screenshot timeout is 30s — too tight for Docker + heavy chat HTML. */
+export function getScreenshotTimeoutMs(): number {
+  const raw = process.env.PLAYWRIGHT_SCREENSHOT_TIMEOUT_MS?.trim();
+  if (raw) {
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 5000) return n;
+  }
+  const inDocker =
+    process.env.DOCKER === "1" ||
+    process.env.PLAYWRIGHT_NO_SANDBOX === "1" ||
+    (process.env.PLAYWRIGHT_BROWSERS_PATH ?? "").includes("/ms-playwright");
+  return inDocker ? 120_000 : 30_000;
+}
+
+export function configureScreenshotPage(page: Page): void {
+  const timeout = getScreenshotTimeoutMs();
+  page.setDefaultTimeout(timeout);
+  page.setDefaultNavigationTimeout(timeout);
+}
+
+export function screenshotOptions(overrides: PageScreenshotOptions = {}): PageScreenshotOptions {
+  return {
+    animations: "disabled",
+    timeout: getScreenshotTimeoutMs(),
+    ...overrides,
+  };
+}
+
+/** Wait for fonts, images, and freeze CSS animations before capture. */
+export async function waitForPageRenderReady(page: Page, imageTimeoutMs = 20_000): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const imgs = [...document.querySelectorAll("img")] as HTMLImageElement[];
+    await Promise.all(
+      imgs.map(
+        (img) =>
+          img.complete ||
+          new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          }),
+      ),
+    );
+  });
+
+  await page
+    .waitForFunction(
+      () => {
+        const imgs = [...document.querySelectorAll("img")] as HTMLImageElement[];
+        return imgs.length === 0 || imgs.every((img) => img.complete && img.naturalWidth > 0);
+      },
+      { timeout: imageTimeoutMs },
+    )
+    .catch(() => undefined);
+
+  await page.evaluate(() => {
+    document.getAnimations?.().forEach((anim) => {
+      try {
+        anim.cancel();
+      } catch {
+        /* ignore */
+      }
+    });
+    if (!document.getElementById("pw-screenshot-prep")) {
+      const style = document.createElement("style");
+      style.id = "pw-screenshot-prep";
+      style.textContent =
+        "*, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }";
+      document.head.appendChild(style);
+    }
+  });
+}
 
 /**
  * Cursor / sandbox often injects PLAYWRIGHT_BROWSERS_PATH into a temp cache

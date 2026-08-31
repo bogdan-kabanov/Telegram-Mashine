@@ -14,6 +14,11 @@ import {
   resolveWallpaperForProject,
 } from "@/lib/media/resolve";
 import { blurWallpaperDataUri, averageWallpaperColor, wallpaperCutoutDataUri } from "@/lib/media/blur-wallpaper";
+import {
+  configureScreenshotPage,
+  screenshotOptions,
+  waitForPageRenderReady,
+} from "@/lib/playwright";
 import { createLogger } from "@/lib/runtime/manager";
 import type { GeneratedDialog } from "@/modules/dialog-generator";
 import {
@@ -77,7 +82,7 @@ async function bakeInputGlass(page: Page, scale: number): Promise<void> {
     });
   });
 
-  const png = await page.screenshot({ type: "png" });
+  const png = await page.screenshot(screenshotOptions({ type: "png" }));
   const meta = await sharp(png).metadata();
   const imgW = meta.width ?? VIEWPORT.width * scale;
   const imgH = meta.height ?? VIEWPORT.height * scale;
@@ -157,22 +162,10 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
       viewport: VIEWPORT,
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
+    configureScreenshotPage(page);
 
     await page.goto(pathToFileURL(path.resolve(htmlPath)).href, { waitUntil: "load" });
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-    });
-    // Wait for wallpaper + Apple emoji PNGs so screenshots aren't blank/Segoe
-    await page
-      .waitForFunction(() => {
-        const imgs = [
-          ...document.querySelectorAll(
-            "img.wallpaper-img, img.frost-img, img.glass-frost-img, img.apple-emoji",
-          ),
-        ] as HTMLImageElement[];
-        return imgs.length === 0 || imgs.every((img) => img.complete && img.naturalWidth > 0);
-      }, { timeout: 15000 })
-      .catch(() => undefined);
+    await waitForPageRenderReady(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const chat = document.querySelector(".chat-bg");
@@ -202,11 +195,13 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
     await page.waitForTimeout(100);
     await bakeInputGlass(page, DEVICE_SCALE_FACTOR);
     await page.waitForTimeout(40);
-    await page.screenshot({
-      path: outputPath,
-      type: "png",
-      fullPage: false,
-    });
+    await page.screenshot(
+      screenshotOptions({
+        path: outputPath,
+        type: "png",
+        fullPage: false,
+      }),
+    );
   } finally {
     await browser.close();
   }
@@ -233,22 +228,10 @@ async function screenshotChatByScrolling(params: {
       viewport: VIEWPORT,
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
+    configureScreenshotPage(page);
 
     await page.goto(pathToFileURL(path.resolve(params.htmlPath)).href, { waitUntil: "load" });
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-      const imgs = [...document.querySelectorAll("img")];
-      await Promise.all(
-        imgs.map(
-          (img) =>
-            img.complete ||
-            new Promise<void>((resolve) => {
-              img.addEventListener("load", () => resolve(), { once: true });
-              img.addEventListener("error", () => resolve(), { once: true });
-            }),
-        ),
-      );
-    });
+    await waitForPageRenderReady(page);
     await page.waitForTimeout(250);
     await page.evaluate(() => {
       window.dispatchEvent(new Event("resize"));
@@ -315,11 +298,13 @@ async function screenshotChatByScrolling(params: {
       await page.waitForTimeout(40);
 
       const pngPath = path.join(params.publicDir, `${params.reviewId}_screen_${i + 1}.png`);
-      await page.screenshot({
-        path: pngPath,
-        type: "png",
-        fullPage: false,
-      });
+      await page.screenshot(
+        screenshotOptions({
+          path: pngPath,
+          type: "png",
+          fullPage: false,
+        }),
+      );
       screenshots.push(pngPath);
     }
   } finally {
