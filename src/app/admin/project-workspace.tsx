@@ -673,55 +673,20 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                 {/* Inside stage so backdrop-filter samples wallpaper */}
                 <div className="project-phone-input">
                   <GlassPill className="project-phone-attach" phoneRef={phoneRef} live>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
-                        stroke="#1C1C1E"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <span className="tg-ico" aria-hidden>
+                      {"\uF0E9"}
+                    </span>
                   </GlassPill>
                   <GlassPill className="project-phone-input-pill" phoneRef={phoneRef} live>
                     <span>{chatUi.inputPlaceholder}</span>
                     <span className="project-phone-sticker" aria-hidden>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M19.4 16.28A8.55 8.55 0 1 1 12 3.45"
-                          stroke="#636366"
-                          strokeWidth="1.55"
-                          strokeLinecap="round"
-                        />
-                        <path
-                          d="M12 3.45C15.5 4.5 18.5 9 19.4 16.28"
-                          stroke="#636366"
-                          strokeWidth="1.55"
-                          strokeLinecap="round"
-                        />
-                        <path
-                          d="M12 3.45C10.5 8 14 14 19.4 16.28"
-                          stroke="#636366"
-                          strokeWidth="1.55"
-                          strokeLinecap="round"
-                        />
-                      </svg>
+                      <span className="tg-ico">{"\uF05A"}</span>
                     </span>
                   </GlassPill>
                   <GlassPill className="project-phone-mic" phoneRef={phoneRef} live>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z"
-                        stroke="#1C1C1E"
-                        strokeWidth="1.45"
-                      />
-                      <path
-                        d="M5.9 11.4c0 3.2 2.5 5.85 5.6 6.2v2.4h1v-2.4c3.1-.35 5.6-3 5.6-6.2"
-                        stroke="#1C1C1E"
-                        strokeWidth="1.45"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    <span className="tg-ico" aria-hidden>
+                      {"\uF044"}
+                    </span>
                   </GlassPill>
                 </div>
               </div>
@@ -760,19 +725,13 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
                   </span>
                 </div>
                 <div className="project-phone-nav">
-                  <GlassPill className="project-phone-back" phoneRef={phoneRef}>
-                    <svg className="project-phone-back-chevron" viewBox="0 0 12 20" fill="none" aria-hidden>
-                      <path
-                        d="M9.2 1.6L1.7 10l7.5 8.4"
-                        stroke="#000"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                  <GlassPill className="project-phone-back" phoneRef={phoneRef} live>
+                    <span className="tg-ico project-phone-back-chevron" aria-hidden>
+                      {"\uF200"}
+                    </span>
                     <span className="project-phone-badge">1</span>
                   </GlassPill>
-                  <GlassPill className="project-phone-title" phoneRef={phoneRef}>
+                  <GlassPill className="project-phone-title" phoneRef={phoneRef} live>
                     <strong>{chatUi.sampleClientName}</strong>
                     <em>{chatUi.statusRecently}</em>
                   </GlassPill>

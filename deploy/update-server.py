@@ -10,9 +10,10 @@ from pathlib import Path
 
 import paramiko
 
-HOST = "80.78.248.96"
-USER = "root"
+HOST = os.environ.get("DEPLOY_HOST", "151.245.140.111")
+USER = os.environ.get("DEPLOY_USER", "root")
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
+DOMAIN = os.environ.get("DEPLOY_DOMAIN", "151-245-140-111.sslip.io")
 REMOTE_DIR = "/opt/bot-ai"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -85,6 +86,7 @@ def connect() -> paramiko.SSHClient:
     ssh_dir = Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or "") / ".ssh"
     key_candidates = [
         os.environ.get("DEPLOY_SSH_KEY_PATH", ""),
+        str(ssh_dir / "hostkey_ed25519"),
         str(ssh_dir / "github_actions_bot_ai"),
         str(ssh_dir / "id_ed25519"),
         str(ssh_dir / "max_desktop_deploy"),
@@ -166,9 +168,9 @@ def main() -> int:
         f"cd {REMOTE_DIR} && grep -q AUTO_SETUP_WEBHOOK .env || echo AUTO_SETUP_WEBHOOK=0 >> .env",
         f"chmod +x {REMOTE_DIR}/deploy/remote-update.sh",
         f"cd {REMOTE_DIR} && bash deploy/remote-update.sh",
-        "curl -s -o /dev/null -w 'admin:%{http_code}\\n' https://80-78-248-96.sslip.io/admin",
-        "curl -s -o /dev/null -w 'media:%{http_code}\\n' https://80-78-248-96.sslip.io/admin/media",
-        "curl -s -o /dev/null -w 'legends:%{http_code}\\n' https://80-78-248-96.sslip.io/admin/settings",
+        f"curl -s -o /dev/null -w 'admin:%{{http_code}}\\n' https://{DOMAIN}/admin",
+        f"curl -s -o /dev/null -w 'media:%{{http_code}}\\n' https://{DOMAIN}/admin/media",
+        f"curl -s -o /dev/null -w 'legends:%{{http_code}}\\n' https://{DOMAIN}/admin/settings",
     ]
 
     for cmd in cmds:
@@ -180,7 +182,7 @@ def main() -> int:
 
     client.close()
     archive.unlink(missing_ok=True)
-    print("\nDone: https://80-78-248-96.sslip.io/admin")
+    print(f"\nDone: https://{DOMAIN}/admin")
     return 0
 
 

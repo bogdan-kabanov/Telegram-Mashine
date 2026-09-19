@@ -12,9 +12,10 @@ from pathlib import Path
 
 import paramiko
 
-HOST = "80.78.248.96"
-USER = "root"
+HOST = os.environ.get("DEPLOY_HOST", "151.245.140.111")
+USER = os.environ.get("DEPLOY_USER", "root")
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
+DOMAIN = os.environ.get("DEPLOY_DOMAIN", "151-245-140-111.sslip.io")
 REMOTE_DIR = "/opt/bot-ai"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -92,8 +93,9 @@ def load_local_env() -> dict[str, str]:
 
 
 def ensure_ssh_key(client: paramiko.SSHClient) -> None:
-    ssh_dir = Path(os.environ.get("USERPROFILE", "")) / ".ssh"
+    ssh_dir = Path(os.environ.get("USERPROFILE", "") or os.environ.get("HOME", "")) / ".ssh"
     pubs = [
+        ssh_dir / "hostkey_ed25519.pub",
         ssh_dir / "id_ed25519.pub",
         ssh_dir / "id_rsa.pub",
         ssh_dir / "github_actions_bot_ai.pub",
@@ -139,7 +141,16 @@ def main() -> int:
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print(f"Connecting to {HOST}...")
-    client.connect(HOST, username=USER, password=PASSWORD, timeout=30)
+    ssh_dir = Path(os.environ.get("USERPROFILE", "") or os.environ.get("HOME", "")) / ".ssh"
+    key_path = os.environ.get("DEPLOY_SSH_KEY_PATH") or str(ssh_dir / "hostkey_ed25519")
+    if Path(key_path).exists():
+        client.connect(HOST, username=USER, key_filename=key_path, timeout=30)
+        print(f"SSH: key auth OK ({Path(key_path).name})")
+    elif PASSWORD:
+        client.connect(HOST, username=USER, password=PASSWORD, timeout=30)
+        print("SSH: password auth OK")
+    else:
+        raise RuntimeError(f"No SSH key/password for {USER}@{HOST}")
     ensure_ssh_key(client)
 
     sftp = client.open_sftp()
@@ -153,13 +164,12 @@ def main() -> int:
             f"cd {REMOTE_DIR} && tar -xzf {remote_archive} && rm -f {remote_archive}",
         )
 
-        domain = "80-78-248-96.sslip.io"
         env_content = f"""NODE_ENV=production
 TELEGRAM_BOT_TOKEN={local_env.get('TELEGRAM_BOT_TOKEN', '')}
 TELEGRAM_WEBHOOK_SECRET={local_env.get('TELEGRAM_WEBHOOK_SECRET', '')}
 TELEGRAM_ADMIN_IDS={local_env.get('TELEGRAM_ADMIN_IDS', '')}
 TELEGRAM_PUBLISH_CHANNEL_ID={local_env.get('TELEGRAM_PUBLISH_CHANNEL_ID', '')}
-APP_URL=https://{domain}
+APP_URL=https://{DOMAIN}
 PORT=3000
 OPENAI_API_KEY={local_env.get('OPENAI_API_KEY', '')}
 OPENAI_MODEL={local_env.get('OPENAI_MODEL', 'gpt-4o-mini')}
@@ -182,7 +192,7 @@ AUTO_SETUP_WEBHOOK=1
     run(client, f"chmod +x {setup_path}")
     code = run(
         client,
-        f"export DEPLOY_DOMAIN=80-78-248-96.sslip.io && bash {setup_path}",
+        f"export DEPLOY_DOMAIN={DOMAIN} DEPLOY_HOST={HOST} && bash {setup_path}",
         timeout=7200,
     )
 
@@ -193,7 +203,7 @@ AUTO_SETUP_WEBHOOK=1
         print(f"Setup exited with code {code}", file=sys.stderr)
         return code
 
-    print("\nDeployment complete: https://80-78-248-96.sslip.io/admin")
+    print(f"\nDeployment complete: https://{DOMAIN}/admin")
     return 0
 
 

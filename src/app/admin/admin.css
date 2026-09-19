@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "iostgico";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("/fonts/iostgico-mono.ttf") format("truetype");
+}
+
 :root {
   /* Telegram palette */
   --bg: #e6ebee;
@@ -1978,7 +1986,9 @@ textarea.admin-input:focus {
 
 .project-glass-pill.is-live.project-phone-attach,
 .project-glass-pill.is-live.project-phone-mic,
-.project-glass-pill.is-live.project-phone-input-pill {
+.project-glass-pill.is-live.project-phone-input-pill,
+.project-glass-pill.is-live.project-phone-back,
+.project-glass-pill.is-live.project-phone-title {
   isolation: auto;
   background: rgba(255, 255, 255, 0.22);
   -webkit-backdrop-filter: blur(22px) saturate(170%);
@@ -2109,8 +2119,6 @@ textarea.admin-input:focus {
 
 .project-phone-back-chevron {
   display: block;
-  width: 7px;
-  height: 13px;
   flex-shrink: 0;
 }
 
@@ -2297,10 +2305,44 @@ img.apple-emoji {
 
 .project-phone-attach svg,
 .project-phone-mic svg,
-.project-phone-sticker svg {
+.project-phone-sticker svg,
+.project-phone-attach .tg-ico,
+.project-phone-mic .tg-ico,
+.project-phone-sticker .tg-ico {
   position: relative;
   z-index: 2;
-  shape-rendering: geometricPrecision;
+}
+
+.tg-ico {
+  font-family: "iostgico", sans-serif !important;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  display: block;
+  speak: never;
+  -webkit-font-smoothing: antialiased;
+  color: #1c1c1e;
+}
+
+.project-phone-attach .tg-ico {
+  font-size: 15px;
+  color: #1c1c1e;
+}
+
+.project-phone-sticker .tg-ico {
+  font-size: 15px;
+  color: #8e8e93;
+}
+
+.project-phone-mic .tg-ico {
+  font-size: 17px;
+  color: #1c1c1e;
+}
+
+.project-phone-back .tg-ico {
+  font-size: 14px;
+  color: #000;
+  flex-shrink: 0;
 }
 
 .project-phone-input-pill {

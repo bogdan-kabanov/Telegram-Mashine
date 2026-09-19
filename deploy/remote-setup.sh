@@ -2,7 +2,8 @@
 set -eu
 
 APP_DIR="/opt/bot-ai"
-DOMAIN="${DEPLOY_DOMAIN:-80-78-248-96.sslip.io}"
+DOMAIN="${DEPLOY_DOMAIN:-151-245-140-111.sslip.io}"
+HOST_IP="${DEPLOY_HOST:-151.245.140.111}"
 APP_URL="https://${DOMAIN}"
 
 export DEBIAN_FRONTEND=noninteractive
@@ -56,7 +57,7 @@ echo "==> Nginx config"
 cat > /etc/nginx/sites-available/bot-ai <<NGINX
 server {
     listen 80;
-    server_name ${DOMAIN} 80.78.248.96;
+    server_name ${DOMAIN} ${HOST_IP};
 
     client_max_body_size 50m;
 

@@ -1,6 +1,7 @@
 import { formatChatTextHtml } from "@/lib/emoji/apple-server";
 import { DialogClock } from "@/lib/dialog/timing";
 import { computeMessageTimes } from "@/lib/format";
+import { iostgicoFontFaceCss, iostgicoIconHtml } from "@/lib/fonts/iostgico";
 import { sfProFontFaceCss } from "@/lib/fonts/sf-pro";
 import { chatUiForLocale } from "@/lib/i18n/chat-ui";
 import { localeClockConfig } from "@/lib/i18n/locale-profile";
@@ -31,29 +32,16 @@ export interface RenderChatParams {
 }
 
 const ICONS = {
-  /* Telegram attach — classic diagonal paperclip */
-  paperclip: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke="#1C1C1E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`,
-  /* Telegram iOS sticker — circle with folded corner (iPhone) */
-  stickerInput: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M19.4 16.28A8.55 8.55 0 1 1 12 3.45" stroke="#636366" stroke-width="1.55" stroke-linecap="round"/>
-    <path d="M12 3.45C15.5 4.5 18.5 9 19.4 16.28" stroke="#636366" stroke-width="1.55" stroke-linecap="round"/>
-    <path d="M12 3.45C10.5 8 14 14 19.4 16.28" stroke="#636366" stroke-width="1.55" stroke-linecap="round"/>
-  </svg>`,
-  microphone: `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2.8c-1.7 0-3.05 1.35-3.05 3.05v6.3c0 1.7 1.35 3.05 3.05 3.05s3.05-1.35 3.05-3.05v-6.3C15.05 4.15 13.7 2.8 12 2.8z" stroke="#1C1C1E" stroke-width="1.45"/>
-    <path d="M5.9 11.4c0 3.2 2.5 5.85 5.6 6.2v2.4h1v-2.4c3.1-.35 5.6-3 5.6-6.2" stroke="#1C1C1E" stroke-width="1.45" stroke-linecap="round"/>
-  </svg>`,
+  /* iostgico — Telegram iOS UI Kit icon font */
+  paperclip: iostgicoIconHtml("paperclip", "tg-ico-attach"),
+  stickerInput: iostgicoIconHtml("sticker", "tg-ico-sticker"),
+  microphone: iostgicoIconHtml("microphone", "tg-ico-mic"),
+  chevronBack: iostgicoIconHtml("chevronBack", "tg-ico-back"),
   /* Official Telegram logo plane (from brand SVG), cropped — not Lucide send */
   telegramPlane: `<svg width="14" height="14" viewBox="48 68 130 115" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <path fill="#fff" d="M81.486 130.178 52.2 120.636s-3.5-1.42-2.373-4.64c.232-.664.7-1.229 2.1-2.2 6.489-4.523 120.106-45.36 120.106-45.36s3.208-1.081 5.1-.362a2.766 2.766 0 0 1 1.885 2.055 9.357 9.357 0 0 1 .254 2.585c-.009.752-.1 1.449-.169 2.542-.692 11.165-21.4 94.493-21.4 94.493s-1.239 4.876-5.678 5.043a8.13 8.13 0 0 1-4.925-1.542c-8.711-7.493-38.819-27.727-45.472-32.177a1.27 1.27 0 0 1-.546-.9c-.093-.469.417-1.05.417-1.05s52.426-46.6 53.821-51.492c.108-.379-.3-.566-.848-.4-3.482 1.281-63.844 39.4-70.506 43.607a3.21 3.21 0 0 1-1.38.79Z"/>
     <path fill="rgba(255,255,255,0.45)" d="M81.229 128.772 95.466 168.178s1.78 3.687 3.686 3.687 30.255-29.492 30.255-29.492l31.525-60.89L81.737 118.6Z"/>
     <path fill="rgba(255,255,255,0.28)" d="M100.106 138.878 97.373 167.924s-1.144 8.9 7.754 0 17.415-15.763 17.415-15.763"/>
-  </svg>`,
-  /* iOS SF-style chevron — thinner stroke like real Telegram */
-  chevronBack: `<svg width="10" height="18" viewBox="0 0 12 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9.2 1.6L1.7 10l7.5 8.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   /* Photo HD/reload — Telegram iOS circular arrow on media */
   mediaReload: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -180,7 +168,7 @@ function glassLiveHtml(): string {
   return `<span class="glass-tint" aria-hidden="true"></span><span class="glass-grain" aria-hidden="true"></span>`;
 }
 
-/** Status/nick under the chat title — exact typed text, never auto-prefixed with "@". */
+/** Trimmed free-text helper (e.g. custom status override). Never auto-prefixes "@". */
 export function chatHandleText(handle: string | undefined, fallback: string): string {
   const raw = (handle ?? "").trim();
   return raw || fallback;
@@ -366,7 +354,8 @@ export function buildChatHtml(params: RenderChatParams): string {
     project,
     clientName,
     messages,
-    statusText = chatHandleText(params.project.managerHandle, ui.statusRecently),
+    /** Presence under the name — never manager @handle (that stays in captions / admin chrome). */
+    statusText = ui.statusRecently,
     statusBarTime = "18:55",
   } = params;
   const clockTz = params.clockTimeZone ?? localeClockConfig(project.locale).timeZone;
@@ -392,6 +381,8 @@ export function buildChatHtml(params: RenderChatParams): string {
     : "";
   const frost = glassFrostHtml(frostWallpaperSrc, wallpaperSrc);
   const liveGlass = glassLiveHtml();
+  /** Header chrome: same translucent glass as input (backdrop), not dark charcoal frost. */
+  const navChromeGlass = livePreview ? liveGlass : frost;
 
   return `<!DOCTYPE html>
 <html lang="${ui.lang}">
@@ -399,7 +390,24 @@ export function buildChatHtml(params: RenderChatParams): string {
   <meta charset="UTF-8" />
   <style>
     ${sfProFontFaceCss()}
+    ${iostgicoFontFaceCss()}
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+    .tg-ico {
+      font-family: "iostgico" !important;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 1;
+      display: block;
+      speak: never;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+      z-index: 2;
+      color: #1C1C1E;
+    }
+    .tg-ico-attach { font-size: 22px; color: #1C1C1E; }
+    .tg-ico-sticker { font-size: 24px; color: #8E8E93; }
+    .tg-ico-mic { font-size: 26px; color: #1C1C1E; }
+    .tg-ico-back { font-size: 20px; color: #000; }
     body {
       width: 390px;
       height: 844px;
@@ -617,17 +625,20 @@ export function buildChatHtml(params: RenderChatParams): string {
       border: none;
       box-shadow: none;
     }
-    /* Header glass — clipped pre-blurred wallpaper (Playwright-safe) */
+    /* Header glass — same translucent material as input chips */
     .nav-glass {
       position: relative;
       overflow: hidden;
       isolation: isolate;
-      background: transparent;
+      background: rgba(255, 255, 255, 0.22);
       border: none;
       box-shadow:
-        0 0.6px 0 rgba(255, 255, 255, 0.42) inset,
-        0 -0.5px 0.5px rgba(0, 0, 0, 0.14) inset,
-        0 1px 2px rgba(0, 0, 0, 0.08);
+        0 0.5px 0 rgba(255, 255, 255, 0.55) inset,
+        0 1px 2px rgba(0, 0, 0, 0.06);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      backdrop-filter: blur(30px) saturate(180%);
+      transform: translateZ(0);
+      will-change: backdrop-filter;
     }
     /* Input / scroll glass — MUST use backdrop-filter so bubbles show through */
     .glass-circle,
@@ -694,25 +705,19 @@ export function buildChatHtml(params: RenderChatParams): string {
       background-image: var(--tg-grain);
       background-size: 108px 108px;
     }
-    /* Name capsule: light frost + grain so mint wallpaper reads through */
-    .nav-center > .glass-tint {
-      background: rgba(255, 255, 255, 0.22);
-    }
-    /* Back chip: darker charcoal glass, white chevron (real iOS Telegram) */
-    .nav-back > .glass-tint {
-      background: rgba(36, 32, 42, 0.46);
-    }
-    .nav-back {
-      color: #fff;
-    }
-    .nav-back > .glass-grain {
-      opacity: 0.45;
-    }
-    /* Input tint lighter so green bubble reads through */
+    /* Nav + input share the same light frost tint */
+    .nav-glass > .glass-tint,
     .glass-circle > .glass-tint,
     .input-pill > .glass-tint,
     .scroll-down > .glass-tint {
       background: rgba(255, 255, 255, 0.18);
+    }
+    .nav-back {
+      color: #000;
+    }
+    .nav-back > .glass-grain,
+    .nav-center > .glass-grain {
+      opacity: 0.32;
     }
     .nav-glass > :not(.glass-frost):not(.glass-tint):not(.glass-grain),
     .glass-circle > :not(.glass-frost):not(.glass-tint):not(.glass-grain),
@@ -737,12 +742,9 @@ export function buildChatHtml(params: RenderChatParams): string {
       z-index: 1;
       justify-self: start;
     }
-    .nav-back svg {
+    .nav-back .tg-ico-back {
       flex-shrink: 0;
-      width: 10px;
-      height: 18px;
       display: block;
-      overflow: visible;
     }
     .nav-center {
       position: relative;
@@ -1254,11 +1256,11 @@ export function buildChatHtml(params: RenderChatParams): string {
       justify-content: center;
       flex-shrink: 0;
     }
-    .glass-circle svg {
+    .glass-circle svg,
+    .glass-circle .tg-ico {
       display: block;
       position: relative;
       z-index: 2;
-      shape-rendering: geometricPrecision;
     }
     .input-pill {
       flex: 1;
@@ -1293,12 +1295,8 @@ export function buildChatHtml(params: RenderChatParams): string {
       margin-left: 2px;
       overflow: visible;
     }
-    .input-sticker svg {
+    .input-sticker .tg-ico-sticker {
       display: block;
-      width: 24px;
-      height: 24px;
-      overflow: visible;
-      shape-rendering: geometricPrecision;
     }
     /* Scroll-to-bottom — light glass circle above composer */
     .scroll-down {
@@ -1439,12 +1437,12 @@ export function buildChatHtml(params: RenderChatParams): string {
 
       <div class="nav-bar">
         <div class="nav-back nav-glass">
-          ${frost}
+          ${navChromeGlass}
           ${ICONS.chevronBack}
           <span class="nav-back-badge">1</span>
         </div>
         <div class="nav-center nav-glass">
-          ${frost}
+          ${navChromeGlass}
           <div class="nav-name">${escapeHtml(clientName)}</div>
           <div class="nav-status">${escapeHtml(statusText)}</div>
         </div>

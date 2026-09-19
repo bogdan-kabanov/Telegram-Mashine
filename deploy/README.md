@@ -1,7 +1,7 @@
 # Deploy & CI/CD
 
-Production: `https://80-78-248-96.sslip.io/admin`  
-Server path: `/opt/bot-ai` · Docker Compose + Nginx + Let’s Encrypt
+Production: `https://151-245-140-111.sslip.io/admin`  
+Server: `151.245.140.111` (`fi-vmmini`) · path `/opt/bot-ai` · Docker Compose + Nginx + Let’s Encrypt
 
 ## Local one-shot deploy
 

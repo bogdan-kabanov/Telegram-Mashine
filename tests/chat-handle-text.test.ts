@@ -33,7 +33,7 @@ describe("buildChatHtml status line", () => {
     locale: "ru",
     currency: "MXN",
     managerName: "тест",
-    managerHandle: "в сети",
+    managerHandle: "@Maya_Nancy",
     theme: {
       incomingBubble: "#fff",
       outgoingBubble: "#eeffde",
@@ -45,27 +45,37 @@ describe("buildChatHtml status line", () => {
     payoutMessageTemplate: "x",
   } as ProjectConfig;
 
-  it("renders managerHandle exactly — no auto @, full status text", () => {
+  it("shows locale presence under the name, not @handle", () => {
     const html = buildChatHtml({
       project: baseProject,
       clientName: "тест",
       messages: [{ id: "1", role: "client", type: "text", content: "hi", time: "12:00" }],
     });
-    expect(html).toContain('class="nav-status">в сети</div>');
+    expect(html).toContain('class="nav-status">был(а) недавно</div>');
+    expect(html).not.toContain('class="nav-status">@Maya_Nancy</div>');
     expect(html).not.toContain('class="nav-status">@');
-    expect(html).not.toContain("@в сети");
-    expect(html).not.toContain(">@в<");
     expect(html).toContain(".nav-status::before");
     expect(html).toMatch(/\.nav-status::before,\s*\n\s*\.nav-status::after \{\s*content: none;/);
     expect(html).toMatch(/\.nav-status \{[^}]*min-width: min-content;/s);
   });
 
-  it("keeps user-typed @ in the status line", () => {
+  it("uses Spanish presence for es locale", () => {
     const html = buildChatHtml({
-      project: { ...baseProject, managerHandle: "@Maya_Nancy" },
+      project: { ...baseProject, locale: "es", managerHandle: "@Demo_ES" },
       clientName: "тест",
       messages: [{ id: "1", role: "client", type: "text", content: "hi", time: "12:00" }],
     });
-    expect(html).toContain('class="nav-status">@Maya_Nancy</div>');
+    expect(html).toContain('class="nav-status">últ. vez recientemente</div>');
+    expect(html).not.toContain('class="nav-status">@Demo_ES</div>');
+  });
+
+  it("allows explicit statusText override", () => {
+    const html = buildChatHtml({
+      project: baseProject,
+      clientName: "тест",
+      messages: [{ id: "1", role: "client", type: "text", content: "hi", time: "12:00" }],
+      statusText: "в сети",
+    });
+    expect(html).toContain('class="nav-status">в сети</div>');
   });
 });
