@@ -50,9 +50,9 @@ jobs:
             "$GITHUB_WORKSPACE"/ "$APP_DIR"/
           test -f "$APP_DIR/.env" || { echo "ERROR: $APP_DIR/.env missing on server"; exit 1; }
           chmod 600 "$APP_DIR/.env"
-          chmod +x "$APP_DIR/deploy/remote-update.sh"
+          chmod +x "$APP_DIR/deploy/"*.sh
 
-      - name: Rebuild container + healthcheck
+      - name: Native rebuild + healthcheck
         run: |
           set -euo pipefail
           export APP_DIR="${DEPLOY_APP_DIR:-/opt/bot-ai}"

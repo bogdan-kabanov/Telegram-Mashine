@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild & restart bot-ai on the server. Keeps .env, SQLite, and renders.
+# Fast native rebuild & restart (no Docker). Keeps .env, SQLite, renders, node_modules cache.
 set -eu
 
 APP_DIR="${APP_DIR:-/opt/bot-ai}"
@@ -10,7 +10,6 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# Read host port + base path from .env (must match nginx upstream + Next basePath).
 PORT="$(grep -E '^PORT=' .env | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
 PORT="${PORT:-3000}"
 BASE_PATH="$(grep -E '^BASE_PATH=' .env | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
@@ -18,21 +17,34 @@ BASE_PATH="${BASE_PATH:-}"
 BASE_PATH="${BASE_PATH%/}"
 HEALTH_URL="http://127.0.0.1:${PORT}${BASE_PATH}/api/health"
 
-# Container runs as pwuser (uid 1000). Host-mounted config/data must be writable
-# or admin saves fail with EACCES on /app/config/projects.json.
-mkdir -p data/logs data/runtime data/reviews data/renders public/renders config
-chown -R 1000:1000 data config public/renders 2>/dev/null || true
-chmod -R u+rwX data config public/renders 2>/dev/null || true
+BROWSERS_PATH="$(grep -E '^PLAYWRIGHT_BROWSERS_PATH=' .env | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
+BROWSERS_PATH="${BROWSERS_PATH:-/opt/ms-playwright}"
+export PLAYWRIGHT_BROWSERS_PATH="$BROWSERS_PATH"
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+export NODE_ENV=production
 
-echo "==> docker compose build"
-docker compose build
+mkdir -p data/logs data/runtime data/reviews data/renders public/renders "$BROWSERS_PATH"
 
-echo "==> docker compose up -d"
-if docker compose up -d --help 2>/dev/null | grep -q -- '--wait'; then
-  docker compose up -d --wait --wait-timeout 300
+echo "==> npm ci"
+npm ci
+
+# Chromium only if missing (saves minutes on every deploy)
+if [ ! -d "$BROWSERS_PATH" ] || [ -z "$(ls -A "$BROWSERS_PATH" 2>/dev/null || true)" ]; then
+  echo "==> Playwright Chromium install"
+  npx playwright install-deps chromium || true
+  npx playwright install chromium
 else
-  docker compose up -d
+  echo "==> Playwright browsers already present at $BROWSERS_PATH"
 fi
+
+echo "==> next build"
+npm run build
+
+echo "==> restart systemd"
+install -m 644 "$APP_DIR/deploy/bot-ai.service" /etc/systemd/system/bot-ai.service
+systemctl daemon-reload
+systemctl enable bot-ai
+systemctl restart bot-ai
 
 echo "==> waiting for health at ${HEALTH_URL}"
 ok=0
@@ -47,8 +59,8 @@ done
 
 if [ "$ok" != "1" ]; then
   echo "ERROR: healthcheck failed for ${HEALTH_URL}"
-  docker compose ps || true
-  docker compose logs --tail=80 app || true
+  systemctl status bot-ai --no-pager || true
+  journalctl -u bot-ai -n 80 --no-pager || true
   exit 1
 fi
 
@@ -56,6 +68,6 @@ curl -fsS -X POST "http://127.0.0.1:${PORT}${BASE_PATH}/api/admin/control" \
   -H "Content-Type: application/json" \
   -d '{"action":"start"}' >/dev/null 2>&1 || true
 
-echo "==> containers"
-docker compose ps
-echo "Done."
+echo "==> status"
+systemctl --no-pager --full status bot-ai | head -n 18
+echo "Done (native)."

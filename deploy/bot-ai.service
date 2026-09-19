@@ -1,0 +1,29 @@
+[Unit]
+Description=Bot AI (Next.js + Playwright)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/bot-ai
+EnvironmentFile=-/opt/bot-ai/.env
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=HOSTNAME=0.0.0.0
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+Environment=PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# Chromium needs more shared memory for glass/backdrop screenshots
+Environment=PLAYWRIGHT_SCREENSHOT_TIMEOUT_MS=120000
+ExecStart=/usr/bin/node /opt/bot-ai/scripts/start.mjs
+Restart=always
+RestartSec=5
+# Match Docker shm_size roughly for Playwright
+LimitNOFILE=65535
+# Soft limit; Playwright can fork Chromium
+TasksMax=infinity
+# Run as root for now (simple VPS). Tighten later if needed.
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

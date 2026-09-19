@@ -40,10 +40,13 @@ export function readPort(defaultPort = 3000) {
 export function resolvePlaywrightBrowsersPath() {
   const fileEnv = readEnvFile();
   const fromFile = fileEnv.PLAYWRIGHT_BROWSERS_PATH?.trim();
-  const stableDefault = path.join(
-    process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
-    "ms-playwright",
-  );
+  const stableDefault =
+    process.platform === "win32"
+      ? path.join(
+          process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
+          "ms-playwright",
+        )
+      : "/opt/ms-playwright";
   const candidate = fromFile || stableDefault;
   const current = (process.env.PLAYWRIGHT_BROWSERS_PATH ?? "").trim();
   const broken =

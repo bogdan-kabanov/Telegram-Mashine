@@ -178,8 +178,9 @@ OPENAI_IMAGE_MODEL={local_env.get('OPENAI_IMAGE_MODEL', 'gpt-image-1')}
 AI_RECEIPTS={local_env.get('AI_RECEIPTS', 'fallback')}
 OPENAI_RECEIPT_IMAGE_MODEL={local_env.get('OPENAI_RECEIPT_IMAGE_MODEL', 'gpt-image-1')}
 AI_MEDIA={local_env.get('AI_MEDIA', 'fallback')}
-DATA_DIR=/app/data
-CONFIG_DIR=/app/config
+DATA_DIR=/opt/bot-ai/data
+CONFIG_DIR=/opt/bot-ai/config
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 AUTO_SETUP_WEBHOOK=1
 """
         with sftp.file(f"{REMOTE_DIR}/.env", "w") as f:
@@ -188,8 +189,8 @@ AUTO_SETUP_WEBHOOK=1
     finally:
         sftp.close()
 
-    setup_path = REMOTE_DIR + "/deploy/remote-setup.sh"
-    run(client, f"chmod +x {setup_path}")
+    setup_path = REMOTE_DIR + "/deploy/remote-setup-native.sh"
+    run(client, f"chmod +x {REMOTE_DIR}/deploy/*.sh")
     code = run(
         client,
         f"export DEPLOY_DOMAIN={DOMAIN} DEPLOY_HOST={HOST} && bash {setup_path}",
