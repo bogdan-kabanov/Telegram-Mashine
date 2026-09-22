@@ -47,6 +47,7 @@ chmod +x /opt/bot-ai/deploy/*.sh
 export DEPLOY_DOMAIN=$Domain DEPLOY_HOST=$HostIp APP_DIR=/opt/bot-ai
 bash /opt/bot-ai/deploy/remote-update.sh
 "@
+if ($LASTEXITCODE -ne 0) { throw "Remote update failed (exit $LASTEXITCODE)" }
 
 Remove-Item -Force $Archive -ErrorAction SilentlyContinue
 Write-Host ""
