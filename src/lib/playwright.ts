@@ -90,6 +90,7 @@ export function ensurePlaywrightBrowsersPath(): string {
   const current = (process.env.PLAYWRIGHT_BROWSERS_PATH ?? "").trim();
   const looksBroken =
     !current ||
+    /[\\/]Users[\\/]YOU[\\/]/i.test(current) ||
     current.toLowerCase().includes("cursor-sandbox-cache") ||
     /[\\/]temp[\\/]/i.test(current);
 

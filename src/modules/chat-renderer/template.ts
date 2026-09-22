@@ -1581,6 +1581,13 @@ export function buildChatHtml(params: RenderChatParams): string {
           }, "*");
         }
       }
+      function scheduleReportReady() {
+        reportReady();
+        requestAnimationFrame(reportReady);
+        setTimeout(reportReady, 120);
+        setTimeout(reportReady, 400);
+        setTimeout(reportReady, 900);
+      }
       window.addEventListener("message", function (ev) {
         var data = ev.data || {};
         if (data.type === "ctor-scroll") {
@@ -1674,8 +1681,11 @@ export function buildChatHtml(params: RenderChatParams): string {
         })();
       }
       function bootLive() {
-        reportReady();
-        requestAnimationFrame(reportReady);
+        scheduleReportReady();
+        document.querySelectorAll("img").forEach(function (img) {
+          if (img.complete) return;
+          img.addEventListener("load", function () { scheduleReportReady(); }, { once: true });
+        });
       }
       if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootLive);
       else bootLive();

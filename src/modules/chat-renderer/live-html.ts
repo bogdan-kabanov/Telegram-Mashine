@@ -1,4 +1,6 @@
 import { and, eq } from "drizzle-orm";
+import { existsSync, readdirSync } from "fs";
+import path from "path";
 
 import { pickAvailableClientPhoto } from "@/lib/client-photos";
 import { computeMessageTimes, formatStatusBarTime, injectTemplate } from "@/lib/format";
@@ -85,6 +87,21 @@ async function peekProjectPaths(type: string, projectId: string, limit: number):
   return rows.map((r) => r.path);
 }
 
+/** Fallback sample checks from receipt_templates/{projectId} when no generated captura/receipt yet. */
+function peekReceiptTemplatePaths(projectId: string, limit: number): string[] {
+  const dataDir = process.env.DATA_DIR ?? "./data";
+  const dir = path.resolve(dataDir, "media/receipt_templates", projectId);
+  if (!existsSync(dir)) return [];
+  try {
+    return readdirSync(dir)
+      .filter((name) => /\.(jpe?g|png|webp)$/i.test(name))
+      .slice(0, limit)
+      .map((name) => path.join("data/media/receipt_templates", projectId, name).replace(/\\/g, "/"));
+  } catch {
+    return [];
+  }
+}
+
 async function sampleMediaPaths(
   project: ProjectConfig,
   extra?: DialogMediaAssets,
@@ -92,8 +109,11 @@ async function sampleMediaPaths(
   const [bets, sticker, photo] = await Promise.all([
     peekProjectPaths("bet", project.id, 3),
     peekProjectPaths("sticker", project.id, 1),
-    pickAvailableClientPhoto({ preferUnused: true }),
+    pickAvailableClientPhoto({ preferUnused: true, projectId: project.id }),
   ]);
+  const templates = peekReceiptTemplatePaths(project.id, 2);
+  // Never pull captura/receipt from other projects' generated pool — only this
+  // project's templates (or explicit overrides from the constructor).
   return {
     conditions: extra?.conditions ?? project.conditionsImagePath ?? null,
     bet1: extra?.bet1 ?? bets[0] ?? null,
@@ -101,8 +121,8 @@ async function sampleMediaPaths(
     bet3: extra?.bet3 ?? bets[2] ?? null,
     sticker: extra?.sticker ?? sticker[0] ?? null,
     storyPhoto: extra?.storyPhoto ?? photo?.path ?? null,
-    receipt: extra?.receipt ?? null,
-    captura: extra?.captura ?? null,
+    receipt: extra?.receipt ?? templates[1] ?? templates[0] ?? null,
+    captura: extra?.captura ?? templates[0] ?? null,
   };
 }
 
@@ -119,6 +139,8 @@ function enrichSampleMessages(
     storyPhoto?: string | null;
     conditions?: string | null;
     bet1?: string | null;
+    bet2?: string | null;
+    bet3?: string | null;
     receipt?: string | null;
     captura?: string | null;
   },
@@ -178,6 +200,38 @@ function enrichSampleMessages(
       mediaSlot: "conditions",
     });
   }
+  if (media.captura) {
+    extra.push({
+      id: "sample-captura",
+      role: "client",
+      type: "image",
+      content: "__image__",
+      time: "12:00",
+      delayMinutes: t("client", "captura"),
+      imageUrl: media.captura,
+      mediaKind: "captura",
+      mediaSlot: "captura",
+    });
+  }
+  const bets: Array<{ id: string; slot: "bet1" | "bet2" | "bet3"; url: string; stage: "bet_1" | "bet_2" | "bet_3" }> =
+    [];
+  if (media.bet1) bets.push({ id: "sample-bet1", slot: "bet1", url: media.bet1, stage: "bet_1" });
+  if (media.bet2) bets.push({ id: "sample-bet2", slot: "bet2", url: media.bet2, stage: "bet_2" });
+  if (media.bet3) bets.push({ id: "sample-bet3", slot: "bet3", url: media.bet3, stage: "bet_3" });
+  for (const bet of bets) {
+    clock.setStage(bet.stage);
+    extra.push({
+      id: bet.id,
+      role: "client",
+      type: "image",
+      content: "__image__",
+      time: "12:00",
+      delayMinutes: t("client", "bet_reply"),
+      imageUrl: bet.url,
+      mediaKind: "bet",
+      mediaSlot: bet.slot,
+    });
+  }
   clock.setStage("completion");
   extra.push({
     id: "sample-completion",
@@ -198,33 +252,6 @@ function enrichSampleMessages(
     delayMinutes: clock.managerBurst(),
     read: true,
   });
-  if (media.captura) {
-    extra.push({
-      id: "sample-captura",
-      role: "client",
-      type: "image",
-      content: "__image__",
-      time: "12:00",
-      delayMinutes: t("client", "captura"),
-      imageUrl: media.captura,
-      mediaKind: "captura",
-      mediaSlot: "captura",
-    });
-  }
-  if (media.bet1) {
-    clock.setStage("bet_1");
-    extra.push({
-      id: "sample-bet",
-      role: "client",
-      type: "image",
-      content: "__image__",
-      time: "12:00",
-      delayMinutes: t("client", "bet_reply"),
-      imageUrl: media.bet1,
-      mediaKind: "bet",
-      mediaSlot: "bet1",
-    });
-  }
   if (media.receipt) {
     extra.push({
       id: "sample-receipt",

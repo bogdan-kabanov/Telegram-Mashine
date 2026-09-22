@@ -11,11 +11,12 @@ export async function GET() {
     await bootstrapApp();
 
     const runtime = getRuntimeManager();
-    const [state, logs, config, upcoming] = await Promise.all([
+    const [state, logs, config, upcoming, queue] = await Promise.all([
       runtime.getState(),
       runtime.getRecentLogs(15),
       loadAppConfig(),
       getScheduler().getUpcomingTasks(5),
+      runtime.getQueue(8),
     ]);
 
     const cycle = getActiveCycleWeekInfo(config.schedule);
@@ -43,6 +44,7 @@ export async function GET() {
         },
       },
       upcoming,
+      queue,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

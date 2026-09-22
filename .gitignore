@@ -1,5 +1,6 @@
 # dependencies
 /node_modules
+/panel/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -47,9 +48,15 @@ tmp-screen.png
 # generated media
 /data/media/capturas/
 /data/media/stamped/
+/data/media/library/
+/data/media/receipts/
+/data/tmp-*/
+/data/tmp-*
+/tmp/
 /public/renders/*.png
 /public/renders/*.html
 !/public/renders/.gitkeep
 
 # keep empty media dirs
 !/data/media/**/.gitkeep
+!/data/media/library/.gitkeep

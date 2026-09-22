@@ -7,7 +7,15 @@ import { pickNextInRotation, sortPathsStable } from "@/lib/media-rotation";
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
 import { overlayReceiptTemplate } from "@/lib/media/overlay-receipt";
-import { materializeReceiptTemplate } from "@/lib/openai/receipts";
+import {
+  assertNotReceiptTemplatePath,
+  writeSlipSourceMeta,
+} from "@/lib/media/slip-source";
+import {
+  generateAiReceipt,
+  getAiReceiptsMode,
+  materializeReceiptTemplate,
+} from "@/lib/openai/receipts";
 import { createLogger } from "@/lib/runtime/manager";
 import { isStandaloneLegend } from "@/lib/legends/standalone";
 import type { ProjectConfig } from "@/lib/schemas/projects";
@@ -16,6 +24,8 @@ import { bankIdToCapturaStyle, renderCapturaPng, type CapturaBankStyle } from ".
 import { bankIdToReceiptStyle, renderReceiptPng, type ReceiptBankStyle } from "./receipt";
 
 const logger = createLogger("media-handler");
+
+export type SlipSource = "ai" | "overlay" | "template" | "html";
 
 export type MediaType =
   | "video_note"
@@ -423,14 +433,29 @@ export class MediaHandler {
     /** Project-level style overrides bank mapping when set. */
     style?: ReceiptBankStyle;
     project?: ProjectConfig;
-  }): Promise<{ id: string; path: string; source: "overlay" | "template" | "html" }> {
+    /** Prefer this template filename under receipt_templates/{projectId}/ */
+    templateFilename?: string;
+  }): Promise<{ id: string; path: string; source: SlipSource }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/receipts");
     const outputPath = path.join(outputDir, `${id}.png`);
+    assertNotReceiptTemplatePath(outputPath);
     const time = params.time ?? "12:00";
+    const mode = getAiReceiptsMode();
+    const tplOpts = params.templateFilename ? { templateFilename: params.templateFilename } : {};
 
-    if (params.project) {
-      const overlay = await overlayReceiptTemplate({
+    const remember = (template: string, role: "client" | "manager") => {
+      if (!params.project) return;
+      writeSlipSourceMeta(outputPath, {
+        template,
+        projectId: params.project.id,
+        role,
+      });
+    };
+
+    const tryOverlay = async () => {
+      if (!params.project) return null;
+      return overlayReceiptTemplate({
         project: params.project,
         role: "manager",
         amount: params.amount,
@@ -441,9 +466,52 @@ export class MediaHandler {
         date: params.date,
         time,
         outputPath,
+        ...tplOpts,
       });
+    };
+
+    const tryAi = async () => {
+      if (!params.project || mode === "off") return null;
+      return generateAiReceipt({
+        project: params.project,
+        role: "manager",
+        amount: params.amount,
+        currency: params.currency,
+        senderName: params.senderName,
+        recipientName: params.recipientName,
+        accountLastDigits: params.accountLastDigits,
+        date: params.date,
+        time,
+        bankName: params.bankName,
+        preferMedium: "paper",
+        ...tplOpts,
+        outputPath,
+      });
+    };
+
+    // AI only when enabled — OCR overlay disabled (it paints gray plaques / wrong fee lines).
+    if (mode !== "off") {
+      const ai = await tryAi();
+      if (ai) {
+        remember(ai.template, "manager");
+        await logger.info("Receipt rewritten by AI image edit (from pristine template)", {
+          id,
+          template: ai.template,
+          model: ai.model,
+          medium: ai.medium,
+        });
+        return { id, path: outputPath, source: "ai" };
+      }
+      await logger.warn("AI receipt edit failed — skipping OCR overlay", {
+        id,
+        mode,
+        projectId: params.project?.id,
+      });
+    } else {
+      const overlay = await tryOverlay();
       if (overlay) {
-        await logger.info("Receipt stamped on original screenshot", {
+        remember(overlay.template, "manager");
+        await logger.info("Receipt stamped on pristine screenshot (AI off)", {
           id,
           template: overlay.template,
           fields: overlay.fields,
@@ -460,6 +528,7 @@ export class MediaHandler {
         outputPath,
       });
       if (fromTemplate) {
+        remember(fromTemplate.template, "manager");
         await logger.info("Receipt generated", {
           id,
           path: outputPath,
@@ -504,17 +573,31 @@ export class MediaHandler {
     style?: CapturaBankStyle;
     project?: ProjectConfig;
     accountLastDigits?: string;
-  }): Promise<{ id: string; path: string; source: "overlay" | "template" | "html" }> {
+    templateFilename?: string;
+  }): Promise<{ id: string; path: string; source: SlipSource }> {
     const id = randomUUID();
     const outputDir = this.store.resolve("media/capturas");
     const outputPath = path.join(outputDir, `${id}.png`);
+    assertNotReceiptTemplatePath(outputPath);
     const time = params.time ?? "12:00";
     const digits =
       params.accountLastDigits ??
       params.clabe.replace(/\D/g, "").slice(-4).padStart(4, "0");
+    const mode = getAiReceiptsMode();
+    const tplOpts = params.templateFilename ? { templateFilename: params.templateFilename } : {};
 
-    if (params.project) {
-      const overlay = await overlayReceiptTemplate({
+    const remember = (template: string) => {
+      if (!params.project) return;
+      writeSlipSourceMeta(outputPath, {
+        template,
+        projectId: params.project.id,
+        role: "client",
+      });
+    };
+
+    const tryOverlay = async () => {
+      if (!params.project) return null;
+      return overlayReceiptTemplate({
         project: params.project,
         role: "client",
         amount: params.amount,
@@ -525,9 +608,54 @@ export class MediaHandler {
         date: params.date,
         time,
         outputPath,
+        preferMedium: "paper",
+        ...tplOpts,
       });
+    };
+
+    const tryAi = async () => {
+      if (!params.project || mode === "off") return null;
+      return generateAiReceipt({
+        project: params.project,
+        role: "client",
+        amount: params.amount,
+        currency: params.currency,
+        senderName: params.senderName,
+        recipientName: params.recipientLabel,
+        accountLastDigits: digits,
+        date: params.date,
+        time,
+        bankName: params.bankName,
+        clabe: params.clabe,
+        preferMedium: "paper",
+        ...tplOpts,
+        outputPath,
+      });
+    };
+
+    // AI only when enabled — OCR overlay disabled (wrong fee lines + gray plaques).
+    if (mode !== "off") {
+      const ai = await tryAi();
+      if (ai) {
+        remember(ai.template);
+        await logger.info("Captura rewritten by AI image edit (from pristine template)", {
+          id,
+          template: ai.template,
+          model: ai.model,
+          medium: ai.medium,
+        });
+        return { id, path: outputPath, source: "ai" };
+      }
+      await logger.warn("AI captura edit failed — skipping OCR overlay", {
+        id,
+        mode,
+        projectId: params.project?.id,
+      });
+    } else {
+      const overlay = await tryOverlay();
       if (overlay) {
-        await logger.info("Captura stamped on original screenshot", {
+        remember(overlay.template);
+        await logger.info("Captura stamped on pristine screenshot (AI off)", {
           id,
           template: overlay.template,
           fields: overlay.fields,
@@ -543,6 +671,7 @@ export class MediaHandler {
         outputPath,
       });
       if (fromTemplate) {
+        remember(fromTemplate.template);
         await logger.info("Captura generated", {
           id,
           path: outputPath,
@@ -561,11 +690,11 @@ export class MediaHandler {
         senderName: params.senderName,
         recipientLabel: params.recipientLabel,
         clabe: params.clabe,
-        bankStyle: params.style ?? bankIdToCapturaStyle(params.bankId),
         bankName: params.bankName,
+        bankStyle: params.style ?? bankIdToCapturaStyle(params.bankId),
         date: params.date,
         time,
-        reference: id.slice(0, 10).toUpperCase(),
+        reference: id.slice(0, 8).toUpperCase(),
       },
       outputPath,
     );

@@ -34,6 +34,14 @@ export type OverlayFieldValues = {
 const MONEY_CORE =
   /\$?\s*\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?|\$?\s*\d+[.,]\d{2}|\$\s*\d{3,}/;
 
+/** Lines that are fees — never overwrite with the deposit/payout amount. */
+const FEE_MONEY_LABEL = /\bcomisi[oó]n\b|\biva\b|\bfee\b|\bpropina\b|\bcargo\b/i;
+/** Primary amount labels (MONTO / PAGO TOTAL on OXXO thermal slips). */
+const PRIMARY_AMOUNT_LABEL =
+  /\bm[oó]nto\b|\bimporte\b|\btotal\b|\bpago\b|\benviado\b|\brecibido\b|\btransferido\b/i;
+const PAGO_TOTAL_LABEL = /pago\s*total|total\s*(a\s*)?pagar|total\s*pago/i;
+const MONTO_LABEL = /\bm[oó]nto\b|\bimporte\b/i;
+
 const SLASH_DATE = /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/;
 const LONG_DATE =
   /\b(?:lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)?\s*\d{1,2}\s+(?:de\s+)?[a-záéíóúñ]+(?:\s+del?)?\s+\d{4}\b/i;
@@ -41,10 +49,10 @@ const TIME_RE = /\b\d{1,2}:\d{2}(?::\d{2})?\b/;
 
 const LABEL_SENDER = /^(de|desde|origen|cuenta de origen)\b/i;
 const LABEL_RECIPIENT =
-  /^(para|a\b|beneficiari|alias|nombre del beneficiario|nombre)\b/i;
+  /^(para|beneficiari|alias|nombre del beneficiario|nombre)\b/i;
 
 const NOT_A_NAME =
-  /banorte|mercado|bbva|visa|spin|oxxo|hey banco|compartamos|citibanamex|naranja|albo|banco|wallet|transfer|comprobante|exitosa|envi[eé]|monto|cuenta|clabe|fecha|hora|concepto|referencia|folio|operaci|n[oó]mina|importe|rastreo|consulta|estatus|favoritos|compartir|volver/i;
+  /banorte|mercado|bbva|visa|spin|oxxo|hey banco|compartamos|citibanamex|naranja|albo|banco|wallet|transfer|comprobante|exitosa|envi[eé]|monto|cuenta|clabe|fecha|hora|concepto|referencia|folio|operaci|n[oó]mina|importe|rastreo|consulta|estatus|favoritos|compartir|volver|comisi|autoriz|atendido|efectivo|tarjeta|deposito|depósito|cadena|comercial|plaza|mexico|méxico|sinaloa|nuevo|leon|león/i;
 
 const MONTHS_ES: Record<string, number> = {
   enero: 1,
@@ -97,13 +105,13 @@ function isPersonName(text: string): boolean {
 
 export function formatMoneyLikeOriginal(original: string, amount: number, currency: string): string {
   const prefix = original.match(/^[^\d]*/)?.[0] ?? "";
-  const suffix = original.match(/[^\d.,]+$/)?.[0] ?? "";
+  let suffix = original.match(/[^\d.,]+$/)?.[0] ?? "";
   const body = original.slice(prefix.length, suffix ? original.length - suffix.length : original.length);
   const european = /\d\.\d{3}/.test(body) || (/\d,\d{2}$/.test(body) && !/\d,\d{3}/.test(body));
   // Keep cents only when the original already has them, or MXN amounts that use `$`.
   // Bet cards like `612 MXN` / `+17,583 MXN` must stay integer.
   const keepDecimals = /[.,]\d{2}$/.test(body.trim()) || (currency === "MXN" && /\$/.test(original));
-  const decimals = keepDecimals && currency !== "ARS" && currency !== "VES" ? 2 : 0;
+  const decimals = keepDecimals && currency !== "ARS" && currency !== "VES" && currency !== "RUB" ? 2 : 0;
   const abs = Math.abs(amount);
   const [intRaw, frac = ""] = abs.toFixed(decimals).split(".");
   const thousand = european ? "." : ",";
@@ -111,7 +119,13 @@ export function formatMoneyLikeOriginal(original: string, amount: number, curren
   const grouped = (intRaw ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, thousand);
   const number = decimals > 0 && frac ? `${grouped}${decimal}${frac}` : grouped;
   const dollar = prefix.includes("$") || original.includes("$") ? prefix || "$" : prefix;
-  return `${dollar}${number}${suffix}`.replace(/\s+/g, (m) => (original.includes(" ") ? m : ""));
+  // Never keep a foreign currency code from the template (MXN on a RUB project, etc.).
+  if (/\b(MXN|ARS|VES|USD|RUB|EUR|BRL|COP|CLP|PEN|UYU|MN)\b/i.test(suffix)) {
+    suffix = suffix.replace(/\b(MXN|ARS|VES|USD|RUB|EUR|BRL|COP|CLP|PEN|UYU|MN)\b/gi, currency);
+  } else if (currency && !/\$/.test(prefix) && !new RegExp(`\\b${currency}\\b`, "i").test(suffix)) {
+    suffix = `${suffix || ""} ${currency}`;
+  }
+  return `${dollar}${number}${suffix}`.replace(/\s{2,}/g, " ");
 }
 
 export function replaceMaskedLast4(original: string, digits: string): string {
@@ -196,7 +210,7 @@ export function planReceiptReplacements(
   fields: OverlayFieldValues,
   imageWidth: number,
 ): OverlayBox[] {
-  const usable = words.filter((w) => (w.conf ?? 80) >= 40 && w.text.trim());
+  const usable = words.filter((w) => (w.conf ?? 80) >= 25 && w.text.trim());
   const boxes: OverlayBox[] = [];
   const used = new Set<OcrWord>();
   const digits = fields.accountLastDigits.replace(/\D/g, "").slice(-4).padStart(4, "0");
@@ -208,54 +222,237 @@ export function planReceiptReplacements(
     boxes.push({ ...box, text, kind, align: boxAlign(box, imageWidth) });
   };
 
-  // Amount: tallest money-like run
-  const moneyRuns: OcrWord[][] = [];
+  const lines = lineGroups(usable);
+  const lineTextAt = (lineIdx: number) => {
+    const line = lines.find((l) => l[0]?.line === lineIdx) ?? usable.filter((w) => w.line === lineIdx);
+    return lineText(line);
+  };
+  const contextForRun = (run: OcrWord[]) => {
+    const lineIdx = run[0]?.line ?? 0;
+    return `${lineTextAt(lineIdx)} ${lineTextAt(lineIdx - 1)}`;
+  };
+
+  const pageText = usable.map((w) => w.text).join(" ");
+  const thermalOxxo =
+    /oxxo|spin|compropago|tarjeta\s*spin|deposito\s+en\s+efectivo/i.test(pageText) &&
+    !/clabe|mercado\s*pago|bbva|banorte/i.test(pageText);
+
+  // Money runs with line context — never stamp deposit amount onto COMISION/IVA rows.
+  type MoneyRun = { group: OcrWord[]; text: string; ctx: string; score: number; value: number | null };
+  const moneyRuns: MoneyRun[] = [];
+  const seenMoney = new Set<OcrWord>();
   for (let i = 0; i < usable.length; i++) {
     const w = usable[i]!;
-    if (used.has(w)) continue;
+    if (seenMoney.has(w)) continue;
     const joined = mergeNeighbors(usable, i, (n) => /[\d$.,MNXmn]|MXN|ARS|VES/.test(n.text));
     const text = lineText(joined);
-    if (MONEY_CORE.test(text) && /\d/.test(text)) moneyRuns.push(joined);
+    const value = parseLooseMoney(text);
+    const looksMoney =
+      (MONEY_CORE.test(text) && /\d/.test(text)) ||
+      (value != null && value >= 80 && /\d+[.,]\d{2}/.test(text));
+    if (!looksMoney) continue;
+    joined.forEach((x) => seenMoney.add(x));
+    const ctx = contextForRun(joined);
+    // On OXXO thermal, keep fee rows out of the primary amount list.
+    if (FEE_MONEY_LABEL.test(ctx) && !PAGO_TOTAL_LABEL.test(ctx) && !MONTO_LABEL.test(ctx)) {
+      continue;
+    }
+    let score = unionBox(joined).y1 - unionBox(joined).y0;
+    if (MONTO_LABEL.test(ctx)) score += 1000;
+    if (PAGO_TOTAL_LABEL.test(ctx)) score += 800;
+    if (PRIMARY_AMOUNT_LABEL.test(ctx) && !FEE_MONEY_LABEL.test(ctx)) score += 200;
+    if (FEE_MONEY_LABEL.test(ctx)) score -= 500;
+    moneyRuns.push({ group: joined, text, ctx, score, value });
   }
-  moneyRuns.sort((a, b) => {
-    const ha = unionBox(a).y1 - unionBox(a).y0;
-    const hb = unionBox(b).y1 - unionBox(b).y0;
-    return hb - ha;
-  });
-  const amountRun = moneyRuns[0];
-  if (amountRun) {
-    take(amountRun, formatMoneyLikeOriginal(lineText(amountRun), fields.amount, fields.currency), "amount");
+  for (const w of usable) {
+    if (seenMoney.has(w)) continue;
+    const value = parseLooseMoney(w.text);
+    if (value == null || value < 80) continue;
+    if (!/\d+[.,]\d{2}/.test(w.text) && !MONEY_CORE.test(w.text)) continue;
+    const ctx = contextForRun([w]);
+    if (FEE_MONEY_LABEL.test(ctx) && !PAGO_TOTAL_LABEL.test(ctx) && !MONTO_LABEL.test(ctx)) continue;
+    seenMoney.add(w);
+    moneyRuns.push({
+      group: [w],
+      text: w.text,
+      ctx,
+      score: unionBox([w]).y1 - unionBox([w]).y0,
+      value,
+    });
+  }
+  moneyRuns.sort((a, b) => b.score - a.score);
+
+  // Parse TOTAL COMISION so PAGO TOTAL = deposit + fees (OXXO layout).
+  let feeTotal = 0;
+  for (const line of lines) {
+    const t = lineText(line);
+    if (/total\s*comisi/i.test(t) || (/^\s*total\b/i.test(t) && /comisi/i.test(t))) {
+      const n = parseLooseMoney(t);
+      if (n != null && n > 0 && n < Math.max(fields.amount, 100)) feeTotal = n;
+    }
+  }
+  if (feeTotal <= 0 && thermalOxxo) feeTotal = 12;
+
+  const stampAmount = (run: MoneyRun, value: number) => {
+    take(run.group, formatMoneyLikeOriginal(run.text, value, fields.currency), "amount");
+  };
+
+  if (thermalOxxo) {
+    const isFeeRun = (r: { ctx: string }) =>
+      FEE_MONEY_LABEL.test(r.ctx) && !PAGO_TOTAL_LABEL.test(r.ctx) && !MONTO_LABEL.test(r.ctx);
+    // Only MONTO + PAGO TOTAL — never COMISION / IVA (that painted 2000 onto the fee line).
+    const byY = [...moneyRuns]
+      .filter((r) => (r.value ?? 0) >= 50 && !isFeeRun(r))
+      .sort((a, b) => unionBox(a.group).y0 - unionBox(b.group).y0);
+    const montoLabeled =
+      byY.find((r) => MONTO_LABEL.test(r.ctx)) ??
+      moneyRuns.find((r) => MONTO_LABEL.test(r.ctx) && !isFeeRun(r));
+    const pagoLabeled =
+      byY.find((r) => PAGO_TOTAL_LABEL.test(r.ctx)) ??
+      moneyRuns.find((r) => PAGO_TOTAL_LABEL.test(r.ctx));
+    const first = montoLabeled;
+    let last =
+      pagoLabeled && pagoLabeled !== first
+        ? pagoLabeled
+        : byY.length >= 2
+          ? byY[byY.length - 1]
+          : undefined;
+    if (!last || last === first) {
+      for (const line of lines) {
+        const t = lineText(line);
+        if (!/pago/i.test(t) || !/total/i.test(t)) continue;
+        if (FEE_MONEY_LABEL.test(t) && !/pago/i.test(t)) continue;
+        const moneyWords = line.filter((w) => !used.has(w) && /\d/.test(w.text));
+        if (!moneyWords.length) continue;
+        last = {
+          group: moneyWords,
+          text: lineText(moneyWords),
+          ctx: t,
+          score: 0,
+          value: parseLooseMoney(lineText(moneyWords)),
+        };
+        break;
+      }
+    }
+    if (first && !isFeeRun(first)) stampAmount(first, fields.amount);
+    if (last && last !== first && !isFeeRun(last)) stampAmount(last, fields.amount + feeTotal);
+
+    // Card tail: TARJETA SPIN line — OCR often breaks ************4122 into junk tokens.
+    for (const line of lines) {
+      const t = lineText(line);
+      if (!/tarjeta|spin/i.test(t)) continue;
+      const free = line.filter((w) => !used.has(w));
+      if (!free.length) continue;
+      const right = free.filter((w) => w.x0 > imageWidth * 0.45);
+      const target = right.length ? right : free.slice(-2);
+      take(target, `************${digits}`, "digits");
+      break;
+    }
+  } else {
+    const montoRun = moneyRuns.find((r) => MONTO_LABEL.test(r.ctx));
+    const pagoRun = moneyRuns.find((r) => PAGO_TOTAL_LABEL.test(r.ctx));
+    if (montoRun || pagoRun) {
+      if (montoRun) stampAmount(montoRun, fields.amount);
+      if (pagoRun && pagoRun !== montoRun) {
+        stampAmount(pagoRun, fields.amount + (feeTotal > 0 ? feeTotal : 0));
+      } else if (!montoRun && pagoRun) {
+        stampAmount(pagoRun, fields.amount + (feeTotal > 0 ? feeTotal : 0));
+        const pagoY = unionBox(pagoRun.group).y0;
+        const above = moneyRuns
+          .filter(
+            (r) =>
+              r !== pagoRun &&
+              !r.group.some((gw) => used.has(gw)) &&
+              unionBox(r.group).y0 < pagoY - 4 &&
+              (r.value ?? 0) >= 80,
+          )
+          .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+        if (above[0]) stampAmount(above[0], fields.amount);
+      }
+    } else {
+      const valued = moneyRuns
+        .filter((r) => r.value != null && (r.value as number) >= 80)
+        .sort((a, b) => unionBox(a.group).y0 - unionBox(b.group).y0);
+      if (valued.length >= 2) {
+        stampAmount(valued[0]!, fields.amount);
+        stampAmount(valued[valued.length - 1]!, fields.amount + (feeTotal > 0 ? feeTotal : 0));
+      } else if (valued[0]) {
+        stampAmount(valued[0], fields.amount);
+      } else if (moneyRuns[0]) {
+        stampAmount(moneyRuns[0], fields.amount);
+      }
+    }
   }
 
-  // Last 4 on masked account tokens
+  // Last-4: token or whole line like ************4122 / ****4122
   for (const w of usable) {
     if (used.has(w)) continue;
-    const t = w.text;
+    const t = w.text.replace(/\s/g, "");
     if (
-      (/\d{4}$/.test(t) && /(\*{2,}|•+|·+|x{2,})/i.test(t)) ||
+      (/\d{4}$/.test(t) && /(\*{2,}|•+|·+|x{2,}|X{2,})/.test(t)) ||
       /^\*{2,}\d{4}$/.test(t) ||
-      /^[•·]+\d{4}$/.test(t)
+      /^[•·xX*]{2,}\d{4}$/.test(t)
     ) {
       take([w], replaceMaskedLast4(t, digits), "digits");
     }
   }
+  for (const line of lines) {
+    const free = line.filter((w) => !used.has(w));
+    if (free.length === 0) continue;
+    const joined = lineText(free);
+    const compact = joined.replace(/\s/g, "");
+    if (/\*{4,}\d{4}$/.test(compact) || /[xX*]{4,}\d{4}$/.test(compact)) {
+      const digitWords = free.filter((w) => /\d{4}/.test(w.text) || /\*/.test(w.text));
+      take(digitWords.length ? digitWords : free, compact.replace(/\d{4}$/, digits), "digits");
+      continue;
+    }
+    // OXXO: "TARJETA SPIN ************4122" often OCR'd as separate mask + 4 digits
+    if (/tarjeta|spin|clabe|cuenta/i.test(joined)) {
+      const tail = free.filter((w) => /^\d{4}$/.test(w.text.trim()) || /\*{3,}/.test(w.text));
+      const four = free.find((w) => /^\d{4}$/.test(w.text.trim()));
+      if (four && (/\*/.test(joined) || /tarjeta|spin/i.test(joined))) {
+        const maskParts = free.filter((w) => /\*/.test(w.text) || w === four);
+        take(maskParts.length ? maskParts : [four], `************${digits}`, "digits");
+      }
+    }
+  }
 
-  const lines = lineGroups(usable);
   for (const line of lines) {
     const free = line.filter((w) => !used.has(w));
     if (free.length === 0) continue;
     const text = lineText(free);
 
     if (SLASH_DATE.test(text) || LONG_DATE.test(text)) {
-      take(free, adaptDateToOriginal(text, fields.date, fields.time), "date");
+      // Only cover date/time glyphs — not "Caja #1" (that made the gray plaque).
+      const dateWords = free.filter(
+        (w) =>
+          SLASH_DATE.test(w.text) ||
+          TIME_RE.test(w.text) ||
+          LONG_DATE.test(w.text) ||
+          /^\d{1,2}[/-]\d{1,2}/.test(w.text) ||
+          /^\d{1,2}:\d{2}/.test(w.text),
+      );
+      const target = dateWords.length >= 1 ? dateWords : free;
+      const sourceText = dateWords.length >= 1 ? lineText(dateWords) : text;
+      take(target, adaptDateToOriginal(sourceText, fields.date, fields.time), "date");
       continue;
     }
     if (TIME_RE.test(text) && text.length <= 18 && !/\d{4}/.test(text.replace(TIME_RE, ""))) {
-      take(free, adaptDateToOriginal(text, fields.date, fields.time), "time");
+      const timeWords = free.filter((w) => TIME_RE.test(w.text));
+      take(
+        timeWords.length ? timeWords : free,
+        adaptDateToOriginal(text, fields.date, fields.time),
+        "time",
+      );
     }
   }
 
   const pageH = Math.max(...usable.map((w) => w.y1), 1);
+  // OXXO / Spin thermal tickets never show client/manager names — don't invent overlays.
+  if (thermalOxxo) {
+    return boxes;
+  }
+
   const nameBoxes: Array<{ group: OcrWord[]; role: "sender" | "recipient" | "unknown" }> = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
@@ -263,6 +460,10 @@ export function planReceiptReplacements(
     if (free.length === 0) continue;
     const text = lineText(line);
     const freeText = lineText(free);
+    // Thermal OXXO legal / store lines are not person names.
+    if (FEE_MONEY_LABEL.test(text) || /autoriz|folio|atendido|comprobado|compropago|efectivo/i.test(text)) {
+      continue;
+    }
     let role: "sender" | "recipient" | "unknown" = "unknown";
     if (LABEL_SENDER.test(text) || LABEL_SENDER.test(freeText)) role = "sender";
     if (LABEL_RECIPIENT.test(text) || LABEL_RECIPIENT.test(freeText)) role = "recipient";
@@ -303,23 +504,29 @@ export function planReceiptReplacements(
 
   const sender = nameBoxes.find((n) => n.role === "sender" && bigEnough(n.group));
   const recipient = nameBoxes.find((n) => n.role === "recipient" && bigEnough(n.group));
-  const unknown = nameBoxes.filter(
-    (n) =>
-      n.role === "unknown" &&
-      bigEnough(n.group) &&
-      unionBox(n.group).y0 > pageH * 0.3,
-  );
+  // Only stamp unlabeled "names" when we already saw De/Para — otherwise OXXO legal text gets mangled.
+  const hasLabeled = Boolean(sender || recipient);
+  const unknown = hasLabeled
+    ? nameBoxes.filter(
+        (n) =>
+          n.role === "unknown" &&
+          bigEnough(n.group) &&
+          unionBox(n.group).y0 > pageH * 0.3,
+      )
+    : [];
 
   if (sender) take(sender.group, fields.senderName, "name");
   if (recipient) take(recipient.group, fields.recipientName, "name");
 
-  if (!recipient && !sender && unknown.length === 1) {
-    take(unknown[0]!.group, fields.recipientName, "name");
-  } else {
-    const leftover = unknown.filter((n) => n.group.every((w) => !used.has(w)));
-    if (leftover[0] && !sender) take(leftover[0].group, fields.senderName, "name");
-    if (leftover[1] && !recipient) take(leftover[1].group, fields.recipientName, "name");
-    else if (leftover[0] && sender && !recipient) take(leftover[0].group, fields.recipientName, "name");
+  if (hasLabeled) {
+    if (!recipient && !sender && unknown.length === 1) {
+      take(unknown[0]!.group, fields.recipientName, "name");
+    } else {
+      const leftover = unknown.filter((n) => n.group.every((w) => !used.has(w)));
+      if (leftover[0] && !sender) take(leftover[0].group, fields.senderName, "name");
+      if (leftover[1] && !recipient) take(leftover[1].group, fields.recipientName, "name");
+      else if (leftover[0] && sender && !recipient) take(leftover[0].group, fields.recipientName, "name");
+    }
   }
 
   return boxes;
@@ -342,13 +549,16 @@ const BET_MONEY =
   /[+$]?\s*\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?|[+$]?\s*\d+[.,]\d{2}|[+$]?\s*\d{2,7}(?:\s*(?:MXN|ARS|VES|MN|RUB))?/;
 
 export function parseLooseMoney(text: string): number | null {
-  const m = text.replace(/[^\d.,]/g, "");
-  if (!m) return null;
+  // Avoid "M.N. $ 650.00" → ".650.00" (leading dot from M.N.) parsing as 0.65
+  const cleaned = text.replace(/\bM\.?\s*N\.?\b/gi, " ").replace(/[^\d.,]/g, " ");
+  const matches = cleaned.match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?|\d+[.,]\d{2}|\d{2,7}/g);
+  if (!matches?.length) return null;
+  const m = matches[matches.length - 1]!;
   if (/\d\.\d{3}/.test(m) && !/\.\d{2}$/.test(m)) {
     const n = Number(m.replace(/\./g, "").replace(",", "."));
     return Number.isFinite(n) ? n : null;
   }
-  if (/\d,\d{3}/.test(m)) {
+  if (/\d,\d{3}/.test(m) && !/,\d{2}$/.test(m)) {
     const n = Number(m.replace(/,/g, ""));
     return Number.isFinite(n) ? n : null;
   }
@@ -358,6 +568,10 @@ export function parseLooseMoney(text: string): number | null {
 
 function formatBetMoney(original: string, amount: number, currency: string, role: "deposit" | "profit"): string {
   let formatted = formatMoneyLikeOriginal(original, amount, currency);
+  formatted = formatted.replace(/\b(MXN|ARS|VES|USD|EUR|BRL|COP|CLP|PEN|UYU|MN)\b/gi, currency);
+  if (!new RegExp(`\\b${currency}\\b`, "i").test(formatted)) {
+    formatted = `${formatted.trim()} ${currency}`;
+  }
   if (role === "profit" && amount > 0 && !/^\s*[+\-]/.test(formatted)) {
     if (/^\s*\+/.test(original) || LABEL_PROFIT.test(original)) {
       formatted = `+${formatted.replace(/^\s+/, "")}`;

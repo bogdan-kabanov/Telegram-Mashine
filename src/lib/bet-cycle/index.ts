@@ -125,6 +125,49 @@ function cooldownMs(days: number): number {
 }
 
 async function listProjectBets(projectId: string): Promise<MediaAsset[]> {
+  const dataDir = process.env.DATA_DIR ?? "./data";
+
+  const collectFromDir = (abs: string, relPrefix: string): MediaAsset[] => {
+    if (!existsSync(abs)) return [];
+    try {
+      const files = readdirSync(abs).filter((f) => isUsableBetFile(f, path.join(abs, f)));
+      return files.map((filename) => ({
+        id: randomUUID(),
+        type: "bet" as const,
+        filename,
+        path: `${relPrefix}/${filename}`.replace(/\\/g, "/"),
+        projectId,
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  // Preferred: shared library folders assigned on the project (e.g. bets/okx).
+  try {
+    const config = await loadAppConfig();
+    const project = config.projects.projects.find((p) => p.id === projectId);
+    const assigned = project?.mediaFolders?.bets?.map((s) => s.trim()).filter(Boolean) ?? [];
+    if (assigned.length > 0) {
+      const all: MediaAsset[] = [];
+      const seen = new Set<string>();
+      for (const folder of assigned) {
+        const safe = folder.replace(/\.\./g, "").replace(/^[/\\]+/, "").replace(/\\/g, "/");
+        if (!safe) continue;
+        const abs = path.resolve(dataDir, "media/library/_shared", safe);
+        const rel = `data/media/library/_shared/${safe}`;
+        for (const asset of collectFromDir(abs, rel)) {
+          if (seen.has(asset.path)) continue;
+          seen.add(asset.path);
+          all.push(asset);
+        }
+      }
+      if (all.length > 0) return sortBetsStable(all);
+    }
+  } catch {
+    /* fall through to legacy */
+  }
+
   const db = getDb();
   const rows = await db
     .select()
@@ -144,24 +187,19 @@ async function listProjectBets(projectId: string): Promise<MediaAsset[]> {
   );
   if (fromDb.length > 0) return fromDb;
 
-  // Disk fallback when media_assets is empty (fresh DB / Docker volume).
-  const dataDir = process.env.DATA_DIR ?? "./data";
-  const dir = path.resolve(dataDir, "media/bets", projectId);
-  if (!existsSync(dir)) return [];
-  try {
-    const files = readdirSync(dir).filter((f) => isUsableBetFile(f, path.join(dir, f)));
-    return sortBetsStable(
-      files.map((filename) => ({
-        id: randomUUID(),
-        type: "bet" as const,
-        filename,
-        path: `data/media/bets/${projectId}/${filename}`,
-        projectId,
-      })),
-    );
-  } catch {
-    return [];
+  // Legacy per-project folders.
+  const dirs = [
+    { abs: path.resolve(dataDir, "media/bets", projectId), rel: `data/media/bets/${projectId}` },
+    {
+      abs: path.resolve(dataDir, "media/library", projectId, "bets"),
+      rel: `data/media/library/${projectId}/bets`,
+    },
+  ];
+  for (const { abs, rel } of dirs) {
+    const files = collectFromDir(abs, rel);
+    if (files.length > 0) return sortBetsStable(files);
   }
+  return [];
 }
 
 async function recentBetPaths(projectId: string, days: number): Promise<Set<string>> {

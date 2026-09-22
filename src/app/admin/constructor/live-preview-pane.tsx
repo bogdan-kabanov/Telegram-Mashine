@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { TARGET_SCREENSHOTS } from "@/modules/chat-renderer/pagination";
+import { planScrollPositions } from "@/modules/chat-renderer/scroll";
 import { withBasePath } from "@/lib/base-path";
 import { dateFromZonedLocal, formatDateTimeLocal } from "@/lib/timezone";
 
@@ -57,6 +58,8 @@ const SLOT_GENERATE_KIND: Record<string, string> = {
   bet2: "bet",
   bet3: "bet",
   sticker: "sticker",
+  captura: "captura",
+  receipt: "receipt",
 };
 
 type Props = {
@@ -79,6 +82,7 @@ type Props = {
     profit3?: number | null;
     profitFinal?: number | null;
   };
+  onScreenshots?: (urls: string[]) => void;
 };
 
 const LIVE_FETCH_TIMEOUT_MS = 90_000;
@@ -95,6 +99,7 @@ export function LivePreviewPane({
   onError,
   onSlideTimes,
   amountDefaults,
+  onScreenshots,
   onReviewId: _onReviewId,
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -111,6 +116,9 @@ export function LivePreviewPane({
   const [mediaSlot, setMediaSlot] = useState<string | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [amountDraft, setAmountDraft] = useState("");
+  const [slidePositions, setSlidePositions] = useState<number[]>([0]);
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [slideMaxScroll, setSlideMaxScroll] = useState(0);
   const overridesKey = JSON.stringify(overrides);
   const mediaKey = JSON.stringify(mediaPaths);
 
@@ -221,18 +229,43 @@ export function LivePreviewPane({
   }, [html]);
 
   useEffect(() => {
+    setSlideIndex(0);
+    setSlidePositions([0]);
+    setSlideMaxScroll(0);
+  }, [html]);
+
+  useEffect(() => {
     function onMsg(ev: MessageEvent) {
       const data = ev.data as {
         type?: string;
         slot?: string;
+        maxScroll?: number;
+        clientHeight?: number;
       };
       if (!data || typeof data !== "object") return;
       if (data.type === "ctor-ready") {
         const local = clockLocal || formatDateTimeLocal(new Date(), timeZone);
         if (!clockLocal) setClockLocal(local);
         const nowIso = dateFromZonedLocal(local, timeZone).toISOString();
-        iframeRef.current?.contentWindow?.postMessage({ type: "ctor-clock", nowIso }, "*");
-        iframeRef.current?.contentWindow?.postMessage({ type: "ctor-scroll", top: 0 }, "*");
+        const maxScroll = Math.max(0, Number(data.maxScroll) || 0);
+        const clientHeight = Math.max(1, Number(data.clientHeight) || PHONE_H);
+        const positions = planScrollPositions(maxScroll, clientHeight, {
+          targetScreens: TARGET_SCREENSHOTS,
+          minOverlapPx: 160,
+        });
+        const nextPositions = positions.length > 0 ? positions : [0];
+        setSlideMaxScroll(maxScroll);
+        setSlidePositions(nextPositions);
+        setSlideIndex((prev) => {
+          const clamped = Math.min(prev, nextPositions.length - 1);
+          const top = nextPositions[clamped] ?? 0;
+          iframeRef.current?.contentWindow?.postMessage({ type: "ctor-clock", nowIso }, "*");
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: "ctor-scroll", top, maxScroll, nowIso },
+            "*",
+          );
+          return clamped;
+        });
       }
       if (data.type === "ctor-media" && data.slot) {
         setMediaSlot(data.slot);
@@ -262,6 +295,18 @@ export function LivePreviewPane({
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, [clockLocal, timeZone, amountDefaults]);
+
+  function goToSlide(index: number) {
+    const next = Math.max(0, Math.min(index, slidePositions.length - 1));
+    setSlideIndex(next);
+    const top = slidePositions[next] ?? 0;
+    const local = clockLocal || formatDateTimeLocal(new Date(), timeZone);
+    const nowIso = dateFromZonedLocal(local, timeZone).toISOString();
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "ctor-scroll", top, maxScroll: slideMaxScroll, nowIso },
+      "*",
+    );
+  }
 
   function setClock(value: string) {
     setClockLocal(value);
@@ -310,6 +355,10 @@ export function LivePreviewPane({
         return;
       }
       if (reviewId) {
+        const selectedTpl =
+          slot === "captura" || slot === "receipt"
+            ? (mediaPaths[slot as "captura" | "receipt"] ?? undefined)
+            : undefined;
         const res = await fetch(`/api/admin/reviews/${reviewId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -317,7 +366,11 @@ export function LivePreviewPane({
             action: "replaceMedia",
             slot,
             generate: true,
+            rerender: true,
             now: nowIso,
+            ...(selectedTpl && String(selectedTpl).includes("receipt_templates")
+              ? { path: selectedTpl }
+              : {}),
             ...((slot === "receipt" || slot === "captura" || slot.startsWith("bet")) &&
             Number.isFinite(Number(amountDraft.replace(",", "."))) &&
             Number(amountDraft.replace(",", ".")) > 0
@@ -326,21 +379,40 @@ export function LivePreviewPane({
           }),
           signal: ctrl.signal,
         });
-        const data = (await res.json()) as { error?: string; path?: string; source?: string };
+        const data = (await res.json()) as {
+          error?: string;
+          path?: string;
+          source?: string;
+          screenshots?: string[];
+        };
         if (!res.ok) throw new Error(data.error ?? "Не удалось перегенерировать");
         if (data.path) onMediaPaths({ ...mediaPaths, [slot]: data.path });
+        if (data.screenshots?.length) onScreenshots?.(data.screenshots);
         if (data.source === "template") {
           onError(
-            "Не удалось прочитать поля на скрине — показан исходный шаблон без замены суммы/имён.",
+            "ИИ не смог отредактировать чек — показан исходный шаблон без замены суммы.",
           );
         } else if (data.source === "html") {
-          onError("Чек собран HTML-заглушкой: на шаблоне не нашлись поля для подстановки.");
+          onError("Чек собран HTML-заглушкой (ИИ недоступен).");
+        } else if (data.source === "overlay") {
+          onError("OCR-штамп (режим Чеки=off). Для правки через ИИ включи always в /admin/ai.");
+        } else if (data.source === "ai") {
+          onError(null);
         }
       } else {
         const kind = SLOT_GENERATE_KIND[slot];
         if (!kind) {
-          throw new Error("Этот тип медиа появится после сборки полного отзыва (чеки).");
+          throw new Error("Этот тип медиа нельзя пересобрать здесь.");
         }
+        const slipAmount =
+          Number.isFinite(Number(amountDraft.replace(",", "."))) &&
+          Number(amountDraft.replace(",", ".")) > 0
+            ? Number(amountDraft.replace(",", "."))
+            : slot === "captura"
+              ? amountDefaults?.deposit
+              : slot === "receipt"
+                ? amountDefaults?.payout
+                : undefined;
         const res = await fetch("/api/admin/media/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -349,6 +421,17 @@ export function LivePreviewPane({
             count: 1,
             projectId,
             slot,
+            now: nowIso,
+            ...(kind === "captura" || kind === "receipt"
+              ? {
+                  ...(mediaPaths[slot as "captura" | "receipt"]
+                    ? { sourcePath: mediaPaths[slot as "captura" | "receipt"] }
+                    : {}),
+                  ...(slipAmount && slipAmount > 0 ? { amount: slipAmount } : {}),
+                  ...(amountDefaults?.deposit ? { deposit: amountDefaults.deposit } : {}),
+                  ...(amountDefaults?.profitFinal ? { profitFinal: amountDefaults.profitFinal } : {}),
+                }
+              : {}),
             ...(kind === "bet"
               ? {
                   ...(mediaPaths[slot as keyof LiveMediaPaths]
@@ -371,11 +454,20 @@ export function LivePreviewPane({
         const data = (await res.json()) as {
           error?: string;
           path?: string;
+          source?: string;
           assets?: Array<{ path: string }>;
+          message?: string;
         };
         if (!res.ok && res.status !== 207) throw new Error(data.error ?? "Ошибка ИИ");
         const path = data.path ?? data.assets?.[0]?.path;
         if (path) onMediaPaths({ ...mediaPaths, [slot]: path });
+        if (data.source === "template") {
+          onError(
+            "Не удалось прочитать поля на скрине — показан исходный шаблон без замены суммы/имён.",
+          );
+        } else if (kind === "captura" || kind === "receipt") {
+          onError(data.message ?? null);
+        }
       }
       setMediaSlot(null);
     } catch (err) {
@@ -406,7 +498,7 @@ export function LivePreviewPane({
           <span>
             {mode === "review"
               ? "Тот же HTML, что уйдёт в канал"
-              : "Имя, ник, аватар, фон, цвета и тексты — сразу в телефоне"}
+              : "Имя, статус, аватар, фон, цвета и тексты — сразу в телефоне"}
             {" · "}
             {tzShort} · HH:mm
           </span>
@@ -450,7 +542,9 @@ export function LivePreviewPane({
             <strong>{SLOT_LABELS[mediaSlot] ?? mediaSlot}</strong>
             <p>
               {mediaSlot === "receipt" || mediaSlot === "captura"
-                ? "На этом же скрине банка заменятся сумма, имена, дата и 4 цифры. Новую фотку не рисуем."
+                ? mediaSlot === "captura"
+                  ? "На исходном шаблоне OXXO/банка проставятся сумма депозита, дата (время слева) и хвост карты. Полный отзыв не нужен."
+                  : "На исходном шаблоне проставятся сумма выплаты, дата и имена. Полный отзыв не обязателен."
                 : mediaSlot === "storyPhoto"
                   ? "Фото клиента генерируется без текста и имён — это кадр из жизни, не документ."
                   : mediaSlot.startsWith("bet")
@@ -486,7 +580,13 @@ export function LivePreviewPane({
                 disabled={mediaBusy}
                 onClick={() => void regenerateSlot(mediaSlot)}
               >
-                {mediaBusy ? "Печать…" : "Перепечатать поля"}
+                {mediaBusy
+                  ? "Печать…"
+                  : mediaSlot === "captura"
+                    ? "Проставить депозит"
+                    : mediaSlot === "receipt"
+                      ? "Проставить выплату"
+                      : "Перепечатать поля"}
               </button>
               <button
                 type="button"
@@ -516,9 +616,48 @@ export function LivePreviewPane({
         />
       </label>
 
+      {slidePositions.length > 1 ? (
+        <div className="ctor-live-slides" role="tablist" aria-label="Экраны альбома">
+          {slidePositions.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={i === slideIndex}
+              className={`ctor-live-slide${i === slideIndex ? " is-active" : ""}`}
+              onClick={() => goToSlide(i)}
+            >
+              {i + 1}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="ctor-live-pager">
+        <button
+          type="button"
+          className="admin-btn-ghost"
+          disabled={slideIndex <= 0}
+          onClick={() => goToSlide(slideIndex - 1)}
+        >
+          ← Назад
+        </button>
+        <span>
+          Экран {slideIndex + 1} / {Math.max(1, slidePositions.length)}
+        </span>
+        <button
+          type="button"
+          className="admin-btn-ghost"
+          disabled={slideIndex >= slidePositions.length - 1}
+          onClick={() => goToSlide(slideIndex + 1)}
+        >
+          Далее →
+        </button>
+      </div>
+
       <p className="ctor-live-hint">
-        Наведите на телефон и крутите колёсико — диалог с первого сообщения до последнего. Клик по
-        фото, чеку, ставке или аватару — заменить.
+        Листайте экраны как в альбоме канала (до {TARGET_SCREENSHOTS}). В примере уже есть фото,
+        условия, ставки и чеки — клик по кадру слева или справа заменяет его.
       </p>
     </aside>
   );

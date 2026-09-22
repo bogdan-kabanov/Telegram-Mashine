@@ -63,10 +63,13 @@ export default async function MediaPage() {
             <div>
               <h3>Чеки банков</h3>
               <p>
-                Не загружаются вручную: на исходном скрине из{" "}
-                <code>data/media/receipt_templates/&#123;project&#125;</code> подставляются сумма,
-                имена и дата. Ставки тоже не перерисовываются: суммы печатаются на готовом скрине.
-                Если поля чека не прочитались — HTML-заглушка.
+                Это не раздел «ставки» в медиатеке. Фото чека, который клиент шлёт после оплаты
+                (OXXO / Spin / Mercado…), кладётся в{" "}
+                <code>data/media/receipt_templates/&#123;project&#125;/</code> и прописывается в{" "}
+                <code>config/projects.json</code> → <code>receiptTemplates.client</code> (чек
+                пополнения) или <code>.manager</code> (чек выплаты). При отзыве ИИ подставит сумму,
+                имена и дату на этот же кадр. Имя файла с <code>detail</code> / <code>papel</code> —
+                бумажный чек; остальные чаще скрин приложения.
               </p>
             </div>
           </div>

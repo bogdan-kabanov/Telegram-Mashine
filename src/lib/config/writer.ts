@@ -7,9 +7,13 @@ import {
   clientLegendSchema,
   projectConfigSchema,
   scheduleConfigSchema,
+  amountPackSchema,
+  amountsConfigSchema,
   type ClientLegend,
   type ProjectConfig,
   type ScheduleConfig,
+  type AmountPack,
+  type AmountsConfig,
 } from "@/lib/schemas";
 import { getEnv } from "@/lib/schemas/env";
 
@@ -81,6 +85,40 @@ export async function updateSchedule(patch: Partial<ScheduleConfig>): Promise<Sc
   const config = await loadAppConfig();
   const next = scheduleConfigSchema.parse({ ...config.schedule, ...patch });
   await fs.writeFile(configPath("schedule.json"), `${JSON.stringify(next, null, 2)}\n`, "utf-8");
+  resetConfigCache();
+  return next;
+}
+
+export async function upsertAmountPack(pack: AmountPack): Promise<AmountsConfig> {
+  const config = await loadAppConfig();
+  const parsed = amountPackSchema.parse(pack);
+  const packs = [...config.amounts.packs];
+  const idx = packs.findIndex((p) => p.id === parsed.id);
+  if (idx >= 0) packs[idx] = parsed;
+  else packs.push(parsed);
+  const next = amountsConfigSchema.parse({
+    ...config.amounts,
+    packs,
+  });
+  await fs.writeFile(configPath("amounts.json"), `${JSON.stringify(next, null, 2)}\n`, "utf-8");
+  resetConfigCache();
+  return next;
+}
+
+export async function deleteAmountPack(packId: string): Promise<AmountsConfig> {
+  const config = await loadAppConfig();
+  const packs = config.amounts.packs.filter((p) => p.id !== packId);
+  if (packs.length === 0) {
+    throw new Error("Нельзя удалить последний пак сумм");
+  }
+  if (packs.length === config.amounts.packs.length) {
+    throw new Error(`Пак не найден: ${packId}`);
+  }
+  const next = amountsConfigSchema.parse({
+    ...config.amounts,
+    packs,
+  });
+  await fs.writeFile(configPath("amounts.json"), `${JSON.stringify(next, null, 2)}\n`, "utf-8");
   resetConfigCache();
   return next;
 }

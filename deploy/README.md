@@ -1,7 +1,8 @@
 # Deploy & CI/CD
 
-Production: `https://151-245-140-111.sslip.io/admin`  
+Production: `https://151-245-140-111.sslip.io/` (panel `/panel`, old admin `/admin`)  
 Server: `151.245.140.111` (`fi-vmmini`) · path `/opt/bot-ai`  
+Repo: https://github.com/bogdan-kabanov/Telegram-Mashine  
 **Runtime: Node.js + systemd + Nginx** (no Docker in production)
 
 ## Why native?
@@ -40,7 +41,7 @@ Deploy runs on the VPS (`runs-on: [self-hosted, linux, bot-ai]`).
 
 ### One-time: install self-hosted runner
 
-1. https://github.com/bogdan-kabanov/ai-telegram-panel/settings/actions/runners/new  
+1. https://github.com/bogdan-kabanov/Telegram-Mashine/settings/actions/runners/new  
 2. On the server:
 
 ```bash

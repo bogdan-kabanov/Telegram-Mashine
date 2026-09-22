@@ -59,6 +59,17 @@ export const projectConfigSchema = z.object({
   capturaStyle: receiptStyleSchema.optional(),
   /** Per-role AI reference templates (Vlad rules: which slips client vs manager may use). */
   receiptTemplates: receiptTemplatesSchema.optional(),
+  /**
+   * Shared library folders assigned to this project (under data/media/library/_shared/).
+   * Example: mediaFolders.bets = ["bets/okx", "bets/spin"] → uses those pools for screenshots.
+   */
+  mediaFolders: z
+    .object({
+      bets: z.array(z.string().min(1)).optional(),
+      receipts: z.array(z.string().min(1)).optional(),
+      conditions: z.array(z.string().min(1)).optional(),
+    })
+    .optional(),
   theme: projectThemeSchema,
   depositMessageTemplate: z.string().min(1),
   completionMessageTemplate: z.string().min(1),

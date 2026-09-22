@@ -5,7 +5,7 @@
 # Token: repo → Settings → Actions → Runners → New self-hosted runner
 set -euo pipefail
 
-REPO="${GITHUB_REPO:-bogdan-kabanov/ai-telegram-panel}"
+REPO="${GITHUB_REPO:-bogdan-kabanov/Telegram-Mashine}"
 RUNNER_DIR="${RUNNER_DIR:-/opt/actions-runner}"
 RUNNER_NAME="${RUNNER_NAME:-bot-ai-vps}"
 RUNNER_LABELS="${RUNNER_LABELS:-self-hosted,linux,x64,bot-ai}"

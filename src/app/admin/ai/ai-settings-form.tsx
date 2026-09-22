@@ -233,8 +233,8 @@ export function AiSettingsForm() {
       />
 
       <ModelSelect
-        label="Модель чеков"
-        help="Редактирование банковских чеков по шаблону (images.edit). Нужен gpt-image-1."
+        label="Модель чеков / ставок"
+        help="images.edit по исходному фото (чеки и ставки). Нужен gpt-image-1."
         value={settings.OPENAI_RECEIPT_IMAGE_MODEL}
         options={RECEIPT_MODEL_OPTIONS}
         onChange={(OPENAI_RECEIPT_IMAGE_MODEL) =>
@@ -267,7 +267,10 @@ export function AiSettingsForm() {
       </label>
 
       <label className="admin-field">
-        <LabelWithHelp label="Чеки (AI)" tip="Больше не рисует новую фотку чека. Суммы и имена печатаются на исходном скрине банка без OpenAI Images. Этот переключатель оставлен на случай старых настроек." />
+        <LabelWithHelp
+          label="Чеки / ставки (AI)"
+          tip="always/fallback: gpt-image правит копию исходника (чеки из receipt_templates, ставки из пака bets) — без белых OCR-плашек. Если ИИ упал: для ставок OCR-fallback, для чеков копия шаблона/HTML. off: только OCR/HTML. Исходники в library не перезаписываются."
+        />
         <select
           className="admin-select"
           style={field}

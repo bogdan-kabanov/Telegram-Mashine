@@ -7,8 +7,8 @@
       "currency": "MXN",
       "managerName": "Anastasia Manager",
       "managerHandle": "@Anastasiiaaa1091",
-      "clientAvatarPath": "data/media/avatars/nancy/1786824598344_photo_2026-05-13_14-04-05.jpg",
-      "wallpaperPath": "data/media/wallpapers/nancy.png",
+      "clientAvatarPath": "data/media/story_photos/pool/ai_1784812785611_4c17ee23.png",
+      "wallpaperPath": "data/media/wallpapers/nancy.jpg",
       "conditionsImagePath": "data/media/conditions/nancy/condiciones.jpg",
       "conditionsTexts": [
         "Permítame contarle brevemente todo para que le quede más claro. Usted invierte sus fondos, luego yo los transfiero a la bolsa, después de eso busco pares comerciales estables y seguros, como consecuencia de lo cual aumento sus ganancias 💰",
@@ -24,18 +24,19 @@
       "capturaStyle": "spin",
       "receiptTemplates": {
         "client": [
-          "01_banorte.jpg",
-          "02_mercado.jpg",
-          "02_oxxo_spin.jpg",
-          "03_spin.jpg",
-          "04_spin_detail.jpg",
-          "05_oxxo_spin.jpg"
+          "06_oxxo_papel.jpg",
+          "02_oxxo_spin.jpg"
         ],
         "manager": [
-          "01_banorte.jpg",
-          "02_mercado.jpg",
+          "04_spin_detail.jpg",
           "03_spin.jpg",
-          "04_spin_detail.jpg"
+          "02_mercado.jpg",
+          "01_banorte.jpg"
+        ]
+      },
+      "mediaFolders": {
+        "bets": [
+          "bets/nancy"
         ]
       },
       "theme": {
@@ -80,6 +81,11 @@
         "manager": [
           "02_compartamos.jpg",
           "04_azteca.jpg"
+        ]
+      },
+      "mediaFolders": {
+        "bets": [
+          "bets/grisel"
         ]
       },
       "theme": {
@@ -133,6 +139,11 @@
           "06_coolsia.jpg"
         ]
       },
+      "mediaFolders": {
+        "bets": [
+          "bets/melissa"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#F5E6FF",
@@ -181,6 +192,11 @@
           "04_bbva.jpg"
         ]
       },
+      "mediaFolders": {
+        "bets": [
+          "bets/paola"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#FFE8E8",
@@ -227,6 +243,11 @@
           "03_light.jpg"
         ]
       },
+      "mediaFolders": {
+        "bets": [
+          "bets/francesca"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#FFF3E0",
@@ -247,7 +268,7 @@
       "locale": "ru-RU",
       "currency": "RUB",
       "managerName": "Анна Тестова",
-      "managerHandle": "@Demo_RU",
+      "managerHandle": "@Богдан",
       "clientAvatarPath": "data/media/story_photos/pool/ai_1784812803851_e86a5bf0.png",
       "conditionsImagePath": "data/media/conditions/demo-ru/1785065110808_ChatGPT_Image_25_июл._2026_г._15_26_13.png",
       "conditionsTexts": [
@@ -255,6 +276,11 @@
       ],
       "receiptStyle": "generic",
       "capturaStyle": "generic",
+      "mediaFolders": {
+        "bets": [
+          "bets/nancy"
+        ]
+      },
       "theme": {
         "incomingBubble": "#FFFFFF",
         "outgoingBubble": "#E7FCC4",

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "next build",
+    "build": "npm run panel:build && next build",
     "start": "node scripts/start.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -13,6 +13,8 @@
     "seed:media": "node scripts/seed-media.mjs",
     "postinstall": "node scripts/playwright-install.mjs",
     "trim:receipts": "node scripts/trim-receipts.mjs",
+    "panel:dev": "npm --prefix panel run dev",
+    "panel:build": "npm --prefix panel install && npm --prefix panel run build",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",

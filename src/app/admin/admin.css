@@ -1381,6 +1381,15 @@ textarea.admin-input:focus {
   gap: 0.3rem;
 }
 
+.ctor-live-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted, #64748b);
+}
+
 .ctor-live-slide {
   min-width: 28px;
   height: 28px;
@@ -2471,6 +2480,159 @@ img.apple-emoji {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: #f4f9fc;
+}
+
+.ctor-patch {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8fafc;
+}
+
+.ctor-patch-title {
+  margin: 0;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ctor-patch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.35rem 0.75rem;
+}
+
+.ctor-patch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ctor-receipts {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8fafc;
+}
+
+.ctor-receipts-block {
+  display: grid;
+  gap: 0.45rem;
+  scroll-margin-top: 4.5rem;
+}
+
+.ctor-receipts-heading {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+
+.ctor-receipts-lead {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.ctor-receipts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 0.55rem;
+}
+
+.ctor-receipt-selected {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent, #2563eb) 45%, var(--line));
+  background: #fff;
+}
+
+.ctor-receipt-selected img {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+.ctor-receipt-selected strong {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.ctor-receipt-selected span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted, #64748b);
+  word-break: break-all;
+}
+
+.ctor-receipt-selected em {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  font-style: normal;
+  color: var(--accent, #2563eb);
+}
+
+.ctor-receipt-card {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.ctor-receipt-card.is-off {
+  opacity: 0.55;
+}
+
+.ctor-receipt-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ctor-receipt-card.is-selected .ctor-receipt-thumb {
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #2563eb) 25%, transparent);
+}
+
+.ctor-receipt-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ctor-receipt-thumb em {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #fff;
+  font-size: 0.65rem;
+  font-style: normal;
+}
+
+.ctor-receipt-pool {
+  font-size: 0.78rem;
 }
 
 .ctor-progress-head {

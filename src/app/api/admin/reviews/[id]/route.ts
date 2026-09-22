@@ -1,17 +1,24 @@
-import { betDepositForSlot, betProfitForSlot } from "@/lib/amounts/split-profit";
 import { NextRequest, NextResponse } from "next/server";
 
 import { bootstrapApp } from "@/lib/bootstrap";
 import { getProjectById } from "@/lib/config/loader";
 import { getReviewFromDb, saveReviewToDb } from "@/lib/db/reviews";
 import { toPublicScreenshotUrl } from "@/lib/media/screenshot-url";
+import { applyDialogAiFix } from "@/lib/openai/ai-fix";
 import { translateDialogMessages } from "@/lib/openai/translate-dialog";
+import {
+  applySlotToRenderMedia,
+  isPatchableMediaSlot,
+  regenerateReviewMediaSlot,
+  type PatchableMediaSlot,
+} from "@/lib/reviews/patch-media";
 import { getRuntimeManager } from "@/lib/runtime/manager";
 import {
   dialogMessageSchema,
   generatedDialogSchema,
   reviewPackageSchema,
   type DialogMessage,
+  type ReviewPackage,
 } from "@/lib/schemas";
 import type { GeneratedDialog } from "@/modules/dialog-generator";
 import { getChatRenderer } from "@/modules/chat-renderer";
@@ -28,6 +35,48 @@ async function loadReviewOr404(id: string) {
   if (!review) return null;
   return review;
 }
+
+async function rerenderReviewScreens(review: ReviewPackage) {
+  if (!review.dialog || !review.renderMedia) {
+    throw new Error("Нет данных для перерисовки (dialog/renderMedia).");
+  }
+  const project = await getProjectById(review.projectId);
+  const renderResult = await getChatRenderer().renderDialog({
+    dialog: review.dialog as GeneratedDialog,
+    project,
+    reviewId: review.id,
+    mediaAssets: {
+      sticker: review.renderMedia.sticker ?? null,
+      storyPhoto: review.renderMedia.storyPhoto ?? null,
+      conditions: review.renderMedia.conditions ?? null,
+      bet1: review.renderMedia.bet1 ?? null,
+      bet2: review.renderMedia.bet2 ?? null,
+      bet3: review.renderMedia.bet3 ?? null,
+      receipt: review.renderMedia.receipt ?? null,
+      captura: review.renderMedia.captura ?? null,
+    },
+    ...(review.slideTimes?.length ? { slideTimes: review.slideTimes } : {}),
+  });
+  const updated = reviewPackageSchema.parse({
+    ...review,
+    screenshots: renderResult.screenshots,
+  });
+  await getPublisher().saveReviewPackage(updated);
+  await saveReviewToDb(updated, renderResult.clientAvatarPath);
+  return updated;
+}
+
+function publicScreens(review: ReviewPackage, cacheBust?: number) {
+  const bust = cacheBust ?? Date.now();
+  return review.screenshots.map((p) => toPublicScreenshotUrl(p, bust));
+}
+
+function parseAmount(raw: unknown): number | undefined {
+  const parsedAmount =
+    typeof raw === "number" ? raw : Number(String(raw ?? "").replace(",", "."));
+  return Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined;
+}
+
 
 export async function GET(_request: NextRequest, context: RouteContext) {
   try {
@@ -117,8 +166,75 @@ export async function POST(request: NextRequest, context: RouteContext) {
       generate?: boolean;
       now?: string;
       amount?: number | string;
+      useAi?: boolean;
+      instruction?: string;
+      target?: string;
+      rerender?: boolean;
+      messageIndex?: number;
     };
     const action = body.action ?? "";
+
+    if (action === "aiFix") {
+      const instruction = (body.instruction ?? "").trim();
+      if (!instruction) {
+        return NextResponse.json({ error: "Укажите instruction (что не так)" }, { status: 400 });
+      }
+      if (!review.dialog) {
+        return NextResponse.json({ error: "Нет диалога для правки" }, { status: 400 });
+      }
+      const project = await getProjectById(review.projectId);
+      const target = body.target ?? "dialog";
+
+      if (target === "slot" && body.slot && isPatchableMediaSlot(body.slot)) {
+        const amt = parseAmount(body.amount);
+        const result = await regenerateReviewMediaSlot({
+          review,
+          slot: body.slot,
+          generate: true,
+          ...(amt !== undefined ? { amount: amt } : {}),
+        });
+        let current = reviewPackageSchema.parse({
+          ...review,
+          renderMedia: applySlotToRenderMedia(review.renderMedia, body.slot, result.path),
+          ...(result.dialog ? { dialog: result.dialog } : {}),
+        });
+        await getPublisher().saveReviewPackage(current);
+        await saveReviewToDb(current);
+        if (body.rerender !== false) {
+          current = await rerenderReviewScreens(current);
+        }
+        const screenshots = publicScreens(current);
+        return NextResponse.json({
+          ok: true,
+          message: `Слот ${body.slot} пересобран (${result.source ?? "ok"}). Инструкция сохранена в лог.`,
+          instruction,
+          review: { ...current, screenshots },
+          screenshots,
+        });
+      }
+
+      const messages = await applyDialogAiFix({
+        messages: review.dialog.messages,
+        instruction,
+        locale: project.locale,
+      });
+      let updated = reviewPackageSchema.parse({
+        ...review,
+        dialog: { ...review.dialog, messages },
+      });
+      await getPublisher().saveReviewPackage(updated);
+      await saveReviewToDb(updated);
+      if (body.rerender) {
+        updated = await rerenderReviewScreens(updated);
+      }
+      const screenshots = publicScreens(updated);
+      return NextResponse.json({
+        ok: true,
+        message: "Диалог поправлен по инструкции ИИ",
+        review: { ...updated, screenshots },
+        screenshots,
+      });
+    }
 
     if (action === "translate") {
       if (!review.dialog) {
@@ -159,64 +275,43 @@ export async function POST(request: NextRequest, context: RouteContext) {
           { status: 400 },
         );
       }
-      const project = await getProjectById(review.projectId);
-      const renderResult = await getChatRenderer().renderDialog({
-        dialog: review.dialog as GeneratedDialog,
-        project,
-        reviewId: review.id,
-        mediaAssets: {
-          sticker: review.renderMedia.sticker ?? null,
-          storyPhoto: review.renderMedia.storyPhoto ?? null,
-          conditions: review.renderMedia.conditions ?? null,
-          bet1: review.renderMedia.bet1 ?? null,
-          bet2: review.renderMedia.bet2 ?? null,
-          bet3: review.renderMedia.bet3 ?? null,
-          receipt: review.renderMedia.receipt ?? null,
-          captura: review.renderMedia.captura ?? null,
-        },
-        ...(review.slideTimes?.length ? { slideTimes: review.slideTimes } : {}),
-      });
-      const updated = reviewPackageSchema.parse({
-        ...review,
-        screenshots: renderResult.screenshots,
-      });
-      await getPublisher().saveReviewPackage(updated);
-      await saveReviewToDb(updated, renderResult.clientAvatarPath);
+      const updated = await rerenderReviewScreens(review);
+      const screenshots = publicScreens(updated);
       return NextResponse.json({
         ok: true,
-        screenshots: updated.screenshots.map(toPublicScreenshotUrl),
+        screenshots,
         review: {
           ...updated,
-          screenshots: updated.screenshots.map(toPublicScreenshotUrl),
+          screenshots,
         },
       });
     }
 
-    if (action === "replaceMedia") {
-      const slot = (body as { slot?: string }).slot;
-      const path = (body as { path?: string }).path;
-      const generate = (body as { generate?: boolean }).generate === true;
+    if (action === "replaceMedia" || action === "patchMedia") {
+      const wantRerender = (body as { rerender?: boolean }).rerender === true;
       const nowRaw = (body as { now?: string }).now;
-      const amountRaw = (body as { amount?: number | string }).amount;
-      const parsedAmount =
-        typeof amountRaw === "number"
-          ? amountRaw
-          : Number(String(amountRaw ?? "").replace(",", "."));
-      const overrideAmount =
-        Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined;
-      const allowed = new Set([
-        "storyPhoto",
-        "conditions",
-        "bet1",
-        "bet2",
-        "bet3",
-        "receipt",
-        "captura",
-        "sticker",
-      ]);
-      if (!slot || !allowed.has(slot)) {
-        return NextResponse.json({ error: "Неизвестный слот медиа" }, { status: 400 });
+      const amounts = (body as { amounts?: Record<string, number | string> }).amounts ?? {};
+
+      const slots: PatchableMediaSlot[] = [];
+      if (action === "patchMedia") {
+        const rawSlots = (body as { slots?: string[] }).slots ?? [];
+        for (const s of rawSlots) {
+          if (!isPatchableMediaSlot(s)) {
+            return NextResponse.json({ error: `Неизвестный слот: ${s}` }, { status: 400 });
+          }
+          slots.push(s);
+        }
+        if (slots.length === 0) {
+          return NextResponse.json({ error: "Выберите хотя бы один слот" }, { status: 400 });
+        }
+      } else {
+        const slot = (body as { slot?: string }).slot;
+        if (!slot || !isPatchableMediaSlot(slot)) {
+          return NextResponse.json({ error: "Неизвестный слот медиа" }, { status: 400 });
+        }
+        slots.push(slot);
       }
+
       if (!review.renderMedia && !review.dialog) {
         return NextResponse.json(
           { error: "Сначала соберите полный отзыв — тогда чеки и ставки можно менять точечно." },
@@ -224,197 +319,92 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
       }
 
-      let nextPath = path?.trim() || "";
-      const project = await getProjectById(review.projectId);
-      let slipSource: "overlay" | "ai" | "template" | "html" | undefined;
+      let current: ReviewPackage = review;
+      const patched: Array<{ slot: string; path: string; source?: string }> = [];
+      const singlePath = (body as { path?: string }).path;
+      const singleGenerate = (body as { generate?: boolean }).generate === true;
+      const singleAmount = parseAmount((body as { amount?: number | string }).amount);
 
-      if (generate) {
-        if (slot === "storyPhoto") {
-          const { generateClientPhoto } = await import("@/lib/openai/images");
-          const hint =
-            review.dialog?.messages
-              .filter((m) => m.role === "client" && m.type === "text")
-              .slice(0, 4)
-              .map((m) => m.content)
-              .join(" ")
-              .slice(0, 400) || undefined;
-          const generated = await generateClientPhoto({
-            projectId: project.id,
-            clientName: review.clientName,
-            locale: project.locale,
-            ...(hint ? { hint } : {}),
-            saveToPool: true,
+      for (const slot of slots) {
+        const generate = action === "patchMedia" ? true : singleGenerate;
+        const path = action === "replaceMedia" && slots.length === 1 ? singlePath : undefined;
+        const amount =
+          parseAmount(amounts[slot]) ??
+          (action === "replaceMedia" && slots[0] === slot ? singleAmount : undefined);
+
+        try {
+          const result = await regenerateReviewMediaSlot({
+            review: current,
+            slot,
+            generate,
+            ...(path ? { path } : {}),
+            ...(nowRaw ? { now: nowRaw } : {}),
+            ...(amount !== undefined ? { amount } : {}),
           });
-          if (!generated) throw new Error("Не удалось сгенерировать фото");
-          nextPath = generated.path;
-        } else if (slot === "receipt" || slot === "captura") {
-          if (!review.dialog) {
-            return NextResponse.json({ error: "Нет диалога для пересборки чека" }, { status: 400 });
-          }
-          const { loadAppConfig } = await import("@/lib/config/loader");
-          const { localeClockConfig } = await import("@/lib/i18n/locale-profile");
-          const { buildMessageClock } = await import("@/lib/format");
-          const { getMediaHandler } = await import("@/modules/media-handler");
-          const config = await loadAppConfig();
-          const clockCfg = localeClockConfig(project.locale);
-          const now = nowRaw ? new Date(nowRaw) : new Date();
-          const clock = buildMessageClock(review.dialog.messages, {
-            now,
-            timeZone: clockCfg.timeZone,
-            locale: clockCfg.locale,
+          const renderMedia = applySlotToRenderMedia(current.renderMedia, slot, result.path);
+          current = reviewPackageSchema.parse({
+            ...current,
+            renderMedia,
+            ...(result.dialog ? { dialog: result.dialog } : {}),
           });
-          const depositBank = config.banks.depositBanks.find((b) => b.id === review.dialog!.depositBankId);
-          const payoutBank = config.banks.payoutBanks.find((b) => b.id === review.dialog!.payoutBankId);
-          const mediaHandler = getMediaHandler();
-          if (slot === "captura") {
-            const stamp =
-              clock.stampForType(review.dialog.messages, "captura") ?? clock.stampAtDelay(40);
-            const capturaAmount = overrideAmount ?? review.dialog.deposit;
-            const captura = await mediaHandler.generateCaptura({
-              amount: capturaAmount,
-              currency: project.currency,
-              senderName: review.dialog.clientName,
-              recipientLabel: project.managerName,
-              clabe: review.dialog.clabe,
-              bankId: review.dialog.depositBankId,
-              bankName: depositBank?.shortName ?? depositBank?.name ?? "Banco",
-              date: stamp.date,
-              time: stamp.time,
-              accountLastDigits: review.dialog.accountLastDigits,
-              project,
-              ...(project.capturaStyle ? { style: project.capturaStyle } : {}),
-            });
-            nextPath = captura.path;
-            slipSource = captura.source;
-            if (overrideAmount) {
-              review.dialog.deposit = overrideAmount;
-            }
-          } else {
-            const stamp =
-              clock.stampForType(review.dialog.messages, "receipt") ??
-              clock.stampAt(review.dialog.messages.length - 1);
-            const receiptAmount = overrideAmount ?? review.dialog.payoutAmount;
-            const receipt = await mediaHandler.generateReceipt({
-              amount: receiptAmount,
-              currency: project.currency,
-              senderName: project.managerName,
-              recipientName: review.dialog.clientName,
-              bankId: review.dialog.payoutBankId,
-              bankName: payoutBank?.shortName ?? payoutBank?.name ?? "Banco",
-              accountLastDigits: review.dialog.accountLastDigits,
-              date: stamp.date,
-              time: stamp.time,
-              project,
-              ...(project.receiptStyle ? { style: project.receiptStyle } : {}),
-            });
-            nextPath = receipt.path;
-            slipSource = receipt.source;
-            if (overrideAmount) {
-              review.dialog.payoutAmount = overrideAmount;
-            }
-          }
-        } else if (slot.startsWith("bet")) {
-          if (!review.dialog) {
-            return NextResponse.json({ error: "Нет диалога для сумм на ставке" }, { status: 400 });
-          }
-          const { stampExistingBet, stampProjectBetSlot } = await import("@/lib/media/stamp-bets");
-          const slotNum = slot === "bet2" ? 2 : slot === "bet3" ? 3 : 1;
-          const profit =
-            overrideAmount ??
-            betProfitForSlot(
-              {
-                profit1: review.dialog.profit1,
-                profit2: review.dialog.profit2,
-                profit3: review.dialog.profit3 ?? 0,
-                profitFinal: review.dialog.profitFinal,
-              },
-              slotNum,
-            );
-          const slotDeposit = betDepositForSlot(
-            {
-              deposit: review.dialog.deposit,
-              profit1: review.dialog.profit1,
-              profit2: review.dialog.profit2,
-            },
-            slotNum,
-          );
-          const source = (review.renderMedia?.[slot as "bet1" | "bet2" | "bet3"] ?? "").trim();
-          try {
-            if (source) {
-              const stamped = await stampExistingBet({
-                sourcePath: source,
-                projectId: project.id,
-                deposit: slotDeposit,
-                profit,
-                currency: project.currency,
-                name: review.dialog.clientName,
-              });
-              nextPath = stamped.path;
-            } else {
-              const stamped = await stampProjectBetSlot({
-                projectId: project.id,
-                slot: slotNum,
-                deposit: slotDeposit,
-                profit,
-                currency: project.currency,
-                name: review.dialog.clientName,
-              });
-              nextPath = stamped.path;
-            }
-            slipSource = "overlay";
-            if (overrideAmount) {
-              if (slot === "bet1") review.dialog.profit1 = overrideAmount;
-              else if (slot === "bet2") review.dialog.profit2 = overrideAmount;
-              else review.dialog.profit3 = overrideAmount;
-            }
-          } catch (err) {
-            const message = err instanceof Error ? err.message : "Не удалось проставить суммы на ставке";
-            return NextResponse.json({ error: message }, { status: 502 });
-          }
-        } else {
-          const { generateSceneMedia } = await import("@/lib/openai/scene-media");
-          const kind = slot === "conditions" ? "conditions" : "sticker";
-          const generated = await generateSceneMedia({
-            kind,
-            projectId: kind === "sticker" ? null : project.id,
-            projectName: project.name,
-            locale: project.locale,
-            currency: project.currency,
-            clientName: review.clientName,
-            reviewId: review.id,
-            force: true,
+          patched.push({
+            slot,
+            path: result.path,
+            ...(result.source ? { source: result.source } : {}),
           });
-          if (!generated) throw new Error("Не удалось сгенерировать медиа");
-          nextPath = generated.path;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Ошибка слота";
+          return NextResponse.json({ error: `${slot}: ${message}` }, { status: 502 });
         }
       }
 
-      if (!nextPath) {
-        return NextResponse.json({ error: "Укажите файл или включите generate" }, { status: 400 });
+      await getPublisher().saveReviewPackage(current);
+      await saveReviewToDb(current);
+
+      let bust = Date.now();
+      if (wantRerender) {
+        try {
+          current = await rerenderReviewScreens(current);
+          bust = Date.now();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Ошибка перерисовки";
+          return NextResponse.json(
+            {
+              error: message,
+              ok: false,
+              patched,
+              review: {
+                ...current,
+                screenshots: publicScreens(current, bust),
+              },
+            },
+            { status: 502 },
+          );
+        }
       }
 
-      const renderMedia = {
-        sticker: review.renderMedia?.sticker ?? null,
-        storyPhoto: review.renderMedia?.storyPhoto ?? null,
-        conditions: review.renderMedia?.conditions ?? null,
-        bet1: review.renderMedia?.bet1 ?? null,
-        bet2: review.renderMedia?.bet2 ?? null,
-        bet3: review.renderMedia?.bet3 ?? null,
-        receipt: review.renderMedia?.receipt ?? null,
-        captura: review.renderMedia?.captura ?? null,
-        [slot]: nextPath,
-      };
-      const updated = reviewPackageSchema.parse({ ...review, renderMedia });
-      await getPublisher().saveReviewPackage(updated);
-      await saveReviewToDb(updated);
+      const screenshots = publicScreens(current, bust);
+      const primary = patched[0];
+      const usedOverlay = patched.some((p) => p.source === "overlay");
+      const usedAi = patched.some((p) => p.source === "ai");
       return NextResponse.json({
         ok: true,
-        slot,
-        path: nextPath,
-        ...(slipSource ? { source: slipSource } : {}),
+        ...(primary
+          ? {
+              slot: primary.slot,
+              path: primary.path,
+              ...(primary.source ? { source: primary.source } : {}),
+            }
+          : {}),
+        patched,
+        rerendered: wantRerender,
+        screenshots,
+        warning: usedOverlay && !usedAi
+          ? "Чеки собраны OCR-наклейкой (нет рабочего OpenAI images.edit). Для реалистичного текста нужен ключ gpt-image-1 в .env /admin/ai."
+          : undefined,
         review: {
-          ...updated,
-          screenshots: updated.screenshots.map(toPublicScreenshotUrl),
+          ...current,
+          screenshots,
         },
       });
     }
@@ -444,7 +434,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json(
-      { error: "Unknown action. Use translate | rerender | publish" },
+      {
+        error:
+          "Unknown action. Use translate | rerender | replaceMedia | patchMedia | publish | aiFix",
+      },
       { status: 400 },
     );
   } catch (error) {

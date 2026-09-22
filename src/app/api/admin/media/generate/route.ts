@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import path from "path";
 
 import { bootstrapApp } from "@/lib/bootstrap";
 import { withBasePath } from "@/lib/base-path";
 import { getProjectById, loadAppConfig } from "@/lib/config/loader";
 import { stampExistingBet, stampProjectBetPack, stampProjectBetSlot } from "@/lib/media/stamp-bets";
+import { resolveTemplateFilenameForRegen } from "@/lib/media/slip-source";
 import { isOpenAIConfigured } from "@/lib/openai/client";
 import { generateClientPhoto, isAiClientPhotoEnabled } from "@/lib/openai/images";
 import {
@@ -13,6 +15,8 @@ import {
 } from "@/lib/openai/scene-media";
 import { betDepositForSlot, betProfitForSlot } from "@/lib/amounts/split-profit";
 import { resolveBetPackNumber } from "@/lib/schemas/amounts";
+import { localeClockConfig } from "@/lib/i18n/locale-profile";
+import { getMediaHandler } from "@/modules/media-handler";
 
 const SCENE_KINDS = new Set<SceneMediaKind>(["conditions", "sticker", "avatar", "wallpaper"]);
 
@@ -21,6 +25,22 @@ export const maxDuration = 120;
 
 function mediaFileUrl(relPath: string): string {
   return withBasePath(`/api/admin/media/file?path=${encodeURIComponent(relPath)}`);
+}
+
+function formatSlipDate(now: Date, timeZone: string, locale: string): { date: string; time: string } {
+  const date = new Intl.DateTimeFormat(locale, {
+    timeZone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(now);
+  const time = new Intl.DateTimeFormat(locale, {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(now);
+  return { date, time };
 }
 
 export async function POST(request: NextRequest) {
@@ -44,10 +64,147 @@ export async function POST(request: NextRequest) {
       randomPack?: boolean;
       sourcePath?: string;
       slot?: string;
+      /** captura | receipt slip stamp */
+      amount?: number;
+      templateFilename?: string;
+      now?: string;
+      recipientName?: string;
+      senderName?: string;
+      accountLastDigits?: string;
     };
 
     const kind = (body.kind ?? "story_photo").trim();
     const count = Math.min(Math.max(Number(body.count) || 1, 1), 5);
+
+    if (kind === "captura" || kind === "receipt") {
+      if (!body.projectId) {
+        return NextResponse.json({ error: "Выберите проект для чека." }, { status: 400 });
+      }
+      const project = await getProjectById(body.projectId);
+      const config = await loadAppConfig();
+      const pack =
+        (body.amountPackId
+          ? config.amounts.packs.find((p) => p.id === body.amountPackId)
+          : undefined) ?? config.amounts.packs.find((p) => p.projectId === project.id);
+      const clockCfg = localeClockConfig(project.locale);
+      const now = body.now ? new Date(body.now) : new Date();
+      const { date, time } = formatSlipDate(now, clockCfg.timeZone, clockCfg.locale);
+      const templateFilename = resolveTemplateFilenameForRegen({
+        explicit: body.templateFilename,
+        mediaPath: body.sourcePath,
+      });
+      const mediaHandler = getMediaHandler();
+      const digits =
+        (body.accountLastDigits ?? "").replace(/\D/g, "").slice(-4) ||
+        String(Math.floor(1000 + Math.random() * 9000));
+
+      if (kind === "captura") {
+        const amount =
+          Number(body.amount) > 0
+            ? Number(body.amount)
+            : Number(body.deposit) > 0
+              ? Number(body.deposit)
+              : (pack?.deposit ?? 0);
+        if (!(amount > 0)) {
+          return NextResponse.json(
+            { error: "Укажите сумму депозита (поле «Сумма на чеке» или пак сумм)." },
+            { status: 400 },
+          );
+        }
+        const depositBank = config.banks.depositBanks[0];
+        const slip = await mediaHandler.generateCaptura({
+          amount,
+          currency: project.currency,
+          senderName: body.senderName?.trim() || body.clientName?.trim() || "Cliente",
+          recipientLabel: body.recipientName?.trim() || project.managerName,
+          clabe: `0000000000000000${digits}`,
+          bankId: depositBank?.id ?? "spin",
+          bankName: depositBank?.shortName ?? depositBank?.name ?? "Spin",
+          date,
+          time,
+          accountLastDigits: digits,
+          project,
+          ...(project.capturaStyle ? { style: project.capturaStyle } : {}),
+          ...(templateFilename ? { templateFilename } : {}),
+        });
+        return NextResponse.json({
+          ok: true,
+          count: 1,
+          kind: "captura",
+          source: slip.source,
+          path: slip.path,
+          assets: [
+            {
+              id: slip.id,
+              path: slip.path,
+              filename: path.basename(slip.path),
+              url: mediaFileUrl(slip.path),
+              type: "captura",
+            },
+          ],
+          message:
+            slip.source === "ai"
+              ? "Чек депозита переписан ИИ (gpt-image) с исходного шаблона."
+              : slip.source === "overlay"
+                ? "OCR-штамп (AI_RECEIPTS=off). Включи always в настройках ИИ."
+                : slip.source === "template"
+                  ? "ИИ не ответил — показан исходный шаблон без правки сумм."
+                  : `Чек депозита: источник ${slip.source}.`,
+        });
+      }
+
+      const amount =
+        Number(body.amount) > 0
+          ? Number(body.amount)
+          : Number(body.profitFinal) > 0
+            ? Number(body.profitFinal)
+            : (pack?.profitFinal ?? 0);
+      if (!(amount > 0)) {
+        return NextResponse.json(
+          { error: "Укажите сумму выплаты (поле «Сумма на чеке» или пак сумм)." },
+          { status: 400 },
+        );
+      }
+      const payoutBank = config.banks.payoutBanks[0];
+      const slip = await mediaHandler.generateReceipt({
+        amount,
+        currency: project.currency,
+        senderName: body.senderName?.trim() || project.managerName,
+        recipientName: body.recipientName?.trim() || body.clientName?.trim() || "Cliente",
+        bankId: payoutBank?.id ?? "spin",
+        bankName: payoutBank?.shortName ?? payoutBank?.name ?? "Spin",
+        accountLastDigits: digits,
+        date,
+        time,
+        project,
+        ...(project.receiptStyle ? { style: project.receiptStyle } : {}),
+        ...(templateFilename ? { templateFilename } : {}),
+      });
+      return NextResponse.json({
+        ok: true,
+        count: 1,
+        kind: "receipt",
+        source: slip.source,
+        path: slip.path,
+        assets: [
+          {
+            id: slip.id,
+            path: slip.path,
+            filename: path.basename(slip.path),
+            url: mediaFileUrl(slip.path),
+            type: "receipt",
+          },
+        ],
+          message:
+            slip.source === "ai"
+              ? "Чек выплаты переписан ИИ (gpt-image) с исходного шаблона."
+              : slip.source === "overlay"
+                ? "OCR-штамп (AI_RECEIPTS=off). Включи always в настройках ИИ."
+                : slip.source === "template"
+                  ? "ИИ не ответил — показан исходный шаблон без правки сумм."
+                  : `Чек выплаты: источник ${slip.source}.`,
+        });
+    }
 
     if (kind === "bet") {
       if (!body.projectId) {

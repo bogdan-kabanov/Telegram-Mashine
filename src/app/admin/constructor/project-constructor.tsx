@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { splitProfitProgression, type CustomAmounts } from "@/lib/amounts/split-profit";
 import { withBasePath } from "@/lib/base-path";
+import { chatUiForLocale } from "@/lib/i18n/chat-ui";
 
 import { ControlButtons } from "../control-buttons";
 import { ScreenshotGallery } from "../screenshot-gallery";
@@ -26,6 +27,10 @@ export interface ConstructorProject {
   conditionsTexts?: string[];
   managerAvatarPath: string | null;
   clientAvatarPath: string | null;
+  receiptTemplates?: {
+    client: string[];
+    manager: string[];
+  };
   theme: {
     incomingBubble: string;
     outgoingBubble: string;
@@ -47,6 +52,15 @@ interface MediaAsset {
   isVideo: boolean;
 }
 
+type ReceiptTemplateFile = {
+  filename: string;
+  path: string;
+  url: string;
+  medium: "paper" | "app";
+  inClient: boolean;
+  inManager: boolean;
+};
+
 type StepId = "project" | "profile" | "look" | "conditions" | "texts" | "media" | "preview" | "launch";
 
 /** Steps mirror TZ §2 (product story) + README assets checklist. */
@@ -55,6 +69,8 @@ const STEPS: Array<{
   title: string;
   short: string;
   doc: string;
+  /** Optional deep-link inside the section (e.g. receipts). */
+  anchor?: string;
 }> = [
   {
     id: "project",
@@ -66,13 +82,13 @@ const STEPS: Array<{
     id: "profile",
     title: "Профиль",
     short: "Имя и аватар",
-    doc: "Шапка чата: имя и ник менеджера, как на реальном аккаунте.",
+    doc: "Шапка чата: имя и статус под ним. Ник (@…) только для подписей к постам.",
   },
   {
     id: "look",
     title: "Вид чата",
     short: "Фон и тема",
-    doc: "README / ТЗ: фон чата и цвета пузырей (тема Telegram) на каждый проект.",
+    doc: "README / ТЗ: фон чата, фото для истории и цвета пузырей на каждый проект.",
   },
   {
     id: "conditions",
@@ -89,8 +105,9 @@ const STEPS: Array<{
   {
     id: "media",
     title: "Живое медиа",
-    short: "Ставки и кружки",
-    doc: "ТЗ §3.2 и §4.5: в полном отзыве нужны фото / кружок / ставки из библиотеки.",
+    short: "Чеки и ставки",
+    doc: "Сверху — чек пополнения (клиент) и чек выплаты. Ниже ставки, кружки и фото.",
+    anchor: "ctor-captura",
   },
   {
     id: "preview",
@@ -165,6 +182,19 @@ export function ProjectConstructor({
     startedAt: number;
   } | null>(null);
   const [genTick, setGenTick] = useState(0);
+  const [patchSlots, setPatchSlots] = useState<Record<string, boolean>>({
+    storyPhoto: false,
+    captura: true,
+    receipt: true,
+    bet1: false,
+    bet2: false,
+    bet3: false,
+    conditions: false,
+  });
+  const [patchRerender, setPatchRerender] = useState(true);
+  const [patchBusy, setPatchBusy] = useState(false);
+  const [receiptTemplates, setReceiptTemplates] = useState<ReceiptTemplateFile[]>([]);
+  const [receiptBusy, setReceiptBusy] = useState(false);
 
   useEffect(() => {
     if (!genProgress) return;
@@ -191,6 +221,14 @@ export function ProjectConstructor({
     setSlideTimesIso(iso);
   }, []);
 
+  const bustScreenshotUrls = useCallback((urls: string[]) => {
+    const bust = Date.now();
+    return urls.map((u) => {
+      if (!u || /[?&]v=/.test(u)) return u;
+      return `${u}${u.includes("?") ? "&" : "?"}v=${bust}`;
+    });
+  }, []);
+
   const loadLastReview = useCallback(async (pid: string) => {
     try {
       const res = await fetch(`/api/admin/reviews?projectId=${encodeURIComponent(pid)}&limit=1`);
@@ -202,7 +240,7 @@ export function ProjectConstructor({
       if (!last) return;
 
       setReviewId(last.id);
-      setScreenshots(last.screenshots ?? []);
+      setScreenshots(bustScreenshotUrls(last.screenshots ?? []));
 
       const detailRes = await fetch(`/api/admin/reviews/${last.id}`);
       if (!detailRes.ok) return;
@@ -215,12 +253,12 @@ export function ProjectConstructor({
     } catch {
       // no prior review
     }
-  }, []);
+  }, [bustScreenshotUrls]);
 
   const applyReviewResult = useCallback(
     async (nextReviewId: string, nextScreenshots: string[]) => {
       setReviewId(nextReviewId);
-      setScreenshots(nextScreenshots);
+      setScreenshots(bustScreenshotUrls(nextScreenshots));
       if (!nextReviewId) return;
       try {
         const detailRes = await fetch(`/api/admin/reviews/${nextReviewId}`);
@@ -238,7 +276,7 @@ export function ProjectConstructor({
         document.getElementById("ctor-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     },
-    [],
+    [bustScreenshotUrls],
   );
 
   const [form, setForm] = useState({
@@ -252,6 +290,8 @@ export function ProjectConstructor({
     accentColor: project?.theme.accentColor ?? "#34C759",
     twoPhaseReview: project?.twoPhaseReview ?? false,
   });
+
+  const chatUi = useMemo(() => chatUiForLocale(project?.locale ?? "ru"), [project?.locale]);
 
   useEffect(() => {
     if (!project) return;
@@ -285,9 +325,30 @@ export function ProjectConstructor({
     setAssets(data.assets ?? []);
   }, []);
 
+  const loadReceiptTemplates = useCallback(async (pid: string) => {
+    if (!pid) {
+      setReceiptTemplates([]);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/admin/receipt-templates?projectId=${encodeURIComponent(pid)}`,
+      );
+      const data = (await res.json()) as { files?: ReceiptTemplateFile[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Не удалось загрузить шаблоны чеков");
+      setReceiptTemplates(data.files ?? []);
+    } catch {
+      setReceiptTemplates([]);
+    }
+  }, []);
+
   useEffect(() => {
     void loadAssets();
   }, [loadAssets]);
+
+  useEffect(() => {
+    void loadReceiptTemplates(projectId);
+  }, [projectId, loadReceiptTemplates]);
 
   const counts = useMemo(() => {
     const forProject = (type: string) =>
@@ -385,6 +446,184 @@ export function ProjectConstructor({
       launch: initialStatus === "running",
     };
   }, [project, form, counts, screenshots.length, initialStatus]);
+
+  async function uploadReceiptTemplate(role: "client" | "manager", file: File) {
+    if (!project) return;
+    setReceiptBusy(true);
+    setMessage("");
+    try {
+      const body = new FormData();
+      body.set("projectId", project.id);
+      body.set("role", role);
+      body.set("file", file);
+      const res = await fetch("/api/admin/receipt-templates", { method: "POST", body });
+      const data = (await res.json()) as {
+        error?: string;
+        file?: ReceiptTemplateFile;
+        pools?: { client: string[]; manager: string[] };
+      };
+      if (!res.ok) throw new Error(data.error ?? "Ошибка загрузки чека");
+      await loadReceiptTemplates(project.id);
+      if (data.file) {
+        const slot = role === "client" ? "captura" : "receipt";
+        setLiveMedia((prev) => ({ ...prev, [slot]: data.file!.path }));
+        setLocalProjects((prev) =>
+          prev.map((p) => {
+            if (p.id !== project.id || !data.pools) return p;
+            return { ...p, receiptTemplates: data.pools };
+          }),
+        );
+      }
+      setMessage(
+        role === "client"
+          ? "Чек пополнения добавлен и выбран в превью"
+          : "Чек выплаты добавлен и выбран в превью",
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setReceiptBusy(false);
+    }
+  }
+
+  async function toggleReceiptPool(
+    role: "client" | "manager",
+    filename: string,
+    enabled: boolean,
+  ) {
+    if (!project) return;
+    setReceiptBusy(true);
+    try {
+      const res = await fetch("/api/admin/receipt-templates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id, filename, role, enabled }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        pools?: { client: string[]; manager: string[] };
+      };
+      if (!res.ok) throw new Error(data.error ?? "Не удалось обновить пул");
+      await loadReceiptTemplates(project.id);
+      if (data.pools) {
+        setLocalProjects((prev) =>
+          prev.map((p) => {
+            if (p.id !== project.id) return p;
+            return { ...p, receiptTemplates: data.pools! };
+          }),
+        );
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setReceiptBusy(false);
+    }
+  }
+
+  function selectReceiptTemplate(role: "client" | "manager", file: ReceiptTemplateFile) {
+    const slot = role === "client" ? "captura" : "receipt";
+    setLiveMedia((prev) => ({ ...prev, [slot]: file.path }));
+    if (reviewId) {
+      void fetch(`/api/admin/reviews/${reviewId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "replaceMedia",
+          slot,
+          path: file.path,
+          rerender: true,
+        }),
+      })
+        .then(async (res) => {
+          const data = (await res.json()) as { screenshots?: string[]; error?: string };
+          if (res.ok && data.screenshots) setScreenshots(data.screenshots);
+        })
+        .catch(() => undefined);
+    }
+    setMessage(
+      role === "client"
+        ? `В превью: чек пополнения «${file.filename}» — нажмите «Проставить депозит»`
+        : `В превью: чек выплаты «${file.filename}» — нажмите «Проставить выплату»`,
+    );
+  }
+
+  async function stampSelectedSlip(slot: "captura" | "receipt") {
+    if (!project) return;
+    const sourcePath = liveMedia[slot];
+    if (!sourcePath) {
+      setMessage(
+        slot === "captura"
+          ? "Сначала кликните шаблон чека пополнения"
+          : "Сначала кликните шаблон чека выплаты",
+      );
+      return;
+    }
+    const amount =
+      slot === "captura"
+        ? effectiveAmounts?.deposit ?? null
+        : effectiveAmounts
+          ? project.id === "francesca"
+            ? Math.round(effectiveAmounts.profitFinal * 0.9)
+            : effectiveAmounts.profitFinal
+          : null;
+    if (!amount || amount <= 0) {
+      setMessage("Укажите итоговую прибыль / пак сумм в блоке «Полный отзыв» — оттуда берётся депозит.");
+      return;
+    }
+    setReceiptBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/media/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: slot,
+          projectId: project.id,
+          sourcePath,
+          amount,
+          deposit: effectiveAmounts?.deposit,
+          profitFinal: effectiveAmounts?.profitFinal,
+        }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        path?: string;
+        source?: string;
+        message?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Не удалось проставить чек");
+      if (data.path) {
+        setLiveMedia((prev) => ({ ...prev, [slot]: data.path! }));
+        if (reviewId) {
+          void fetch(`/api/admin/reviews/${reviewId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "replaceMedia",
+              slot,
+              path: data.path,
+              rerender: true,
+            }),
+          })
+            .then(async (r) => {
+              const j = (await r.json()) as { screenshots?: string[] };
+              if (r.ok && j.screenshots) setScreenshots(j.screenshots);
+            })
+            .catch(() => undefined);
+        }
+      }
+      setMessage(
+        data.message ??
+          (slot === "captura"
+            ? `Чек депозита готов (${amount} ${project.currency})`
+            : `Чек выплаты готов (${amount} ${project.currency})`),
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setReceiptBusy(false);
+    }
+  }
 
   async function upload(type: string, file: File, requireProject = true) {
     if (requireProject && !projectId) {
@@ -605,8 +844,21 @@ export function ProjectConstructor({
         void fetch(`/api/admin/reviews/${reviewId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "replaceMedia", slot: livePickSlot, path: asset.path }),
-        });
+          body: JSON.stringify({
+            action: "replaceMedia",
+            slot: livePickSlot,
+            path: asset.path,
+            rerender: true,
+          }),
+        })
+          .then(async (res) => {
+            const data = (await res.json()) as { screenshots?: string[]; error?: string };
+            if (res.ok && data.screenshots) setScreenshots(data.screenshots);
+          })
+          .catch(() => undefined);
+      }
+      if (livePickSlot === "storyPhoto") {
+        setMediaPreview((prev) => ({ ...prev, story_photo: asset.url }));
       }
       setLivePickSlot(null);
       setPickerKind(null);
@@ -712,6 +964,85 @@ export function ProjectConstructor({
     await applyReviewResult(data.reviewId ?? "", data.screenshots ?? []);
     setMessage(`Готово: ${(data.screenshots ?? []).length} скринов`);
     setGenProgress(null);
+  }
+
+  async function patchSelectedMedia() {
+    if (!reviewId) {
+      setMessage("Сначала соберите полный отзыв один раз — потом можно править точечно.");
+      return;
+    }
+    const slots = Object.entries(patchSlots)
+      .filter(([, on]) => on)
+      .map(([k]) => k);
+    if (slots.length === 0 && !patchRerender) {
+      setMessage("Отметьте слоты или включите перерисовку скринов.");
+      return;
+    }
+    setPatchBusy(true);
+    setMessage("");
+    try {
+      if (slots.length === 0 && patchRerender) {
+        const res = await fetch(`/api/admin/reviews/${reviewId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "rerender" }),
+        });
+        const data = (await res.json()) as { error?: string; screenshots?: string[] };
+        if (!res.ok) throw new Error(data.error ?? "Ошибка перерисовки");
+        if (data.screenshots) setScreenshots(data.screenshots);
+        setMessage(`Скрины обновлены (${data.screenshots?.length ?? 0}), диалог и медиа без изменений`);
+        return;
+      }
+
+      const amounts: Record<string, number> = {};
+      if (computedCustomAmounts) {
+        if (slots.includes("captura")) amounts.captura = computedCustomAmounts.deposit;
+        if (slots.includes("receipt")) amounts.receipt = computedCustomAmounts.profitFinal;
+        if (slots.includes("bet1")) amounts.bet1 = computedCustomAmounts.profit1;
+        if (slots.includes("bet2")) amounts.bet2 = computedCustomAmounts.profit2;
+        if (slots.includes("bet3")) amounts.bet3 = computedCustomAmounts.profit3;
+      }
+
+      const res = await fetch(`/api/admin/reviews/${reviewId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "patchMedia",
+          slots,
+          rerender: patchRerender,
+          ...(Object.keys(amounts).length ? { amounts } : {}),
+        }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        screenshots?: string[];
+        patched?: Array<{ slot: string; path: string; source?: string }>;
+        review?: { renderMedia?: LiveMediaPaths };
+        warning?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Ошибка точечной правки");
+      if (data.screenshots) setScreenshots(data.screenshots);
+      if (data.review?.renderMedia) {
+        setLiveMedia({ ...data.review.renderMedia });
+      } else if (data.patched) {
+        setLiveMedia((prev) => {
+          const next = { ...prev };
+          for (const p of data.patched!) {
+            (next as Record<string, string | null | undefined>)[p.slot] = p.path;
+          }
+          return next;
+        });
+      }
+      const names = (data.patched ?? []).map((p) => p.slot).join(", ");
+      const base = patchRerender
+        ? `Обновлено: ${names || "—"} + PNG-альбом`
+        : `Медиа обновлено: ${names}. Включите «перерисовать скрины», чтобы обновить PNG.`;
+      setMessage(data.warning ? `${base}. ⚠ ${data.warning}` : base);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setPatchBusy(false);
+    }
   }
 
   async function generatePreview() {
@@ -866,7 +1197,7 @@ export function ProjectConstructor({
           {STEPS.map((s) => (
             <a
               key={s.id}
-              href={`#ctor-${s.id}`}
+              href={`#${s.anchor ?? `ctor-${s.id}`}`}
               className={`ctor-jump-item${stepDone[s.id] ? " is-done" : ""}`}
             >
               {stepDone[s.id] ? "✓" : "·"} {s.short}
@@ -912,14 +1243,38 @@ export function ProjectConstructor({
             <HelpTip text={STEPS[1]!.doc} />
           </h2>
           <div className="ctor-form">
-            <Field label={<LabelWithHelp label="Имя в шапке чата" tip="Видно вверху скриншота." />}>
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Имя в шапке чата"
+                  tip="Видно вверху скриншота. Под ним — статус, не @ник."
+                />
+              }
+            >
               <input
                 style={field}
                 value={form.managerName}
                 onChange={(e) => setForm({ ...form, managerName: e.target.value })}
               />
             </Field>
-            <Field label={<LabelWithHelp label="Ник в Telegram" tip="Например @Maya_Nancy." />}>
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Статус под именем"
+                  tip="Текст под именем в шапке. Берётся из языка проекта."
+                />
+              }
+            >
+              <input style={{ ...field, opacity: 0.85 }} value={chatUi.statusRecently} readOnly />
+            </Field>
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Ник для подписей"
+                  tip="Только для подписей к постам (@Maya_Nancy). В шапке чата не показывается."
+                />
+              }
+            >
               <input
                 style={field}
                 value={form.managerHandle}
@@ -962,6 +1317,21 @@ export function ProjectConstructor({
               onFile={(f) => void upload("wallpaper", f)}
               onGenerateAi={() => void generateAiMedia("wallpaper")}
               aiLabel="Сгенерировать ИИ"
+            />
+            <LibraryPickBlock
+              label="Фото для истории"
+              hint="Кадр клиента в переписке (больница / жизнь). Из медиатеки, с компьютера или ИИ — сразу видно справа."
+              accept="image/*"
+              previewUrl={
+                mediaPreview.story_photo ??
+                assets.find((a) => a.type === "story_photo")?.url ??
+                null
+              }
+              disabled={busy}
+              onPick={() => setPickerKind("story_photo")}
+              onFile={(f) => void upload("story_photo", f, false)}
+              onGenerateAi={() => void generateAiMedia("story_photo", 3)}
+              aiLabel="ИИ: фото"
             />
             <div className="ctor-colors">
               <Field label={<LabelWithHelp label="Пузырь клиента" tip="Входящие сообщения." />}>
@@ -1114,10 +1484,62 @@ export function ProjectConstructor({
           </h2>
           <div className="ctor-form">
             <div className="ctor-media-stats">
+              <Stat
+                ok={receiptTemplates.some((f) => f.inClient)}
+                label="Чек пополнения"
+                value={`${receiptTemplates.filter((f) => f.inClient).length || receiptTemplates.length}`}
+              />
+              <Stat
+                ok={receiptTemplates.some((f) => f.inManager)}
+                label="Чек выплаты"
+                value={`${receiptTemplates.filter((f) => f.inManager).length || receiptTemplates.length}`}
+              />
               <Stat ok={counts.bet >= 3} label="Ставки" value={`${counts.bet} / 3+`} />
               <Stat ok={counts.video_note >= 1} label="Кружки" value={`${counts.video_note}`} />
               <Stat ok={counts.story_photo >= 1} label="Фото клиентов" value={`${counts.story_photo}`} />
             </div>
+
+            <div id="ctor-captura" className="ctor-receipts-block">
+              <h3 className="ctor-receipts-heading">Чек пополнения от клиента</h3>
+              <p className="admin-muted ctor-receipts-lead">
+                Выберите шаблон → нажмите «Проставить депозит». Сумма из пака / поля прибыли ниже.
+                Клик по чеку справа тоже открывает правку.
+              </p>
+              <ReceiptTemplatesPanel
+                title="Шаблоны captura"
+                hint="Клик — в превью · галочка — в пуле генерации"
+                role="client"
+                files={receiptTemplates}
+                selectedPath={liveMedia.captura ?? null}
+                disabled={busy || receiptBusy}
+                onSelect={(f) => selectReceiptTemplate("client", f)}
+                onToggle={(filename, on) => void toggleReceiptPool("client", filename, on)}
+                onUpload={(f) => void uploadReceiptTemplate("client", f)}
+                stampLabel="Проставить депозит на выбранном"
+                onStamp={() => void stampSelectedSlip("captura")}
+              />
+            </div>
+
+            <div id="ctor-receipt" className="ctor-receipts-block">
+              <h3 className="ctor-receipts-heading">Чек выплаты (менеджер → клиент)</h3>
+              <p className="admin-muted ctor-receipts-lead">
+                Исходящий перевод в конце истории. Клик — в превью справа.
+              </p>
+              <ReceiptTemplatesPanel
+                title="Шаблоны receipt"
+                hint="Клик — в превью · галочка — в пуле генерации"
+                role="manager"
+                files={receiptTemplates}
+                selectedPath={liveMedia.receipt ?? null}
+                disabled={busy || receiptBusy}
+                onSelect={(f) => selectReceiptTemplate("manager", f)}
+                onToggle={(filename, on) => void toggleReceiptPool("manager", filename, on)}
+                onUpload={(f) => void uploadReceiptTemplate("manager", f)}
+                stampLabel="Проставить выплату на выбранном"
+                onStamp={() => void stampSelectedSlip("receipt")}
+              />
+            </div>
+
             <LibraryPickBlock
               label="Ставка (скрин)"
               hint="ТЗ: 3 ставки в истории с паузами. Загрузите готовые скрины без сумм — укажите «Итоговую прибыль» ниже в «Полном отзыве» и нажмите «Проставить суммы»."
@@ -1163,11 +1585,10 @@ export function ProjectConstructor({
               onGenerateAi={() => void generateAiMedia("story_photo", 3)}
               aiLabel="ИИ: фото"
             />
+
             <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-              Чеки не грузятся вручную: на исходном скрине из{" "}
-              <code>data/media/receipt_templates/{project.id}</code> подставляются сумма, имена, дата
-              и 4 цифры счёта. Ставки — так же: суммы на готовом скрине, ИИ кадр не перерисовывает.
-              Клик по чеку или ставке справа — указать сумму и перепечатать поля.
+              На выбранном шаблоне при сборке/точечной правке ИИ подставит сумму, имена и дату.
+              Ставки — суммы на готовом скрине. Клик по чеку справа тоже открывает замену.
             </p>
           </div>
         </section>
@@ -1249,6 +1670,100 @@ export function ProjectConstructor({
             <button type="button" className="admin-btn" disabled={busy} onClick={() => void generatePreview()}>
               {busy ? "Собираем…" : "Собрать полный отзыв (ИИ)"}
             </button>
+            <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+              Полный прогон дорогой: новый диалог, фото, чеки и все скрины. Ниже — правка только
+              выбранных частей уже собранного отзыва.
+            </p>
+
+            {reviewId ? (
+              <div className="ctor-patch">
+                <h3 className="ctor-patch-title">
+                  Точечная правка
+                  <HelpTip text="Не трогает диалог и не отмеченные слоты. Дешевле, чем собирать отзыв заново." />
+                </h3>
+                <div className="ctor-patch-grid">
+                  {(
+                    [
+                      ["storyPhoto", "Фото клиента"],
+                      ["captura", "Чек депозита"],
+                      ["receipt", "Чек выплаты"],
+                      ["bet1", "Ставка 1"],
+                      ["bet2", "Ставка 2"],
+                      ["bet3", "Ставка 3"],
+                      ["conditions", "Условия"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="admin-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(patchSlots[key])}
+                        onChange={(e) =>
+                          setPatchSlots((prev) => ({ ...prev, [key]: e.target.checked }))
+                        }
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <label className="admin-check">
+                  <input
+                    type="checkbox"
+                    checked={patchRerender}
+                    onChange={(e) => setPatchRerender(e.target.checked)}
+                  />
+                  <span>Перерисовать PNG-альбом после правок (без ИИ-диалога)</span>
+                </label>
+                <div className="ctor-patch-actions">
+                  <button
+                    type="button"
+                    className="admin-btn"
+                    disabled={busy || patchBusy}
+                    onClick={() => void patchSelectedMedia()}
+                  >
+                    {patchBusy ? "Обновляем…" : "Обновить выбранное"}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn-secondary"
+                    disabled={busy || patchBusy}
+                    onClick={() => {
+                      void (async () => {
+                        if (!reviewId) return;
+                        setPatchBusy(true);
+                        setMessage("");
+                        try {
+                          const res = await fetch(`/api/admin/reviews/${reviewId}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "rerender" }),
+                          });
+                          const data = (await res.json()) as {
+                            error?: string;
+                            screenshots?: string[];
+                          };
+                          if (!res.ok) throw new Error(data.error ?? "Ошибка перерисовки");
+                          if (data.screenshots) setScreenshots(data.screenshots);
+                          setMessage(
+                            `Скрины обновлены (${data.screenshots?.length ?? 0}), медиа без изменений`,
+                          );
+                        } catch (err) {
+                          setMessage(err instanceof Error ? err.message : "Ошибка");
+                        } finally {
+                          setPatchBusy(false);
+                        }
+                      })();
+                    }}
+                  >
+                    Только скрины
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                Точечная правка появится после первой полной сборки.
+              </p>
+            )}
+
             {genProgress ? (
               <div className="ctor-progress" aria-live="polite">
                 <div className="ctor-progress-head">
@@ -1365,6 +1880,7 @@ export function ProjectConstructor({
         }}
         onReviewId={setReviewId}
         onMediaPaths={setLiveMedia}
+        onScreenshots={setScreenshots}
         onPickMedia={openLivePicker}
         onError={(msg) => setMessage(msg ?? "")}
         onSlideTimes={handleSlideTimes}
@@ -1455,6 +1971,133 @@ function Stat({ ok, label, value }: { ok: boolean; label: string; value: string 
     <div className={`ctor-stat${ok ? " is-ok" : ""}`}>
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ReceiptTemplatesPanel({
+  title,
+  hint,
+  role,
+  files,
+  selectedPath,
+  disabled,
+  onSelect,
+  onToggle,
+  onUpload,
+  stampLabel,
+  onStamp,
+}: {
+  title: string;
+  hint: string;
+  role: "client" | "manager";
+  files: ReceiptTemplateFile[];
+  selectedPath: string | null;
+  disabled?: boolean;
+  onSelect: (file: ReceiptTemplateFile) => void;
+  onToggle: (filename: string, enabled: boolean) => void;
+  onUpload: (file: File) => void;
+  stampLabel?: string;
+  onStamp?: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const inPool = (f: ReceiptTemplateFile) => (role === "client" ? f.inClient : f.inManager);
+  const selected = files.find((f) => f.path === selectedPath) ?? null;
+
+  return (
+    <div className="ctor-receipts">
+      <div className="ctor-upload-meta">
+        <strong>{title}</strong>
+        <span>{hint}</span>
+      </div>
+      {selected ? (
+        <div className="ctor-receipt-selected">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={selected.url} alt={selected.filename} />
+          <div>
+            <strong>В превью справа</strong>
+            <span>{selected.filename}</span>
+            <em>{selected.medium === "paper" ? "бумага" : "приложение"}</em>
+          </div>
+        </div>
+      ) : (
+        <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+          Ничего не выбрано — кликните миниатюру ниже, чтобы увидеть чек в чате справа.
+        </p>
+      )}
+      {stampLabel && onStamp ? (
+        <button
+          type="button"
+          className="admin-btn"
+          disabled={disabled || !selected}
+          onClick={onStamp}
+        >
+          {stampLabel}
+        </button>
+      ) : null}
+      <div className="ctor-receipts-grid">
+        {files.length === 0 ? (
+          <p className="admin-muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+            Пока нет файлов — загрузите фото чека с компьютера.
+          </p>
+        ) : (
+          files.map((f) => {
+            const isSelected = selectedPath === f.path;
+            const pooled = inPool(f);
+            return (
+              <div
+                key={f.filename}
+                className={`ctor-receipt-card${isSelected ? " is-selected" : ""}${pooled ? "" : " is-off"}`}
+              >
+                <button
+                  type="button"
+                  className="ctor-receipt-thumb"
+                  disabled={disabled}
+                  onClick={() => onSelect(f)}
+                  title={f.filename}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.url} alt={f.filename} />
+                  <em>{f.medium === "paper" ? "бумага" : "приложение"}</em>
+                </button>
+                <label className="admin-check ctor-receipt-pool">
+                  <input
+                    type="checkbox"
+                    checked={pooled}
+                    disabled={disabled}
+                    onChange={(e) => onToggle(f.filename, e.target.checked)}
+                  />
+                  <span>в пуле</span>
+                </label>
+              </div>
+            );
+          })
+        )}
+      </div>
+      <div className="ctor-upload-actions">
+        <button
+          type="button"
+          className="admin-btn-secondary"
+          disabled={disabled}
+          onClick={() => fileRef.current?.click()}
+        >
+          Загрузить чек с компьютера
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          disabled={disabled}
+          className="ctor-file-input"
+          tabIndex={-1}
+          aria-hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onUpload(file);
+            e.currentTarget.value = "";
+          }}
+        />
+      </div>
     </div>
   );
 }

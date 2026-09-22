@@ -20,14 +20,14 @@ export function resetOpenAIClient(): void {
 }
 
 export function getOpenAIClient(): OpenAI | null {
-  const env = getEnv();
-  if (!env.OPENAI_API_KEY) return null;
+  if (!isOpenAIConfigured()) return null;
 
+  const env = getEnv();
   const proxyUrl = getProxyUrl();
-  const nextFp = fingerprint(env.OPENAI_API_KEY, proxyUrl);
+  const nextFp = fingerprint(env.OPENAI_API_KEY!, proxyUrl);
   if (!clientInstance || clientFingerprint !== nextFp) {
     clientInstance = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
+      apiKey: env.OPENAI_API_KEY!,
       fetch: getOutboundFetch(),
     });
     clientFingerprint = nextFp;
@@ -65,5 +65,9 @@ export async function generateDialogStub(prompt: string): Promise<string> {
 }
 
 export function isOpenAIConfigured(): boolean {
-  return Boolean(getEnv().OPENAI_API_KEY);
+  const key = getEnv().OPENAI_API_KEY?.trim() ?? "";
+  if (!key) return false;
+  // Reject .env.example placeholders so we don't pretend Images API works.
+  if (/your[_-]?openai|changeme|xxx+|placeholder|sk-proj-your/i.test(key)) return false;
+  return key.length >= 20;
 }

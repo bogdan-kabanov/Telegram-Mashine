@@ -12,18 +12,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   serverExternalPackages: ["better-sqlite3", "playwright", "tesseract.js", "tesseract.js-core"],
-  // Next file tracing copies JS from tesseract.js-core but skips .wasm binaries.
   outputFileTracingIncludes: {
     "/**/*": ["./node_modules/tesseract.js-core/*.wasm"],
   },
-  // Next 15.5 Segment Explorer crashes the client with:
-  // Cannot read properties of undefined (reading 'page.tsx')
-  // (next-devtools segmentExplorerNodeAdd)
   devIndicators: false,
   experimental: {
     devtoolSegmentExplorer: false,
   },
-  // OneDrive sync corrupts webpack HMR; disable persistent cache in dev.
   webpack: (config, { dev }) => {
     if (dev) {
       config.cache = false;
@@ -37,6 +32,13 @@ const nextConfig: NextConfig = {
         destination: "/icons/telegram-input-sticker.svg",
         permanent: false,
       },
+    ];
+  },
+  async rewrites() {
+    return [
+      { source: "/panel", destination: "/panel/index.html" },
+      { source: "/panel/app", destination: "/panel/index.html" },
+      { source: "/panel/app/:path*", destination: "/panel/index.html" },
     ];
   },
 };

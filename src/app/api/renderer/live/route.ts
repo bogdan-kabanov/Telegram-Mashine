@@ -55,15 +55,23 @@ export async function POST(request: NextRequest) {
         ? new Date(review.slideTimes.filter(Boolean).at(-1)!)
         : new Date();
 
+    const pick = (slot: keyof DialogMediaAssets) => {
+      const fromBody = body.mediaPaths?.[slot];
+      if (typeof fromBody === "string" && fromBody.trim()) return fromBody.trim();
+      return review?.renderMedia?.[slot] ?? null;
+    };
+
+    // When a review is open, its renderMedia is the source of truth — do not
+    // fill gaps with another project's leftover captura/receipt from sample mode.
     const mediaPaths: DialogMediaAssets = {
-      sticker: body.mediaPaths?.sticker ?? review?.renderMedia?.sticker ?? null,
-      storyPhoto: body.mediaPaths?.storyPhoto ?? review?.renderMedia?.storyPhoto ?? null,
-      conditions: body.mediaPaths?.conditions ?? review?.renderMedia?.conditions ?? null,
-      bet1: body.mediaPaths?.bet1 ?? review?.renderMedia?.bet1 ?? null,
-      bet2: body.mediaPaths?.bet2 ?? review?.renderMedia?.bet2 ?? null,
-      bet3: body.mediaPaths?.bet3 ?? review?.renderMedia?.bet3 ?? null,
-      receipt: body.mediaPaths?.receipt ?? review?.renderMedia?.receipt ?? null,
-      captura: body.mediaPaths?.captura ?? review?.renderMedia?.captura ?? null,
+      sticker: pick("sticker"),
+      storyPhoto: pick("storyPhoto"),
+      conditions: pick("conditions") ?? project.conditionsImagePath ?? null,
+      bet1: pick("bet1"),
+      bet2: pick("bet2"),
+      bet3: pick("bet3"),
+      receipt: pick("receipt"),
+      captura: pick("captura"),
     };
 
     const result = await composeLiveChatHtml({

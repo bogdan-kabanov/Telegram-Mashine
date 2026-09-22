@@ -32,6 +32,14 @@ export default async function ConstructorPage() {
           conditionsTexts: p.conditionsTexts ?? [],
           managerAvatarPath: p.managerAvatarPath ?? null,
           clientAvatarPath: p.clientAvatarPath ?? null,
+          ...(p.receiptTemplates
+            ? {
+                receiptTemplates: {
+                  client: [...p.receiptTemplates.client],
+                  manager: [...p.receiptTemplates.manager],
+                },
+              }
+            : {}),
           theme: {
             incomingBubble: p.theme.incomingBubble,
             outgoingBubble: p.theme.outgoingBubble,

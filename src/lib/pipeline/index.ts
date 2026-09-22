@@ -228,7 +228,7 @@ export class ReviewPipeline {
             reviewType === "unique_circle" ? 3 : 2,
             "bets",
             "Печать сумм на ставках",
-            "OCR переписывает цифры на скринах из медиатеки…",
+            "ИИ правит копию исходного скрина (суммы Depósito/Ganancia)…",
           );
           const stamped = await stampProjectBetPack({
             projectId: params.projectId,
@@ -237,6 +237,7 @@ export class ReviewPipeline {
             profit2: dialog.profit2,
             profit3: dialog.profit3 ?? dialog.profitFinal - dialog.profit1 - dialog.profit2,
             currency: project.currency,
+            locale: project.locale,
             sourcePaths: [bet1.path, bet2.path, bet3.path],
             name: dialog.clientName,
           });
@@ -247,10 +248,10 @@ export class ReviewPipeline {
           const message = err instanceof Error ? err.message : String(err);
           if (useCustomAmounts) {
             throw new Error(
-              `Не удалось проставить суммы на всех 3 ставках (OCR): ${message}. Перегенерируйте отзыв или загрузите другой пак скринов.`,
+              `Не удалось проставить суммы на всех 3 ставках (ИИ/OCR): ${message}. Перегенерируйте отзыв или загрузите другой пак скринов.`,
             );
           }
-          await logger.warn("Bet OCR stamp failed — using raw bet screenshots", {
+          await logger.warn("Bet stamp failed — using raw bet screenshots", {
             projectId: params.projectId,
             reviewId,
             error: message,
@@ -354,7 +355,7 @@ export class ReviewPipeline {
         4,
         "slips",
         "Правка чеков",
-        "На исходном скрине банка меняем сумму, имена и дату — без новой картинки…",
+        "ИИ переписывает сумму, имена и дату прямо в скрине банка…",
       );
       const [captura, receipt] = await Promise.all([
         mediaHandler.generateCaptura({

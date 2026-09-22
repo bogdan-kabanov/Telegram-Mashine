@@ -464,13 +464,28 @@ export function ProjectWorkspace({ project, locales, initialReview }: ProjectWor
             >
               <input style={{ ...fieldInput, opacity: 0.85 }} value={displayCurrency} readOnly />
             </Field>
+            <Field label={<LabelWithHelp label="Имя в шапке чата" tip="Имя вверху скриншота. Под ним — статус, не @ник." />}>
+              <input style={fieldInput} value={form.managerName} onChange={(e) => setForm({ ...form, managerName: e.target.value })} />
+            </Field>
             <Field
-              label={<LabelWithHelp label="Ник в Telegram" tip="Как отображается менеджер, например @Maya_Nancy." />}
+              label={
+                <LabelWithHelp
+                  label="Статус под именем"
+                  tip="Текст под именем в шапке чата. Берётся из языка проекта (не @ник)."
+                />
+              }
+            >
+              <input style={{ ...fieldInput, opacity: 0.85 }} value={chatUi.statusRecently} readOnly />
+            </Field>
+            <Field
+              label={
+                <LabelWithHelp
+                  label="Ник для подписей"
+                  tip="Только для подписей к постам в канале (@Maya_Nancy). В шапке чата не показывается."
+                />
+              }
             >
               <input style={fieldInput} value={form.managerHandle} onChange={(e) => setForm({ ...form, managerHandle: e.target.value })} />
-            </Field>
-            <Field label={<LabelWithHelp label="Имя в шапке чата" tip="Имя, которое видно вверху скриншота переписки." />}>
-              <input style={fieldInput} value={form.managerName} onChange={(e) => setForm({ ...form, managerName: e.target.value })} />
             </Field>
             <Field
               label={

@@ -74,4 +74,59 @@ describe("receipt overlay field planning", () => {
     );
     expect(boxes.find((b) => b.kind === "digits")?.text).toBe("****4821");
   });
+
+  it("stamps MONTO + PAGO TOTAL on OXXO thermal layout, not COMISION", () => {
+    const words: OcrWord[] = [
+      w("Caja", 20, 40, 60, 56, 0),
+      w("#1", 65, 40, 90, 56, 0),
+      w("08/08/2026", 100, 40, 200, 56, 0),
+      w("13:02", 210, 40, 260, 56, 0),
+      w("TARJETA", 20, 80, 100, 96, 1),
+      w("SPIN", 105, 80, 150, 96, 1),
+      w("************4122", 160, 80, 320, 96, 1),
+      w("MONTO", 20, 120, 90, 140, 2),
+      w("M.N.", 100, 120, 140, 140, 2),
+      w("$", 150, 120, 165, 140, 2),
+      w("650.00", 170, 120, 250, 140, 2),
+      w("COMISION", 20, 150, 110, 168, 3),
+      w("DEPOSITO", 115, 150, 200, 168, 3),
+      w("$", 210, 150, 225, 168, 3),
+      w("10.34", 230, 150, 290, 168, 3),
+      w("IVA", 20, 175, 55, 190, 4),
+      w("DE", 60, 175, 85, 190, 4),
+      w("COMISION", 90, 175, 180, 190, 4),
+      w("$", 200, 175, 215, 190, 4),
+      w("1.66", 220, 175, 270, 190, 4),
+      w("TOTAL", 20, 200, 80, 218, 5),
+      w("COMISION", 85, 200, 175, 218, 5),
+      w("$", 200, 200, 215, 218, 5),
+      w("12.00", 220, 200, 280, 218, 5),
+      w("PAGO", 20, 230, 70, 250, 6),
+      w("TOTAL", 75, 230, 140, 250, 6),
+      w("$", 160, 230, 175, 250, 6),
+      w("662.00", 180, 230, 270, 250, 6),
+    ];
+    const boxes = planReceiptReplacements(
+      words,
+      {
+        amount: 9999,
+        currency: "MXN",
+        senderName: "Test Client",
+        recipientName: "Anastasia Manager",
+        accountLastDigits: "7777",
+        date: "19/09/2026",
+        time: "02:35",
+        role: "client",
+      },
+      400,
+    );
+    const amountTexts = boxes.filter((b) => b.kind === "amount").map((b) => b.text);
+    expect(amountTexts.some((t) => /9,?999\.00/.test(t))).toBe(true);
+    expect(amountTexts.some((t) => /10,?011\.00/.test(t))).toBe(true); // 9999 + 12
+    expect(boxes.find((b) => b.kind === "digits")?.text).toMatch(/7777/);
+    expect(boxes.find((b) => b.kind === "date")?.text).toMatch(/19\/09\/2026/);
+    expect(boxes.every((b) => b.kind !== "name")).toBe(true);
+    expect(amountTexts.filter((t) => /9,?999\.00/.test(t)).length).toBeGreaterThanOrEqual(1);
+    expect(amountTexts.filter((t) => /10,?011\.00/.test(t)).length).toBeGreaterThanOrEqual(1);
+  });
 });

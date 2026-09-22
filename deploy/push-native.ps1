@@ -16,6 +16,7 @@ Push-Location $Root
 tar -czf $Archive `
   --exclude=.git `
   --exclude=node_modules `
+  --exclude=panel/node_modules `
   --exclude=.next `
   --exclude=.cursor `
   --exclude=tmp `
@@ -49,4 +50,4 @@ bash /opt/bot-ai/deploy/remote-update.sh
 
 Remove-Item -Force $Archive -ErrorAction SilentlyContinue
 Write-Host ""
-Write-Host "Done: https://$Domain/admin"
+Write-Host "Done: https://$Domain/panel"

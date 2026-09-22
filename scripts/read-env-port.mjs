@@ -47,13 +47,20 @@ export function resolvePlaywrightBrowsersPath() {
           "ms-playwright",
         )
       : "/opt/ms-playwright";
-  const candidate = fromFile || stableDefault;
+
+  const isPlaceholder = (p) =>
+    !p ||
+    /[\\/]Users[\\/]YOU[\\/]/i.test(p) ||
+    p.toLowerCase().includes("cursor-sandbox-cache") ||
+    /[\\/]temp[\\/]/i.test(p);
+
+  const candidate =
+    fromFile && !isPlaceholder(fromFile) ? fromFile : stableDefault;
   const current = (process.env.PLAYWRIGHT_BROWSERS_PATH ?? "").trim();
-  const broken =
-    !current ||
-    current.toLowerCase().includes("cursor-sandbox-cache") ||
-    /[\\/]temp[\\/]/i.test(current);
-  return broken || !existsSync(current) ? candidate : current;
+  if (current && !isPlaceholder(current) && existsSync(current)) {
+    return current;
+  }
+  return candidate;
 }
 
 export function getProjectRoot() {
