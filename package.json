@@ -14,7 +14,7 @@
     "postinstall": "node scripts/playwright-install.mjs",
     "trim:receipts": "node scripts/trim-receipts.mjs",
     "panel:dev": "npm --prefix panel run dev",
-    "panel:build": "npm --prefix panel install && npm --prefix panel run build",
+    "panel:build": "npm --prefix panel install --include=dev && npm --prefix panel run build",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
