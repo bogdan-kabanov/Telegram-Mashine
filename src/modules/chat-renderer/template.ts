@@ -43,11 +43,6 @@ const ICONS = {
     <path fill="rgba(255,255,255,0.45)" d="M81.229 128.772 95.466 168.178s1.78 3.687 3.686 3.687 30.255-29.492 30.255-29.492l31.525-60.89L81.737 118.6Z"/>
     <path fill="rgba(255,255,255,0.28)" d="M100.106 138.878 97.373 167.924s-1.144 8.9 7.754 0 17.415-15.763 17.415-15.763"/>
   </svg>`,
-  /* Photo HD/reload — Telegram iOS circular arrow on media */
-  mediaReload: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M20.2 12a8.2 8.2 0 1 1-2.35-5.8" stroke="#fff" stroke-width="2.15" stroke-linecap="round"/>
-    <path d="M20.4 3.6v5.1h-5.1" stroke="#fff" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`,
   /* Telegram iOS read receipts — short peek + full check (not WhatsApp double-V) */
   checks: `<svg width="16" height="10" viewBox="0 0 16 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <path d="M1.2 5.55L3.65 8.0" stroke="#4FAE4E" stroke-width="1.45" stroke-linecap="round"/>
@@ -172,10 +167,6 @@ function glassLiveHtml(): string {
 export function chatHandleText(handle: string | undefined, fallback: string): string {
   const raw = (handle ?? "").trim();
   return raw || fallback;
-}
-
-function mediaReloadHtml(): string {
-  return `<span class="media-reload" aria-hidden="true">${ICONS.mediaReload}</span>`;
 }
 
 function navAvatarBlock(
@@ -315,7 +306,6 @@ function renderBubble(
       <div class="bubble-wrap">
         <div class="bubble ${isOutgoing ? "bubble-out" : "bubble-in"} ${bubbleToneClass} bubble-media ${tailClass}" style="${style}">
           ${media}
-          ${mediaReloadHtml()}
           ${metaHtml(msg, isOutgoing, "overlay")}
         </div>
       </div>
@@ -381,8 +371,8 @@ export function buildChatHtml(params: RenderChatParams): string {
     : "";
   const frost = glassFrostHtml(frostWallpaperSrc, wallpaperSrc);
   const liveGlass = glassLiveHtml();
-  /** Header chrome: same translucent glass as input (backdrop), not dark charcoal frost. */
-  const navChromeGlass = livePreview ? liveGlass : frost;
+  /** Header chrome always matches Playwright screenshots (frost), not live tint. */
+  const navChromeGlass = frost;
 
   return `<!DOCTYPE html>
 <html lang="${ui.lang}">
@@ -880,40 +870,42 @@ export function buildChatHtml(params: RenderChatParams): string {
     }
     .message.group-last { margin-bottom: 6px; }
     .message.group-first.group-last { margin-bottom: 6px; }
-    .message.incoming { padding-right: 48px; padding-left: 10px; }
+    .message.incoming {
+      justify-content: flex-start;
+      padding-right: 10px;
+      padding-left: 10px;
+    }
     .message.outgoing {
       justify-content: flex-end;
-      padding-left: 48px;
+      padding-left: 10px;
       padding-right: 10px;
     }
+    /*
+     * Real Telegram: shrink-wrap to text; long messages may grow up to 80% of
+     * the phone width (390 * 0.8). Opposite-side gap comes from this cap, not
+     * from a hard padding that forces a narrower column.
+     */
     .bubble-wrap {
-      max-width: min(82%, 310px);
-      width: fit-content;
-      display: flex;
-      flex-direction: column;
+      display: table;
+      width: auto;
+      max-width: calc(390px * 0.8);
       min-width: 0;
-      flex: 0 1 auto;
       overflow: visible;
-    }
-    .message.incoming .bubble-wrap {
-      align-self: flex-start;
-      align-items: flex-start;
-      max-width: min(82%, 310px);
-    }
-    .message.outgoing .bubble-wrap {
-      align-self: flex-end;
-      align-items: flex-end;
-      max-width: min(82%, 310px);
     }
     .bubble {
       padding: 7px 12px 8px 12px;
       position: relative;
-      display: inline-block;
-      width: fit-content;
+      display: table;
+      box-sizing: border-box;
+      width: auto;
       max-width: 100%;
       height: auto;
       overflow: visible;
       box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+    }
+    .bubble.bubble-media {
+      display: inline-block;
+      width: fit-content;
     }
     .bubble-in,
     .bubble-out {
@@ -981,13 +973,21 @@ export function buildChatHtml(params: RenderChatParams): string {
       line-height: 22px;
       letter-spacing: 0;
       color: #000;
-      overflow-wrap: break-word;
+      overflow-wrap: anywhere;
       word-wrap: break-word;
       white-space: pre-wrap;
       position: relative;
       z-index: 1;
-      display: flow-root;
+      display: block;
+      /* Let the table bubble size to this content; long lines wrap at bubble max-width */
+      width: auto;
       max-width: 100%;
+      box-sizing: border-box;
+    }
+    .text::after {
+      content: "";
+      display: table;
+      clear: both;
     }
     img.apple-emoji {
       height: 1.2em;
@@ -1157,24 +1157,6 @@ export function buildChatHtml(params: RenderChatParams): string {
     .bubble-media .meta-overlay {
       bottom: 8px;
       right: 8px;
-    }
-    .media-reload {
-      position: absolute;
-      top: 7px;
-      right: 7px;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.46);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2;
-      pointer-events: none;
-      box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.25);
-    }
-    .media-reload svg {
-      display: block;
     }
     .sticker-wrap {
       position: relative;
@@ -1403,7 +1385,7 @@ export function buildChatHtml(params: RenderChatParams): string {
       <div class="header-frost" aria-hidden="true">${frostImg}</div>
       <div class="input-frost" aria-hidden="true">${frostImg}</div>
 
-      <div class="scroll-down${livePreview ? " is-visible" : ""}" aria-hidden="true">${liveGlass}${ICONS.chevronDown}</div>
+      <div class="scroll-down" aria-hidden="true">${liveGlass}${ICONS.chevronDown}</div>
 
       <div class="input-bar">
         <div class="glass-circle attach">

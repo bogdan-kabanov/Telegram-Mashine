@@ -24,5 +24,5 @@
 
 ```bash
 npm run seed:media          # PNG placeholders
-# затем загрузить реальные MP4 в /admin/media → video_notes
+# затем загрузить реальные MP4 в панели → Медиа → video_notes
 ```

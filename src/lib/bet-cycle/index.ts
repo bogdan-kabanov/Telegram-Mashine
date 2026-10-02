@@ -124,7 +124,16 @@ function cooldownMs(days: number): number {
   return days * 24 * 60 * 60 * 1000;
 }
 
-async function listProjectBets(projectId: string): Promise<MediaAsset[]> {
+export type MediaFolderOverride = {
+  bets?: string[];
+  receipts?: string[];
+  conditions?: string[];
+};
+
+async function listProjectBets(
+  projectId: string,
+  opts?: { betFolders?: string[] },
+): Promise<MediaAsset[]> {
   const dataDir = process.env.DATA_DIR ?? "./data";
 
   const collectFromDir = (abs: string, relPrefix: string): MediaAsset[] => {
@@ -143,11 +152,17 @@ async function listProjectBets(projectId: string): Promise<MediaAsset[]> {
     }
   };
 
-  // Preferred: shared library folders assigned on the project (e.g. bets/okx).
+  // Preferred: shared library folders (per-run override or project.mediaFolders.bets).
   try {
     const config = await loadAppConfig();
     const project = config.projects.projects.find((p) => p.id === projectId);
-    const assigned = project?.mediaFolders?.bets?.map((s) => s.trim()).filter(Boolean) ?? [];
+    const assigned =
+      (opts?.betFolders && opts.betFolders.length > 0
+        ? opts.betFolders
+        : project?.mediaFolders?.bets
+      )
+        ?.map((s) => s.trim())
+        .filter(Boolean) ?? [];
     if (assigned.length > 0) {
       const all: MediaAsset[] = [];
       const seen = new Set<string>();
@@ -254,8 +269,11 @@ export type BetPackPick = {
 };
 
 /** Complete packs only: packNN_1 + _2 + _3 present and usable. */
-export async function listCompleteBetPacks(projectId: string): Promise<BetPackPick[]> {
-  const pool = await listProjectBets(projectId);
+export async function listCompleteBetPacks(
+  projectId: string,
+  opts?: { betFolders?: string[] },
+): Promise<BetPackPick[]> {
+  const pool = await listProjectBets(projectId, opts);
   const byPack = new Map<number, Map<number, MediaAsset>>();
 
   for (const asset of pool) {
@@ -290,9 +308,13 @@ export async function pickBetPackByNumber(params: {
   projectId: string;
   packNumber: number;
   reviewId?: string | null;
+  betFolders?: string[];
 }): Promise<BetPackPick | null> {
   if (params.packNumber < 1) return null;
-  const packs = await listCompleteBetPacks(params.projectId);
+  const packs = await listCompleteBetPacks(
+    params.projectId,
+    params.betFolders?.length ? { betFolders: params.betFolders } : undefined,
+  );
   const chosen = packs.find((p) => p.packNumber === params.packNumber) ?? null;
   if (!chosen) return null;
   await markBetsUsed({
@@ -311,8 +333,12 @@ export async function pickNextBetPack(params: {
   projectId: string;
   reuseDays?: number;
   reviewId?: string | null;
+  betFolders?: string[];
 }): Promise<BetPackPick | null> {
-  const packs = await listCompleteBetPacks(params.projectId);
+  const packs = await listCompleteBetPacks(
+    params.projectId,
+    params.betFolders?.length ? { betFolders: params.betFolders } : undefined,
+  );
   if (packs.length === 0) return null;
 
   const db = getDb();
@@ -353,10 +379,14 @@ export async function pickRandomBetPack(params: {
   projectId: string;
   reuseDays?: number;
   reviewId?: string | null;
+  betFolders?: string[];
 }): Promise<BetPackPick | null> {
   const reuseDays =
     params.reuseDays !== undefined ? params.reuseDays : await getConfiguredBetReuseDays();
-  const packs = await listCompleteBetPacks(params.projectId);
+  const packs = await listCompleteBetPacks(
+    params.projectId,
+    params.betFolders?.length ? { betFolders: params.betFolders } : undefined,
+  );
   if (packs.length === 0) return null;
 
   const blocked = await recentBetPaths(params.projectId, reuseDays);

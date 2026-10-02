@@ -5,15 +5,6 @@ import { pathToFileURL } from "url";
 import type { Page } from "playwright";
 import sharp from "sharp";
 
-import { formatStatusBarTime } from "@/lib/format";
-import { chatUiForLocale } from "@/lib/i18n/chat-ui";
-import { localeClockConfig } from "@/lib/i18n/locale-profile";
-import {
-  pickRandomClientAvatar,
-  resolveImageForRender,
-  resolveWallpaperForProject,
-} from "@/lib/media/resolve";
-import { blurWallpaperDataUri, averageWallpaperColor, wallpaperCutoutDataUri } from "@/lib/media/blur-wallpaper";
 import {
   configureScreenshotPage,
   screenshotOptions,
@@ -21,15 +12,14 @@ import {
 } from "@/lib/playwright";
 import { createLogger } from "@/lib/runtime/manager";
 import type { GeneratedDialog } from "@/modules/dialog-generator";
-import {
-  dialogToRenderMessages,
-  TARGET_SCREENSHOTS,
-  type DialogMediaAssets,
-} from "./messages";
+import { composeDialogChat, composeChatRenderParams, sampleClientNameForProject } from "./compose";
+import { TARGET_SCREENSHOTS, type DialogMediaAssets } from "./messages";
+import { enrichSampleMessages, ensureSamplePreviewMedia } from "./preview-media";
 import { planScrollPositions } from "./scroll";
-import { buildChatHtml, getSampleMessages, type RenderChatParams, type RenderMessage } from "./template";
+import { buildChatHtml, type RenderChatParams } from "./template";
 
 export { planScrollPositions } from "./scroll";
+export { composeDialogChat, composeChatRenderParams } from "./compose";
 
 const logger = createLogger("chat-renderer");
 
@@ -46,16 +36,9 @@ export interface RenderDialogResult {
 }
 
 const VIEWPORT = { width: 390, height: 844 } as const;
-/** iPhone logical 390×844 @3x → 1170×2532 PNG (sharper than Telegram-compressed chat photos). */
 const DEVICE_SCALE_FACTOR = 3;
-/** Keep this much previous content when scrolling to the next frame. */
 const SCROLL_OVERLAP_PX = 160;
 
-/**
- * Bake blurred underlays for input glass pills.
- * CSS backdrop-filter often fails in headless Chromium; this samples the real
- * chat (green bubbles etc.) so glass looks translucent in screenshots.
- */
 async function bakeInputGlass(page: Page, scale: number): Promise<void> {
   const targets = await page.evaluate(() => {
     const nodes = [...document.querySelectorAll(".glass-circle, .input-pill, .scroll-down, .input-frost")];
@@ -152,7 +135,6 @@ async function bakeInputGlass(page: Page, scale: number): Promise<void> {
   }, baked);
 }
 
-/** Load written HTML via file:// so @font-face file:// SF Pro URLs resolve. */
 async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise<void> {
   const { launchChromium } = await import("@/lib/playwright");
 
@@ -207,12 +189,6 @@ async function screenshotHtmlFile(htmlPath: string, outputPath: string): Promise
   }
 }
 
-/**
- * One full chat HTML → several PNGs by scrolling down (like reading Telegram).
- * Overlap keeps the previous bubble(s) visible so nothing “vanishes” between frames.
- */
-// planScrollPositions lives in ./scroll (imported above)
-
 async function screenshotChatByScrolling(params: {
   htmlPath: string;
   reviewId: string;
@@ -258,7 +234,6 @@ async function screenshotChatByScrolling(params: {
       const scrollTop = positions[i]!;
       await page.evaluate(
         ({ top, maxScroll }) => {
-          // Clear previous glass bake so the next frame resamples underlays.
           document.querySelectorAll("[data-glass-bake-id]").forEach((node) => {
             const el = node as HTMLElement;
             el.style.backgroundImage = "";
@@ -315,10 +290,7 @@ async function screenshotChatByScrolling(params: {
 }
 
 export class ChatRenderer {
-  private async renderToFile(
-    params: RenderChatParams,
-    id: string,
-  ): Promise<RenderResult> {
+  private async renderToFile(params: RenderChatParams, id: string): Promise<RenderResult> {
     const dataDir = process.env.DATA_DIR ?? "./data";
     const publicDir = path.resolve(process.cwd(), "public/renders");
     mkdirSync(publicDir, { recursive: true });
@@ -331,7 +303,12 @@ export class ChatRenderer {
     writeFileSync(htmlPath, html, "utf-8");
     await screenshotHtmlFile(htmlPath, pngPath);
 
-    return { pngPath, htmlPath, width: VIEWPORT.width * DEVICE_SCALE_FACTOR, height: VIEWPORT.height * DEVICE_SCALE_FACTOR };
+    return {
+      pngPath,
+      htmlPath,
+      width: VIEWPORT.width * DEVICE_SCALE_FACTOR,
+      height: VIEWPORT.height * DEVICE_SCALE_FACTOR,
+    };
   }
 
   async render(params: RenderChatParams): Promise<RenderResult> {
@@ -341,32 +318,24 @@ export class ChatRenderer {
     return result;
   }
 
-  async renderPreview(projectId: string, project: RenderChatParams["project"]): Promise<RenderResult> {
-    const ui = chatUiForLocale(project.locale);
-    const clockCfg = localeClockConfig(project.locale);
+  /**
+   * PNG preview — same stamped sample compose as live iframe,
+   * captured via Playwright + bakeInputGlass (trial path).
+   */
+  async renderPreview(_projectId: string, project: RenderChatParams["project"]): Promise<RenderResult> {
     const now = new Date();
-    const messages = getSampleMessages(project.locale, now);
-    const [wallpaperUrl, avatar] = await Promise.all([
-      resolveWallpaperForProject(projectId, project.wallpaperPath),
-      pickRandomClientAvatar(projectId, project.clientAvatarPath),
-    ]);
-    const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
-    const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperUrl
-      ? await Promise.all([wallpaperCutoutDataUri(wallpaperUrl), averageWallpaperColor(wallpaperUrl)])
-      : [null, null];
-
-    return this.render({
+    const stamped = await ensureSamplePreviewMedia({ project, now });
+    const messages = enrichSampleMessages(project, now, stamped.media, stamped.displayVars);
+    const composed = await composeChatRenderParams({
       project,
-      clientName: ui.sampleClientName,
+      clientName: sampleClientNameForProject(project),
       messages,
-      wallpaperUrl,
-      frostWallpaperUrl,
-      wallpaperCutoutUrl,
-      wallpaperCutoutColor,
-      clientAvatarUrl: avatar.dataUri,
-      statusBarTime: messages.at(-1)?.time ?? formatStatusBarTime(now, clockCfg.timeZone),
-      clockTimeZone: clockCfg.timeZone,
+      mediaPaths: stamped.media,
+      now,
+      mediaMode: "embed",
+      interactive: false,
     });
+    return this.render(composed.params);
   }
 
   async renderDialog(params: {
@@ -374,71 +343,20 @@ export class ChatRenderer {
     project: RenderChatParams["project"];
     mediaAssets: DialogMediaAssets;
     reviewId: string;
-    /** Same instant used for bank slips so chat + receipts stay in sync. */
     now?: Date;
-    /** Per-screenshot clock. Status bar + bubbles remapped before each PNG. */
     slideTimes?: Array<Date | string | null | undefined>;
   }): Promise<RenderDialogResult> {
     const { dialog, project, mediaAssets, reviewId } = params;
-
-    const [wallpaperUrl, avatar, stickerUri, resolvedStoryPhoto, conditionsUri, bet1Uri, bet2Uri, bet3Uri, receiptUri, capturaUri] =
-      await Promise.all([
-        resolveWallpaperForProject(dialog.projectId, project.wallpaperPath),
-        pickRandomClientAvatar(dialog.projectId, project.clientAvatarPath),
-        resolveImageForRender(mediaAssets.sticker ?? null, { removeWhiteBackground: true }),
-        resolveImageForRender(mediaAssets.storyPhoto ?? null),
-        resolveImageForRender(mediaAssets.conditions ?? project.conditionsImagePath ?? null),
-        resolveImageForRender(mediaAssets.bet1 ?? null),
-        resolveImageForRender(mediaAssets.bet2 ?? null),
-        resolveImageForRender(mediaAssets.bet3 ?? null),
-        resolveImageForRender(mediaAssets.receipt ?? null),
-        resolveImageForRender(mediaAssets.captura ?? null),
-      ]);
-    let storyPhotoUri = resolvedStoryPhoto;
-    const needsStoryPhoto = dialog.messages.some((m) => m.type === "image");
-    if (needsStoryPhoto && !storyPhotoUri) {
-      const { pickAvailableClientPhoto } = await import("@/lib/client-photos");
-      const fallback = await pickAvailableClientPhoto({
-        excludePaths: mediaAssets.storyPhoto ? [mediaAssets.storyPhoto] : [],
-      });
-      if (fallback) {
-        storyPhotoUri = await resolveImageForRender(fallback.path);
-        if (storyPhotoUri) {
-          await logger.info("Story photo missing — used another pool image", {
-            reviewId,
-            broken: mediaAssets.storyPhoto ?? null,
-            used: fallback.path,
-          });
-        }
-      } else {
-        await logger.warn("Story photo required but no usable pool image", { reviewId });
-      }
-    }
-    const frostWallpaperUrl = wallpaperUrl ? await blurWallpaperDataUri(wallpaperUrl) : null;
-    const [wallpaperCutoutUrl, wallpaperCutoutColor] = wallpaperUrl
-      ? await Promise.all([wallpaperCutoutDataUri(wallpaperUrl), averageWallpaperColor(wallpaperUrl)])
-      : [null, null];
-
-    const enrichedMedia: DialogMediaAssets = {
-      sticker: stickerUri,
-      storyPhoto: storyPhotoUri,
-      conditions: conditionsUri,
-      bet1: bet1Uri,
-      bet2: bet2Uri,
-      bet3: bet3Uri,
-      receipt: receiptUri,
-      captura: capturaUri,
-    };
-
-    const clockCfg = localeClockConfig(project.locale);
     const now = params.now ?? (dialog.createdAt ? new Date(dialog.createdAt) : new Date());
-    const renderMessages = dialogToRenderMessages(dialog.messages, enrichedMedia, {
+
+    const composed = await composeDialogChat({
+      project,
+      dialog,
+      mediaPaths: mediaAssets,
       now,
-      timeZone: clockCfg.timeZone,
-      locale: clockCfg.locale,
+      mediaMode: "embed",
+      interactive: false,
     });
-    const lastTime =
-      renderMessages[renderMessages.length - 1]?.time ?? formatStatusBarTime(now, clockCfg.timeZone);
 
     const dataDir = process.env.DATA_DIR ?? "./data";
     const publicDir = path.resolve(process.cwd(), "public/renders");
@@ -446,19 +364,7 @@ export class ChatRenderer {
     mkdirSync(path.resolve(dataDir, "renders"), { recursive: true });
 
     const htmlPath = path.join(path.resolve(dataDir, "renders"), `${reviewId}.html`);
-    const html = buildChatHtml({
-      project,
-      clientName: dialog.clientName,
-      messages: renderMessages,
-      wallpaperUrl,
-      frostWallpaperUrl,
-      wallpaperCutoutUrl,
-      wallpaperCutoutColor,
-      clientAvatarUrl: avatar.dataUri,
-      statusBarTime: lastTime,
-      clockTimeZone: clockCfg.timeZone,
-    });
-    writeFileSync(htmlPath, html, "utf-8");
+    writeFileSync(htmlPath, composed.html, "utf-8");
 
     const slideTimes = (params.slideTimes ?? []).map((t) => {
       if (!t) return null;
@@ -480,7 +386,7 @@ export class ChatRenderer {
       mode: "scroll",
     });
 
-    return { screenshots, clientAvatarPath: avatar.filePath };
+    return { screenshots, clientAvatarPath: composed.clientAvatarPath };
   }
 }
 

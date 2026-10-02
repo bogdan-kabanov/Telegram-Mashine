@@ -6,7 +6,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { pickNextInRotation, sortPathsStable } from "@/lib/media-rotation";
 import { getDb } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
-import { overlayReceiptTemplate } from "@/lib/media/overlay-receipt";
+import { overlayReceiptTemplate, refineSlipWithOverlay } from "@/lib/media/overlay-receipt";
 import {
   assertNotReceiptTemplatePath,
   writeSlipSourceMeta,
@@ -489,11 +489,22 @@ export class MediaHandler {
       });
     };
 
-    // AI only when enabled — OCR overlay disabled (it paints gray plaques / wrong fee lines).
+    // AI first → OCR-refine (incl. names) → OCR overlay fallback → template/HTML last.
     if (mode !== "off") {
       const ai = await tryAi();
       if (ai) {
         remember(ai.template, "manager");
+        await refineSlipWithOverlay({
+          imagePath: outputPath,
+          amount: params.amount,
+          currency: params.currency,
+          senderName: params.senderName,
+          recipientName: params.recipientName,
+          accountLastDigits: params.accountLastDigits,
+          date: params.date,
+          time,
+          role: "manager",
+        });
         await logger.info("Receipt rewritten by AI image edit (from pristine template)", {
           id,
           template: ai.template,
@@ -502,16 +513,18 @@ export class MediaHandler {
         });
         return { id, path: outputPath, source: "ai" };
       }
-      await logger.warn("AI receipt edit failed — skipping OCR overlay", {
+      await logger.warn("AI receipt edit failed — trying OCR overlay", {
         id,
         mode,
         projectId: params.project?.id,
       });
-    } else {
+    }
+
+    {
       const overlay = await tryOverlay();
       if (overlay) {
         remember(overlay.template, "manager");
-        await logger.info("Receipt stamped on pristine screenshot (AI off)", {
+        await logger.info("Receipt stamped on pristine screenshot", {
           id,
           template: overlay.template,
           fields: overlay.fields,
@@ -633,11 +646,22 @@ export class MediaHandler {
       });
     };
 
-    // AI only when enabled — OCR overlay disabled (wrong fee lines + gray plaques).
+    // AI first → OCR-refine → OCR overlay fallback → template/HTML last.
     if (mode !== "off") {
       const ai = await tryAi();
       if (ai) {
         remember(ai.template);
+        await refineSlipWithOverlay({
+          imagePath: outputPath,
+          amount: params.amount,
+          currency: params.currency,
+          senderName: params.senderName,
+          recipientName: params.recipientLabel,
+          accountLastDigits: digits,
+          date: params.date,
+          time,
+          role: "client",
+        });
         await logger.info("Captura rewritten by AI image edit (from pristine template)", {
           id,
           template: ai.template,
@@ -646,16 +670,18 @@ export class MediaHandler {
         });
         return { id, path: outputPath, source: "ai" };
       }
-      await logger.warn("AI captura edit failed — skipping OCR overlay", {
+      await logger.warn("AI captura edit failed — trying OCR overlay", {
         id,
         mode,
         projectId: params.project?.id,
       });
-    } else {
+    }
+
+    {
       const overlay = await tryOverlay();
       if (overlay) {
         remember(overlay.template);
-        await logger.info("Captura stamped on pristine screenshot (AI off)", {
+        await logger.info("Captura stamped on pristine screenshot", {
           id,
           template: overlay.template,
           fields: overlay.fields,

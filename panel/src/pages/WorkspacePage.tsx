@@ -3,10 +3,16 @@ import { api, mediaFileUrl } from "../api/client";
 import { DataTable } from "../components/DataTable";
 import { FolderPicker } from "../components/FolderPicker";
 import { Lightbox } from "../components/Lightbox";
+import { LiveChatPreview } from "../components/LiveChatPreview";
 import { ProjectEditor, type ProjectDraft } from "../components/ProjectEditor";
 import { RowPopup } from "../components/RowPopup";
+import {
+  TrialReviewPopup,
+  type MediaFoldersSelection,
+} from "../components/TrialReviewPopup";
+import { PanelTour, shouldAutoStartTour } from "../components/PanelTour";
 
-type Tab =
+export type Tab =
   | "projects"
   | "reviews"
   | "media"
@@ -81,6 +87,7 @@ export function WorkspacePage() {
     | { kind: "project"; id: string }
     | { kind: "review"; id: string }
     | { kind: "legend"; id: string }
+    | { kind: "trial"; projectId: string }
     | null
   >(null);
 
@@ -109,6 +116,7 @@ export function WorkspacePage() {
   const [proxyUrl, setProxyUrl] = useState("");
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
 
   const loadProjects = useCallback(async () => {
     const [st, amounts] = await Promise.all([
@@ -177,6 +185,14 @@ export function WorkspacePage() {
       }
     })();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (shouldAutoStartTour()) {
+      const t = window.setTimeout(() => setTourOpen(true), 600);
+      return () => window.clearTimeout(t);
+    }
+    return undefined;
+  }, []);
 
   useEffect(() => {
     if (tab === "reviews") void loadReviews().catch((e) => setError(String(e.message ?? e)));
@@ -253,13 +269,31 @@ export function WorkspacePage() {
 
   async function trialGenerate(
     projectId: string,
-    opts: { profitFinal?: number; amountPackId?: string } = {},
+    opts: {
+      profitFinal?: number;
+      amountPackId?: string;
+      mediaFolders?: MediaFoldersSelection;
+    } = {},
   ) {
     setBusy(true);
     setError(null);
     setMsg(null);
     setBusyLabel("Запуск генерации…");
     try {
+      // Persist folder picks on the project so next trial / scheduler reuse them.
+      if (
+        opts.mediaFolders &&
+        (opts.mediaFolders.bets?.length ||
+          opts.mediaFolders.receipts?.length ||
+          opts.mediaFolders.conditions?.length)
+      ) {
+        await api(`/api/admin/projects/${projectId}`, {
+          method: "PATCH",
+          json: { mediaFolders: opts.mediaFolders },
+        });
+        await loadProjects();
+      }
+
       const res = await fetch("/api/pipeline/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -269,6 +303,7 @@ export function WorkspacePage() {
           stream: true,
           ...(opts.profitFinal && opts.profitFinal > 0 ? { profitFinal: opts.profitFinal } : {}),
           ...(opts.amountPackId ? { amountPackId: opts.amountPackId } : {}),
+          ...(opts.mediaFolders ? { mediaFolders: opts.mediaFolders } : {}),
         }),
       });
       if (!res.ok) {
@@ -490,18 +525,34 @@ export function WorkspacePage() {
 
   return (
     <>
-      <h1>Рабочий стол</h1>
-      <p className="sub">Таблицы проектов, отзывов, медиа, расписания и настроек. Клик по строке — попап.</p>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div>
+          <h1 style={{ marginBottom: 4 }}>Рабочий стол</h1>
+          <p className="sub" style={{ marginTop: 0 }}>
+            Таблицы проектов, отзывов, медиа, расписания и настроек. Клик по строке — попап.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn"
+          data-tour="tour-button"
+          onClick={() => setTourOpen(true)}
+          title="Подробное обучение по панели"
+        >
+          Обучение
+        </button>
+      </div>
       {error ? <div className="err">{error}</div> : null}
       {msg ? <div className="okbox">{msg}</div> : null}
       {busy && busyLabel ? <div className="busybox">{busyLabel}</div> : null}
 
-      <div className="tabs">
+      <div className="tabs" data-tour="tabs">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             className={`tab${tab === t.id ? " active" : ""}`}
+            data-tour={`tab-${t.id}`}
             onClick={() => setTab(t.id)}
           >
             {t.label}
@@ -510,24 +561,26 @@ export function WorkspacePage() {
       </div>
 
       {tab === "projects" ? (
-        <DataTable
-          columns={[
-            { key: "name", label: "Проект" },
-            { key: "id", label: "ID" },
-            { key: "locale", label: "Локаль" },
-            { key: "manager", label: "Менеджер" },
-            { key: "profit", label: "Заработок (итог)" },
-            { key: "packs", label: "Паки" },
-            { key: "twoPhase", label: "2 фазы" },
-          ]}
-          rows={projectRows}
-          onRowClick={(id) => void openProject(id)}
-        />
+        <div data-tour="projects-table">
+          <DataTable
+            columns={[
+              { key: "name", label: "Проект" },
+              { key: "id", label: "ID" },
+              { key: "locale", label: "Локаль" },
+              { key: "manager", label: "Менеджер" },
+              { key: "profit", label: "Заработок (итог)" },
+              { key: "packs", label: "Паки" },
+              { key: "twoPhase", label: "2 фазы" },
+            ]}
+            rows={projectRows}
+            onRowClick={(id) => void openProject(id)}
+          />
+        </div>
       ) : null}
 
       {tab === "reviews" ? (
         <div>
-          <div className="row" style={{ marginBottom: 12 }}>
+          <div className="row" style={{ marginBottom: 12 }} data-tour="reviews-toolbar">
             <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -541,32 +594,34 @@ export function WorkspacePage() {
             <button
               type="button"
               className="btn primary"
+              data-tour="trial-button"
               disabled={busy || !projectFilter}
-              onClick={() => void trialGenerate(projectFilter)}
+              onClick={() => setPopup({ kind: "trial", projectId: projectFilter })}
             >
               Пробный отзыв
             </button>
           </div>
-          <DataTable
-            columns={[
-              { key: "client", label: "Клиент" },
-              { key: "phase", label: "Фаза" },
-              { key: "created", label: "Создан" },
-              { key: "shots", label: "Скрины" },
-            ]}
-            rows={reviewRows}
-            onRowClick={(id) => void openReview(id)}
-            empty="Нет отзывов для проекта"
-          />
+          <div data-tour="reviews-table">
+            <DataTable
+              columns={[
+                { key: "client", label: "Клиент" },
+                { key: "phase", label: "Фаза" },
+                { key: "created", label: "Создан" },
+                { key: "shots", label: "Скрины" },
+              ]}
+              rows={reviewRows}
+              onRowClick={(id) => void openReview(id)}
+              empty="Нет отзывов для проекта"
+            />
+          </div>
         </div>
       ) : null}
 
       {tab === "media" ? (
-        <div className="section">
+        <div className="section" data-tour="media-section">
           <p className="muted">
-            Общее хранилище <code>_shared</code>: папки вида <code>bets/okx</code>,{" "}
-            <code>receipts/…</code>. Потом в проекте (вкладка Медиа в попапе) отметь, какие папки
-            ставок ему брать.
+            Загрузка файлов в общее хранилище <code>_shared</code> (ставки, чеки, условия и т.п.).
+            При создании отзыва выберешь, какие папки брать.
           </p>
           <div className="row" style={{ marginBottom: 12 }}>
             <button type="button" className="btn" disabled={busy} onClick={() => void importLibrary()}>
@@ -741,31 +796,52 @@ export function WorkspacePage() {
       {tab === "bets" ? (
         <div className="card">
           <p className="muted">
-            Общие папки ставок (<code>_shared/bets/okx</code> и т.п.). Назначение проекту — в
-            попапе проекта → Медиа. Cooldown — Расписание.
+            Общие папки ставок (<code>_shared/bets/okx</code> и т.п.). Выбор папок — при создании
+            отзыва. Cooldown — Расписание.
           </p>
           <FolderPicker value={null} onChange={() => undefined} allowShared manage />
         </div>
       ) : null}
 
+      {popup?.kind === "trial" ? (
+        <TrialReviewPopup
+          projects={projects}
+          initialProjectId={popup.projectId}
+          initialFolders={
+            projects.find((p) => p.id === popup.projectId)?.mediaFolders ?? null
+          }
+          busy={busy}
+          onClose={() => setPopup(null)}
+          onConfirm={(opts) => void trialGenerate(opts.projectId, opts)}
+        />
+      ) : null}
+
       {popup?.kind === "project" && projectDraft ? (
         <RowPopup
           title={projectDraft.name}
-          subtitle={`${projectDraft.id} · клик по вкладкам: медиа, тексты, суммы`}
+          subtitle={`${projectDraft.id} · слева настройки, справа превью без полной генерации`}
           onClose={() => setPopup(null)}
+          wide
         >
           <ProjectEditor
             draft={projectDraft}
             onChange={setProjectDraft}
             busy={busy}
             onSave={() => void saveProject()}
-            onTrial={(opts) => void trialGenerate(projectDraft.id, opts)}
+            onTrial={() => setPopup({ kind: "trial", projectId: projectDraft.id })}
           />
         </RowPopup>
       ) : null}
 
       {popup?.kind === "review" && review ? (
-        <RowPopup title={`Отзыв ${review.clientName}`} subtitle={review.id} onClose={() => setPopup(null)}>
+        <RowPopup
+          title={`Отзыв ${review.clientName}`}
+          subtitle={review.id}
+          onClose={() => setPopup(null)}
+          wide
+        >
+          <div className="review-layout">
+            <div className="review-layout-main">
           <div className="toolbar">
             <label className="check-label">
               <input type="checkbox" checked={useAi} onChange={(e) => setUseAi(e.target.checked)} />
@@ -935,6 +1011,11 @@ export function WorkspacePage() {
               </button>
             </div>
           </div>
+            </div>
+            <aside className="review-layout-preview" aria-label="Превью чата">
+              <LiveChatPreview projectId={review.projectId} reviewId={review.id} compact />
+            </aside>
+          </div>
         </RowPopup>
       ) : null}
 
@@ -960,9 +1041,25 @@ export function WorkspacePage() {
               2,
             )}
           </pre>
-          <p className="muted">Полный CRUD легенд — через JSON выше / старый admin при необходимости.</p>
+          <p className="muted">Полный CRUD легенд — через JSON выше или вкладку «Истории».</p>
         </RowPopup>
       ) : null}
+
+      <PanelTour
+        active={tourOpen}
+        tab={tab}
+        onTab={setTab}
+        onOpenTrial={() => {
+          const pid = projectFilter || projects[0]?.id;
+          if (!pid) return;
+          setPopup({ kind: "trial", projectId: pid });
+        }}
+        onClosePopups={() => setPopup(null)}
+        onFinish={() => {
+          setTourOpen(false);
+          setPopup(null);
+        }}
+      />
     </>
   );
 }

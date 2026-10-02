@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { FolderPicker } from "./FolderPicker";
+import { LiveChatPreview } from "./LiveChatPreview";
 
 export type ProjectDraft = {
   id: string;
@@ -59,19 +60,22 @@ export function ProjectEditor({
   onChange: (next: ProjectDraft) => void;
   busy: boolean;
   onSave: () => void;
-  onTrial: (opts: { profitFinal?: number; amountPackId?: string }) => void;
+  onTrial: () => void;
 }) {
   const [section, setSection] = useState<"main" | "media" | "texts" | "amounts" | "theme">(
     "main",
   );
   const [packs, setPacks] = useState<AmountPackRow[]>([]);
   const [locales, setLocales] = useState<LocaleRow[]>([]);
-  const [betFolders, setBetFolders] = useState<string[]>([]);
+  const [sharedFolders, setSharedFolders] = useState<{
+    bets: string[];
+    receipts: string[];
+    conditions: string[];
+  }>({ bets: [], receipts: [], conditions: [] });
   const [packError, setPackError] = useState<string | null>(null);
   const [packBusy, setPackBusy] = useState(false);
   const [editPack, setEditPack] = useState<AmountPackRow | null>(null);
   const [trialProfit, setTrialProfit] = useState("");
-  const [trialPackId, setTrialPackId] = useState("");
 
   const loadPacks = async () => {
     const data = await api<{ packs: AmountPackRow[] }>(
@@ -89,12 +93,25 @@ export function ProjectEditor({
       "/api/admin/media/folders?shared=1",
     )
       .then((d) => {
-        const bets = (d.folders ?? [])
-          .filter((f) => f.scope === "_shared" && (f.kind === "bets" || f.name.startsWith("bets/")))
-          .map((f) => f.name);
-        setBetFolders(bets);
+        const next = { bets: [] as string[], receipts: [] as string[], conditions: [] as string[] };
+        for (const f of d.folders ?? []) {
+          if (f.scope !== "_shared") continue;
+          const kind =
+            f.kind ??
+            (f.name.startsWith("bets/")
+              ? "bets"
+              : f.name.startsWith("receipts/")
+                ? "receipts"
+                : f.name.startsWith("conditions/")
+                  ? "conditions"
+                  : "");
+          if (kind === "bets" || kind === "receipts" || kind === "conditions") {
+            next[kind].push(f.name);
+          }
+        }
+        setSharedFolders(next);
       })
-      .catch(() => setBetFolders([]));
+      .catch(() => setSharedFolders({ bets: [], receipts: [], conditions: [] }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.id]);
 
@@ -202,8 +219,36 @@ export function ProjectEditor({
 
   const caps = draft.betCaptionTemplates ?? ["", "", ""];
 
+  const previewOverrides = useMemo(
+    () => ({
+      managerName: draft.managerName,
+      managerHandle: draft.managerHandle,
+      incomingBubble: draft.theme?.incomingBubble,
+      outgoingBubble: draft.theme?.outgoingBubble,
+      accentColor: draft.theme?.accentColor,
+      depositMessageTemplate: draft.depositMessageTemplate,
+      completionMessageTemplate: draft.completionMessageTemplate,
+      payoutMessageTemplate: draft.payoutMessageTemplate,
+      wallpaperPath: draft.wallpaperPath ?? null,
+      clientAvatarPath: draft.clientAvatarPath ?? null,
+    }),
+    [
+      draft.managerName,
+      draft.managerHandle,
+      draft.theme?.incomingBubble,
+      draft.theme?.outgoingBubble,
+      draft.theme?.accentColor,
+      draft.depositMessageTemplate,
+      draft.completionMessageTemplate,
+      draft.payoutMessageTemplate,
+      draft.wallpaperPath,
+      draft.clientAvatarPath,
+    ],
+  );
+
   return (
-    <div className="project-editor">
+    <div className="project-editor-layout">
+      <div className="project-editor">
       <div className="tabs" style={{ marginBottom: 12 }}>
         {(
           [
@@ -294,52 +339,52 @@ export function ProjectEditor({
       {section === "media" ? (
         <>
           <div className="card" style={{ marginBottom: 14, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Папки ставок (общее хранилище)</h3>
+            <h3 style={{ marginTop: 0 }}>Папки медиа (по умолчанию)</h3>
             <p className="muted" style={{ marginTop: 0 }}>
-              Медиа лежит в <code>_shared/bets/…</code> (например <code>bets/okx</code>). Отметь,
-              какие папки использует этот проект. Создать/залить фото — вкладка Медиа.
+              Эти папки подставятся в попапе при создании отзыва. Загрузить фото — вкладка Медиа.
             </p>
-            {betFolders.length === 0 ? (
-              <p className="muted">
-                Пока нет папок bets/* — в Медиа создай <code>bets/okx</code> или нажми «Импорт
-                старых каст».
-              </p>
-            ) : (
-              <div style={{ display: "grid", gap: 6 }}>
-                {betFolders.map((name) => {
-                  const selected = draft.mediaFolders?.bets?.includes(name) ?? false;
-                  return (
-                    <label key={name} className="row" style={{ gap: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={(e) => {
-                          const cur = new Set(draft.mediaFolders?.bets ?? []);
-                          if (e.target.checked) cur.add(name);
-                          else cur.delete(name);
-                          setField("mediaFolders", {
-                            ...draft.mediaFolders,
-                            bets: [...cur],
-                          });
-                        }}
-                      />
-                      <span>
-                        <code>{name}</code>
-                      </span>
-                    </label>
-                  );
-                })}
+            {(
+              [
+                ["bets", "Ставки", sharedFolders.bets],
+                ["receipts", "Чеки", sharedFolders.receipts],
+                ["conditions", "Условия", sharedFolders.conditions],
+              ] as const
+            ).map(([key, title, names]) => (
+              <div key={key} style={{ marginBottom: 12 }}>
+                <strong>{title}</strong>
+                {names.length === 0 ? (
+                  <p className="muted" style={{ margin: "4px 0 0" }}>
+                    Нет папок <code>_shared/{key}/…</code>
+                  </p>
+                ) : (
+                  <div style={{ display: "grid", gap: 6, marginTop: 6 }}>
+                    {names.map((name) => {
+                      const selected = draft.mediaFolders?.[key]?.includes(name) ?? false;
+                      return (
+                        <label key={name} className="row" style={{ gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(e) => {
+                              const cur = new Set(draft.mediaFolders?.[key] ?? []);
+                              if (e.target.checked) cur.add(name);
+                              else cur.delete(name);
+                              setField("mediaFolders", {
+                                ...draft.mediaFolders,
+                                [key]: [...cur],
+                              });
+                            }}
+                          />
+                          <span>
+                            <code>{name}</code>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-            {(draft.mediaFolders?.bets?.length ?? 0) > 0 ? (
-              <p className="muted" style={{ marginBottom: 0 }}>
-                Выбрано: {(draft.mediaFolders?.bets ?? []).join(", ")}
-              </p>
-            ) : (
-              <p className="muted" style={{ marginBottom: 0 }}>
-                Не выбрано — будет старый путь library/{"{"}project{"}"}/bets (если есть).
-              </p>
-            )}
+            ))}
           </div>
 
           <div className="field">
@@ -588,29 +633,9 @@ export function ProjectEditor({
 
           <hr style={{ margin: "16px 0", border: 0, borderTop: "1px solid var(--line)" }} />
           <h3>Пробный отзыв</h3>
-          <div className="field">
-            <label>Пак (или случайный по циклу)</label>
-            <select value={trialPackId} onChange={(e) => setTrialPackId(e.target.value)}>
-              <option value="">случайный / по циклу</option>
-              {packs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.id} → {p.profitFinal} {p.currency}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            type="button"
-            className="btn"
-            disabled={busy}
-            onClick={() =>
-              onTrial({
-                ...(trialPackId ? { amountPackId: trialPackId } : {}),
-                ...(trialProfit && !trialPackId ? { profitFinal: Number(trialProfit) } : {}),
-              })
-            }
-          >
-            Пробный отзыв
+          <p className="muted">Откроется попап: папки ставок / чеков / условий и пак сумм.</p>
+          <button type="button" className="btn" disabled={busy} onClick={() => onTrial()}>
+            Пробный отзыв…
           </button>
         </>
       ) : null}
@@ -650,11 +675,17 @@ export function ProjectEditor({
           type="button"
           className="btn"
           disabled={busy}
-          onClick={() => onTrial({})}
+          onClick={() => onTrial()}
+          title="Попап выбора медиа + полный пайплайн"
         >
           Пробный отзыв
         </button>
       </div>
+      </div>
+
+      <aside className="project-editor-preview" aria-label="Превью чата">
+        <LiveChatPreview projectId={draft.id} overrides={previewOverrides} compact />
+      </aside>
     </div>
   );
 }

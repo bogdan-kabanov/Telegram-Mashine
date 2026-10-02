@@ -400,7 +400,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         rerendered: wantRerender,
         screenshots,
         warning: usedOverlay && !usedAi
-          ? "Чеки собраны OCR-наклейкой (нет рабочего OpenAI images.edit). Для реалистичного текста нужен ключ gpt-image-1 в .env /admin/ai."
+          ? "Чеки собраны OCR-наклейкой (нет рабочего OpenAI images.edit). Для реалистичного текста нужен ключ gpt-image-1 в .env / панели → ИИ."
           : undefined,
         review: {
           ...current,

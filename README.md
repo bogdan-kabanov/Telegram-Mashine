@@ -20,10 +20,10 @@ npm install
 cp .env.example .env
 
 npm run seed:media   # placeholder PNG (ставки, условия, обои)
-# реальные кружки (MP4) — загрузить в /admin/media
+# реальные кружки (MP4) — загрузить в панели → Медиа
 
 npm run dev
-# http://localhost:PORT/admin
+# http://localhost:PORT/panel
 ```
 
 ## Docker (production)
@@ -66,12 +66,9 @@ curl -X POST http://localhost:3000/api/telegram/setup
 | `npm run seed:media` | Placeholder-медиа |
 | `npm run typecheck` | `tsc --noEmit` |
 
-## Админка
+## Панель
 
 | Раздел | Описание |
 |--------|----------|
-| `/admin` | Dashboard, управление, очередь, логи |
-| `/admin/projects` | 5 проектов, превью PNG чата |
-| `/admin/media` | Загрузка кружков, ставок, обоев |
-| `/admin/settings` | Загрузка JSON (скрипты, легенды, банки) |
-| `/admin/schedule` | Цикл 3 недели, 15 слотов/день |
+| `/panel` | Статус бота, запуск/стоп |
+| `/panel/app` | Рабочий стол: проекты, отзывы, медиа, расписание, истории, ИИ, ставки |

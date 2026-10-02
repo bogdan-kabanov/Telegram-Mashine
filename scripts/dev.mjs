@@ -9,7 +9,7 @@ const browsersPath = resolvePlaywrightBrowsersPath();
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
 
 console.log(`Starting dev server on port ${port}`);
-console.log(`Admin panel: http://localhost:${port}/admin`);
+console.log(`Panel: http://localhost:${port}/panel`);
 console.log(`Playwright browsers: ${browsersPath}`);
 
 const child = spawn(process.execPath, [nextBin, "dev", "-p", port], {

@@ -526,7 +526,14 @@ export async function refineSlipWithOverlay(params: {
         role: params.role,
       },
       width,
-    ).filter((b) => b.kind === "amount" || b.kind === "date" || b.kind === "time" || b.kind === "digits");
+    ).filter(
+      (b) =>
+        b.kind === "amount" ||
+        b.kind === "date" ||
+        b.kind === "time" ||
+        b.kind === "digits" ||
+        b.kind === "name",
+    );
 
     if (boxes.length === 0) return null;
 

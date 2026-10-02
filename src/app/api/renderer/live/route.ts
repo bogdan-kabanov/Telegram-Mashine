@@ -10,7 +10,7 @@ import type { GeneratedDialog } from "@/modules/dialog-generator";
 import type { DialogMediaAssets } from "@/modules/chat-renderer/messages";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type LiveBody = {
   projectId?: string;

@@ -11,14 +11,49 @@ import type { ReviewPackage } from "@/lib/schemas";
 import { resolveBetPackNumber } from "@/lib/schemas/amounts";
 import { pickUniqueWeeklyCircle } from "@/lib/weekly-circle";
 import type { CustomAmounts } from "@/lib/amounts/split-profit";
+import {
+  assertDialogAmountsConsistent,
+  reinjectTemplatedMessages,
+} from "@/lib/amounts/sync-dialog";
 import { pickNextBetPack, pickBetPackByNumber } from "@/lib/bet-cycle";
 import { stampProjectBetPack } from "@/lib/media/stamp-bets";
+import { existsSync, readdirSync, statSync } from "fs";
+import path from "path";
 import { getChatRenderer } from "@/modules/chat-renderer";
 import { getDialogGenerator } from "@/modules/dialog-generator";
 import { getMediaHandler } from "@/modules/media-handler";
 import { getPublisher } from "@/modules/publisher";
 
 const logger = createLogger("pipeline");
+
+const IMAGE_FILE_RE = /\.(png|jpe?g|webp|gif)$/i;
+
+/** First image from shared library folders (e.g. conditions/nancy). */
+function pickSharedLibraryImage(
+  folders: string[] | undefined,
+): { id: string; path: string; filename: string; type: "conditions"; projectId: string } | null {
+  if (!folders?.length) return null;
+  const dataDir = process.env.DATA_DIR ?? "./data";
+  for (const folder of folders) {
+    const safe = folder.replace(/\.\./g, "").replace(/^[/\\]+/, "").replace(/\\/g, "/");
+    if (!safe) continue;
+    const abs = path.resolve(dataDir, "media/library/_shared", safe);
+    if (!existsSync(abs) || !statSync(abs).isDirectory()) continue;
+    const files = readdirSync(abs)
+      .filter((f) => IMAGE_FILE_RE.test(f))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const filename = files[0];
+    if (!filename) continue;
+    return {
+      id: randomUUID(),
+      type: "conditions",
+      filename,
+      path: `data/media/library/_shared/${safe}/${filename}`.replace(/\\/g, "/"),
+      projectId: "",
+    };
+  }
+  return null;
+}
 
 export type PipelineProgressEvent = {
   step: number;
@@ -45,6 +80,15 @@ export interface GenerateReviewParams {
   amountPackId?: string;
   /** Operator-defined profit split — random bet pack + OCR stamp. */
   customAmounts?: CustomAmounts;
+  /**
+   * Per-run media pool override (trial popup). When set, bets are taken from
+   * these shared folders instead of project.mediaFolders defaults.
+   */
+  mediaFolders?: {
+    bets?: string[];
+    receipts?: string[];
+    conditions?: string[];
+  };
 }
 
 export interface GenerateReviewResult {
@@ -101,6 +145,9 @@ export class ReviewPipeline {
 
       const requestedBetPack = amountPack ? resolveBetPackNumber(amountPack) : null;
       const useCustomAmounts = params.customAmounts != null;
+      const betFolderOpts = params.mediaFolders?.bets?.length
+        ? { betFolders: params.mediaFolders.bets }
+        : {};
 
       let betPackPick =
         useCustomAmounts
@@ -108,17 +155,20 @@ export class ReviewPipeline {
               projectId: params.projectId,
               reviewId,
               reuseDays: config.schedule.betReuseDays,
+              ...betFolderOpts,
             })
           : requestedBetPack && requestedBetPack > 0
             ? await pickBetPackByNumber({
                 projectId: params.projectId,
                 packNumber: requestedBetPack,
                 reviewId,
+                ...betFolderOpts,
               })
             : await pickNextBetPack({
                 projectId: params.projectId,
                 reviewId,
                 reuseDays: config.schedule.betReuseDays,
+                ...betFolderOpts,
               });
 
       if (!betPackPick && requestedBetPack) {
@@ -126,6 +176,7 @@ export class ReviewPipeline {
           projectId: params.projectId,
           reviewId,
           reuseDays: config.schedule.betReuseDays,
+          ...betFolderOpts,
         });
       }
 
@@ -149,7 +200,7 @@ export class ReviewPipeline {
         await report(progress, 1, "dialog", "Генерация диалога", "OpenAI пишет переписку клиент ↔ менеджер…");
       }
 
-      const dialog = await getDialogGenerator().generate({
+      let dialog = await getDialogGenerator().generate({
         projectId: params.projectId,
         reviewType,
         ...(params.amountPackId
@@ -161,6 +212,16 @@ export class ReviewPipeline {
               : {}),
         ...(forcedLegendId ? { forcedLegendId } : {}),
       });
+
+      dialog = reinjectTemplatedMessages(dialog, project);
+      const amountCheck = assertDialogAmountsConsistent(dialog, project);
+      if (!amountCheck.ok) {
+        await logger.warn("Dialog amount mentions out of sync — reinjected templates", {
+          reviewId,
+          issues: amountCheck.issues.slice(0, 8),
+        });
+        dialog = reinjectTemplatedMessages(dialog, project);
+      }
 
       const depositBank = config.banks.depositBanks.find((b) => b.id === dialog.depositBankId);
       const payoutBank = config.banks.payoutBanks.find((b) => b.id === dialog.payoutBankId);
@@ -195,18 +256,23 @@ export class ReviewPipeline {
       if (!videoNote) {
         videoNote = await mediaHandler.pickVideoNote(params.projectId, legendIdForMedia);
       }
-      const [conditions, sticker] = await Promise.all([
-        mediaHandler.resolveProjectImage("conditions", {
-          projectId: params.projectId,
-          projectName: project.name,
-          locale: project.locale,
-          currency: project.currency,
-        }),
+      const [conditionsResolved, sticker] = await Promise.all([
+        (async () => {
+          const fromFolders = pickSharedLibraryImage(params.mediaFolders?.conditions);
+          if (fromFolders) return { ...fromFolders, projectId: params.projectId };
+          return mediaHandler.resolveProjectImage("conditions", {
+            projectId: params.projectId,
+            projectName: project.name,
+            locale: project.locale,
+            currency: project.currency,
+          });
+        })(),
         mediaHandler.resolveProjectImage("sticker", {
           projectId: params.projectId,
           projectName: project.name,
         }),
       ]);
+      const conditions = conditionsResolved;
 
       const sequentialBets = betPackPick?.assets ?? [];
       // Use one complete pack only — never fill slots from random other packs

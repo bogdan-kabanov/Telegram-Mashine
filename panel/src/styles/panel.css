@@ -410,6 +410,10 @@ table.data tr:last-child td {
   box-shadow: var(--shadow-lg);
 }
 
+.drawer.drawer-wide {
+  width: min(1180px, 100%);
+}
+
 .drawer-head {
   display: flex;
   align-items: flex-start;
@@ -712,4 +716,182 @@ table.data tr:last-child td {
 .input-sm {
   width: 120px;
   max-width: 100%;
+}
+
+/* ——— Live chat preview ——— */
+.project-editor-layout,
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .project-editor-layout,
+  .review-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.project-editor-preview,
+.review-layout-preview {
+  position: sticky;
+  top: 0;
+}
+
+.live-preview {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg3);
+  padding: 10px;
+}
+
+.live-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.live-preview-stage {
+  display: flex;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.live-preview-phone {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--line-strong);
+  background: #000;
+  box-shadow: var(--shadow);
+}
+
+.live-preview-iframe {
+  border: 0;
+  display: block;
+  background: #111;
+  pointer-events: auto;
+}
+
+.live-preview-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.live-preview-foot {
+  margin: 8px 0 0;
+  font-size: 11px;
+}
+
+.btn.sm {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ??? Guided tour / ???????? ??? */
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.tour-dim {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.tour-hole {
+  position: fixed;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.62);
+  outline: 2px solid #60a5fa;
+  outline-offset: 0;
+  pointer-events: none;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
+  z-index: 1;
+}
+
+.tour-dim:not(:has(.tour-hole)) {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.tour-card {
+  pointer-events: auto;
+  z-index: 2;
+  background: var(--bg2);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  padding: 16px 18px 14px;
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tour-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tour-step {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.tour-skip {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.tour-card h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.tour-body {
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.tour-body p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tour-body p:last-child {
+  margin-bottom: 0;
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
 }

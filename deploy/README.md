@@ -1,6 +1,6 @@
 # Deploy & CI/CD
 
-Production: `https://151-245-140-111.sslip.io/` (panel `/panel`, old admin `/admin`)  
+Production: `https://151-245-140-111.sslip.io/` (panel `/panel`)  
 Server: `151.245.140.111` (`fi-vmmini`) · path `/opt/bot-ai`  
 Repo: https://github.com/bogdan-kabanov/Telegram-Mashine  
 **Runtime: Node.js + systemd + Nginx** (no Docker in production)

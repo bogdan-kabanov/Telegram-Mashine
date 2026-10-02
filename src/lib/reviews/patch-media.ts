@@ -1,9 +1,11 @@
 import { betDepositForSlot, betProfitForSlot } from "@/lib/amounts/split-profit";
+import { applyAmountOverride, reinjectTemplatedMessages } from "@/lib/amounts/sync-dialog";
 import { loadAppConfig, getProjectById } from "@/lib/config/loader";
 import { buildMessageClock } from "@/lib/format";
 import { localeClockConfig } from "@/lib/i18n/locale-profile";
 import { resolveTemplateFilenameForRegen } from "@/lib/media/slip-source";
 import type { ReviewPackage } from "@/lib/schemas";
+import type { GeneratedDialog } from "@/modules/dialog-generator";
 import { getMediaHandler } from "@/modules/media-handler";
 
 export const PATCHABLE_MEDIA_SLOTS = [
@@ -87,6 +89,7 @@ export async function regenerateReviewMediaSlot(params: {
     const payoutBank = config.banks.payoutBanks.find((b) => b.id === dialog!.payoutBankId);
     const mediaHandler = getMediaHandler();
     const overrideAmount = params.amount;
+    const asDialog = (): GeneratedDialog => dialog as GeneratedDialog;
 
     if (slot === "captura") {
       const stamp = clock.stampForType(dialog.messages, "captura") ?? clock.stampAtDelay(40);
@@ -111,7 +114,11 @@ export async function regenerateReviewMediaSlot(params: {
       });
       nextPath = captura.path;
       slipSource = captura.source;
-      if (overrideAmount) dialog = { ...dialog, deposit: overrideAmount };
+      if (overrideAmount) {
+        dialog = applyAmountOverride(asDialog(), project, "captura", overrideAmount);
+      } else {
+        dialog = reinjectTemplatedMessages(asDialog(), project);
+      }
     } else {
       const stamp =
         clock.stampForType(dialog.messages, "receipt") ?? clock.stampAt(dialog.messages.length - 1);
@@ -135,7 +142,11 @@ export async function regenerateReviewMediaSlot(params: {
       });
       nextPath = receipt.path;
       slipSource = receipt.source;
-      if (overrideAmount) dialog = { ...dialog, payoutAmount: overrideAmount };
+      if (overrideAmount) {
+        dialog = applyAmountOverride(asDialog(), project, "receipt", overrideAmount);
+      } else {
+        dialog = reinjectTemplatedMessages(asDialog(), project);
+      }
     }
     return { path: nextPath, source: slipSource, dialog };
   }
@@ -145,6 +156,8 @@ export async function regenerateReviewMediaSlot(params: {
     const { stampExistingBet, stampProjectBetSlot } = await import("@/lib/media/stamp-bets");
     const slotNum = slot === "bet2" ? 2 : slot === "bet3" ? 3 : 1;
     const overrideAmount = params.amount;
+    const betSlot = slot === "bet2" ? "bet2" : slot === "bet3" ? "bet3" : "bet1";
+    const asDialog = (): GeneratedDialog => dialog as GeneratedDialog;
     const profit =
       overrideAmount ??
       betProfitForSlot(
@@ -156,11 +169,14 @@ export async function regenerateReviewMediaSlot(params: {
         },
         slotNum,
       );
+    const workingDialog = overrideAmount
+      ? applyAmountOverride(asDialog(), project, betSlot, overrideAmount)
+      : asDialog();
     const slotDeposit = betDepositForSlot(
       {
-        deposit: dialog.deposit,
-        profit1: dialog.profit1,
-        profit2: dialog.profit2,
+        deposit: workingDialog.deposit,
+        profit1: workingDialog.profit1,
+        profit2: workingDialog.profit2,
       },
       slotNum,
     );
@@ -172,7 +188,7 @@ export async function regenerateReviewMediaSlot(params: {
         deposit: slotDeposit,
         profit,
         currency: project.currency,
-        name: dialog.clientName,
+        name: workingDialog.clientName,
       });
       nextPath = stamped.path;
     } else {
@@ -182,15 +198,13 @@ export async function regenerateReviewMediaSlot(params: {
         deposit: slotDeposit,
         profit,
         currency: project.currency,
-        name: dialog.clientName,
+        name: workingDialog.clientName,
       });
       nextPath = stamped.path;
     }
-    if (overrideAmount) {
-      if (slot === "bet1") dialog = { ...dialog, profit1: overrideAmount };
-      else if (slot === "bet2") dialog = { ...dialog, profit2: overrideAmount };
-      else dialog = { ...dialog, profit3: overrideAmount };
-    }
+    dialog = overrideAmount
+      ? workingDialog
+      : reinjectTemplatedMessages(workingDialog, project);
     return { path: nextPath, source: "overlay", dialog };
   }
 

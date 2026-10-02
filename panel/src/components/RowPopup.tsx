@@ -5,15 +5,18 @@ export function RowPopup({
   subtitle,
   onClose,
   children,
+  wide,
 }: {
   title: string;
   subtitle?: string;
   onClose: () => void;
   children: ReactNode;
+  /** Wider drawer for editor + live preview side by side */
+  wide?: boolean;
 }) {
   return (
     <div className="overlay" onClick={onClose}>
-      <aside className="drawer" onClick={(e) => e.stopPropagation()}>
+      <aside className={`drawer${wide ? " drawer-wide" : ""}`} onClick={(e) => e.stopPropagation()}>
         <header className="drawer-head">
           <div>
             <h2>{title}</h2>

@@ -48,6 +48,11 @@ export async function POST(request: NextRequest) {
       customAmounts?: CustomAmounts;
       profitFinal?: number;
       deposit?: number;
+      mediaFolders?: {
+        bets?: string[];
+        receipts?: string[];
+        conditions?: string[];
+      };
     };
 
     if (!body.projectId) {
@@ -82,6 +87,22 @@ export async function POST(request: NextRequest) {
         : body.amountPackId?.trim()
           ? { amountPackId: body.amountPackId.trim() }
           : {}),
+      ...(body.mediaFolders &&
+      (body.mediaFolders.bets?.length ||
+        body.mediaFolders.receipts?.length ||
+        body.mediaFolders.conditions?.length)
+        ? {
+            mediaFolders: {
+              ...(body.mediaFolders.bets?.length ? { bets: body.mediaFolders.bets } : {}),
+              ...(body.mediaFolders.receipts?.length
+                ? { receipts: body.mediaFolders.receipts }
+                : {}),
+              ...(body.mediaFolders.conditions?.length
+                ? { conditions: body.mediaFolders.conditions }
+                : {}),
+            },
+          }
+        : {}),
     };
 
     if (body.stream) {

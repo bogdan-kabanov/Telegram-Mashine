@@ -11,9 +11,6 @@ export function App() {
           Статус
         </NavLink>
         <NavLink to="/app">Рабочий стол</NavLink>
-        <a href="/admin" style={{ marginTop: "auto", fontSize: 12 }}>
-          Старый admin →
-        </a>
       </nav>
       <main className="main">
         <Routes>

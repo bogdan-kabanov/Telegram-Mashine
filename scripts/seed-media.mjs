@@ -1,6 +1,6 @@
 /**
  * Ensures media directories exist. Does NOT create colored placeholder bets/conditions —
- * upload real assets via /admin/media.
+ * upload real assets via the panel media folders.
  *
  * Usage: npm run seed:media
  */
@@ -39,5 +39,5 @@ for (const rel of dirs) {
 }
 
 console.log(
-  `Seed done. New dirs: ${created}. Upload bets/conditions/circles via /admin/media. Wallpapers & receipt templates live under data/media/.`,
+  `Seed done. New dirs: ${created}. Upload bets/conditions/circles via panel → Медиа. Wallpapers & receipt templates live under data/media/.`,
 );

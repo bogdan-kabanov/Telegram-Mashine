@@ -32,6 +32,16 @@ const nextConfig: NextConfig = {
         destination: "/icons/telegram-input-sticker.svg",
         permanent: false,
       },
+      {
+        source: "/admin",
+        destination: "/panel",
+        permanent: false,
+      },
+      {
+        source: "/admin/:path*",
+        destination: "/panel/app",
+        permanent: false,
+      },
     ];
   },
   async rewrites() {
